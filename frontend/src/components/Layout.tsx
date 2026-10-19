@@ -23,11 +23,13 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { path: '/', labelKey: 'nav.overview', defaultLabel: 'Overview', icon: 'dashboard' },
   { path: '/risk-map', labelKey: 'nav.riskMap', defaultLabel: 'Risk Map', icon: 'radar' },
-  { path: '/eight-impacts', labelKey: 'nav.eightImpacts', defaultLabel: 'Eight Impacts', icon: 'grid_view' },
-  { path: '/insight-agent', labelKey: 'nav.insightAgent', defaultLabel: 'Insight Agent', icon: 'auto_awesome' },
-  { path: '/data-quality', labelKey: 'nav.dataQuality', defaultLabel: 'Data Quality', icon: 'verified_user' },
-  { path: '/pipeline-freshness', labelKey: 'nav.pipelineFreshness', defaultLabel: 'Pipeline & Freshness', icon: 'history_toggle_off' },
-  { path: '/about-limits', labelKey: 'nav.aboutLimits', defaultLabel: 'About & Limits', icon: 'info' },
+  { path: '/forecast', labelKey: 'nav.forecast', defaultLabel: 'Heat & Rain Forecast', icon: 'cyclone' },
+  { path: '/eight-impacts', labelKey: 'nav.eightImpacts', defaultLabel: 'Eight-Impact Analysis', icon: 'grid_view' },
+  { path: '/data-quality', labelKey: 'nav.dataQuality', defaultLabel: 'Data Quality Center', icon: 'verified_user' },
+  { path: '/ai-assistant', labelKey: 'nav.aiAssistant', defaultLabel: 'AI Climate Assistant', icon: 'auto_awesome' },
+  { path: '/emergency-planner', labelKey: 'nav.emergencyPlanner', defaultLabel: 'Emergency Action Planner', icon: 'emergency' },
+  { path: '/system-health', labelKey: 'nav.systemHealth', defaultLabel: 'Automation & System Health', icon: 'health_and_safety' },
+  { path: '/methodology', labelKey: 'nav.methodology', defaultLabel: 'Data Sources & Methodology', icon: 'library_books' },
 ];
 
 export const Layout: React.FC<LayoutProps> = ({ meta, isLoadingMeta = false }) => {
@@ -266,7 +268,7 @@ export const Layout: React.FC<LayoutProps> = ({ meta, isLoadingMeta = false }) =
             </NavLink>
           ))}
           <NavLink
-            to="/about-limits"
+            to="/methodology"
             className={({ isActive }) =>
               `flex flex-col items-center justify-center flex-1 h-full min-h-[44px] transition-colors text-[10px] ${
                 isActive

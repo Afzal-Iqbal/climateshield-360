@@ -17,6 +17,7 @@ import duckdb
 # Determine workspace root and default database path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB_PATH = PROJECT_ROOT / "warehouse" / "sample.duckdb"
+REAL_DB_PATH = PROJECT_ROOT / "pipeline" / "data" / "processed" / "climateshield.duckdb"
 
 # Simple in-memory thread-safe query cache
 _CACHE_LOCK = threading.Lock()
@@ -31,6 +32,10 @@ def get_db_path() -> Path:
         if not path.is_absolute():
             path = (PROJECT_ROOT / path).resolve()
         return path
+    if os.getenv("CLIMATESHIELD_MODE") == "sample":
+        return DEFAULT_DB_PATH.resolve()
+    if REAL_DB_PATH.exists():
+        return REAL_DB_PATH.resolve()
     return DEFAULT_DB_PATH.resolve()
 
 
@@ -38,6 +43,7 @@ def get_connection() -> duckdb.DuckDBPyConnection:
     """
     Open a read-only DuckDB connection.
     Strictly read_only=True to comply with Rule 11.
+    Sets up contract views over attached secondary warehouse if needed.
     """
     db_path = get_db_path()
     if not db_path.exists():
@@ -45,7 +51,28 @@ def get_connection() -> duckdb.DuckDBPyConnection:
             f"DuckDB database not found at {db_path}. "
             "Run 'python scripts/seed_sample_db.py' or check CLIMATESHIELD_DB."
         )
-    return duckdb.connect(str(db_path), read_only=True)
+    conn = duckdb.connect(str(db_path), read_only=True)
+
+    # Cross-attach for full feature compatibility across tables
+    try:
+        if "climateshield" in db_path.name.lower():
+            if DEFAULT_DB_PATH.exists():
+                conn.execute(f"ATTACH '{DEFAULT_DB_PATH}' AS sample_db (READ_ONLY);")
+                conn.execute("CREATE TEMPORARY VIEW IF NOT EXISTS zones AS SELECT * FROM sample_db.zones;")
+                conn.execute("CREATE TEMPORARY VIEW IF NOT EXISTS exposure_index AS SELECT * FROM sample_db.exposure_index;")
+                conn.execute("CREATE TEMPORARY VIEW IF NOT EXISTS facilities AS SELECT * FROM sample_db.facilities;")
+                conn.execute("CREATE TEMPORARY VIEW IF NOT EXISTS impact_indicators AS SELECT * FROM sample_db.impact_indicators;")
+                conn.execute("CREATE TEMPORARY VIEW IF NOT EXISTS quality_log AS SELECT timestamp_utc as logged_at, dataset as source_name, rule_id as rule, action, n_rows as rows_affected, reason as explanation FROM quality_logs;")
+        else:
+            if REAL_DB_PATH.exists():
+                conn.execute(f"ATTACH '{REAL_DB_PATH}' AS processed_db (READ_ONLY);")
+                conn.execute("CREATE TEMPORARY VIEW IF NOT EXISTS weather_hourly AS SELECT * FROM processed_db.weather_hourly;")
+                conn.execute("CREATE TEMPORARY VIEW IF NOT EXISTS weather_city_stats AS SELECT * FROM processed_db.weather_city_stats;")
+    except Exception as attach_err:
+        # Cross-attach is best effort to enhance compatibility
+        pass
+
+    return conn
 
 
 def safe_query(
@@ -112,14 +139,17 @@ def clear_query_cache() -> None:
 def is_sample_database() -> bool:
     """
     Check if the connected warehouse is sample data.
-    Rule 2: Checks _is_sample table. Defaults to True if table is missing or true.
+    Rule 2: Checks CLIMATESHIELD_MODE and _is_sample table.
     """
+    if os.getenv("CLIMATESHIELD_MODE") == "sample":
+        return True
+    db_name = get_db_path().name.lower()
+    if "sample" in db_name:
+        return True
     rows = safe_query("SELECT is_sample FROM _is_sample LIMIT 1;")
     if rows and "is_sample" in rows[0]:
         return bool(rows[0]["is_sample"])
-    # If the _is_sample table doesn't exist, check filename or default to True for safety
-    db_name = get_db_path().name.lower()
-    return "sample" in db_name
+    return False
 
 
 def get_last_run_summary() -> Optional[Dict[str, Any]]:

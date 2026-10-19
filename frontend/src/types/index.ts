@@ -398,3 +398,115 @@ export interface ZoneDetailData {
   evidence: ZoneEvidenceDetail;
 }
 
+export interface ObservedWeatherPoint {
+  timestamp_utc: string;
+  timestamp_pkt: string;
+  value: number;
+  unit: string;
+  relative_humidity_pct?: number | null;
+  wind_speed_kmh?: number | null;
+  weather_condition?: string | null;
+}
+
+export interface PredictedPoint {
+  forecast_time_utc: string;
+  forecast_time_pkt: string;
+  probability: number;
+  interval_low: number;
+  interval_high: number;
+  median: number;
+  baseline_value: number;
+  unit: string;
+}
+
+export interface ThresholdLevel {
+  level: string;
+  value: number;
+  label: string;
+  color: string;
+}
+
+export interface ForecastThresholds {
+  unit: string;
+  primary_threshold: number;
+  primary_label: string;
+  levels: ThresholdLevel[];
+}
+
+export interface BaselineInfo {
+  name: string;
+  description: string;
+  value?: number | null;
+}
+
+export interface ForecastData {
+  hazard: 'heavy_rain' | 'heat';
+  city: string;
+  range: '24h' | '48h' | '7d';
+  observed: ObservedWeatherPoint[];
+  predicted?: PredictedPoint[] | null;
+  baseline: BaselineInfo;
+  declared_target: string;
+  thresholds: ForecastThresholds;
+  note?: string | null;
+  model_version?: string | null;
+  generated_at: string;
+}
+
+export interface ModelVsBaselineMetrics {
+  baseline_declared: string;
+  model_architecture: string;
+  model_mae: number;
+  baseline_mae: number;
+  mae_improvement_pct: number;
+  model_rmse: number;
+  baseline_rmse: number;
+  rmse_improvement_pct: number;
+  model_brier?: number | null;
+  baseline_brier?: number | null;
+  model_r2?: number | null;
+  meets_20pct_target: boolean;
+}
+
+export interface PeriodInfo {
+  description: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  rows_count: number;
+}
+
+export interface IntervalCoverageInfo {
+  nominal_coverage_pct: number;
+  observed_coverage_pct: number;
+  average_interval_width: number;
+  width_unit: string;
+}
+
+export interface WeakestGroupInfo {
+  dimension: string;
+  name: string;
+  mae: number;
+  recommendation: string;
+}
+
+export interface GroupErrorItem {
+  group_type: string;
+  group_value: string;
+  metric: string;
+  baseline_score: number;
+  model_score: number;
+  gain_pct: number;
+  is_weakest: boolean;
+}
+
+export interface ModelSummaryData {
+  metrics: ModelVsBaselineMetrics;
+  training_period: PeriodInfo;
+  test_period: PeriodInfo;
+  interval_coverage: IntervalCoverageInfo;
+  weakest_group: WeakestGroupInfo;
+  groups: GroupErrorItem[];
+  model_version: string;
+}
+
+

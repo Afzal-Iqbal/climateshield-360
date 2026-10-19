@@ -22,6 +22,8 @@ import {
   QualitySummaryResponseData,
   RunStatusExtended,
   FacilityGeoJSONFeatureCollection,
+  ForecastData,
+  ModelSummaryData,
   ZoneDetailData,
   ZoneGeoJSONFeatureCollection,
 } from '../types';
@@ -128,6 +130,16 @@ export const api = {
   },
   getZoneDetail: (zoneId: string) =>
     apiFetch<ZoneDetailData>(`/map/zone/${encodeURIComponent(zoneId)}`),
+  getForecast: (params: { hazard?: 'heavy_rain' | 'heat'; city?: string; range?: '24h' | '48h' | '7d' } = {}) => {
+    const q = new URLSearchParams();
+    if (params.hazard) q.set('hazard', params.hazard);
+    if (params.city) q.set('city', params.city);
+    if (params.range) q.set('range', params.range);
+    const qs = q.toString();
+    return apiFetch<ForecastData>(`/forecast${qs ? `?${qs}` : ''}`);
+  },
+  getModelSummary: () =>
+    apiFetch<ModelSummaryData>('/model/summary'),
 };
 
 /**

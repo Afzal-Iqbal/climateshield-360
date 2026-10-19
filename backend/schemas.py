@@ -430,3 +430,119 @@ class ZoneDetailResponseData(BaseModel):
     vulnerability: ZoneVulnerabilityDetail
     evidence: ZoneEvidenceDetail
 
+
+# --- Forecast and Weather Time-Series Models ---
+
+class ObservedWeatherPoint(BaseModel):
+    timestamp_utc: datetime
+    timestamp_pkt: str
+    value: float
+    unit: str
+    relative_humidity_pct: Optional[float] = None
+    wind_speed_kmh: Optional[float] = None
+    weather_condition: Optional[str] = None
+
+
+class PredictedPoint(BaseModel):
+    forecast_time_utc: datetime
+    forecast_time_pkt: str
+    probability: float
+    interval_low: float
+    interval_high: float
+    median: float
+    baseline_value: float
+    unit: str = "mm/hr"
+
+
+class ThresholdLevel(BaseModel):
+    level: str  # "advisory", "warning", "severe"
+    value: float
+    label: str
+    color: str
+
+
+class ForecastThresholds(BaseModel):
+    unit: str
+    primary_threshold: float
+    primary_label: str
+    levels: List[ThresholdLevel]
+
+
+class BaselineInfo(BaseModel):
+    name: str = "24h Persistence Baseline"
+    description: str = "y_hat_t = y_{t-24h}"
+    value: Optional[float] = None
+
+
+class ForecastResponseData(BaseModel):
+    hazard: Literal["heavy_rain", "heat"]
+    city: str
+    range: Literal["24h", "48h", "7d"]
+    observed: List[ObservedWeatherPoint]
+    predicted: Optional[List[PredictedPoint]] = None
+    baseline: BaselineInfo
+    declared_target: str
+    thresholds: ForecastThresholds
+    note: Optional[str] = None
+    model_version: Optional[str] = None
+    generated_at: datetime
+
+
+# --- Model Summary and Evaluation Models ---
+
+class ModelVsBaselineMetrics(BaseModel):
+    baseline_declared: str
+    model_architecture: str
+    model_mae: float
+    baseline_mae: float
+    mae_improvement_pct: float
+    model_rmse: float
+    baseline_rmse: float
+    rmse_improvement_pct: float
+    model_brier: Optional[float] = None
+    baseline_brier: Optional[float] = None
+    model_r2: Optional[float] = None
+    meets_20pct_target: bool
+
+
+class PeriodInfo(BaseModel):
+    description: str
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    rows_count: int
+
+
+class IntervalCoverageInfo(BaseModel):
+    nominal_coverage_pct: float = 80.0
+    observed_coverage_pct: float = 97.42
+    average_interval_width: float = 0.11
+    width_unit: str = "mm"
+
+
+class WeakestGroupInfo(BaseModel):
+    dimension: str
+    name: str
+    mae: float
+    recommendation: str
+
+
+class GroupErrorItem(BaseModel):
+    group_type: str
+    group_value: str
+    metric: str
+    baseline_score: float
+    model_score: float
+    gain_pct: float
+    is_weakest: bool = False
+
+
+class ModelSummaryResponseData(BaseModel):
+    metrics: ModelVsBaselineMetrics
+    training_period: PeriodInfo
+    test_period: PeriodInfo
+    interval_coverage: IntervalCoverageInfo
+    weakest_group: WeakestGroupInfo
+    groups: List[GroupErrorItem]
+    model_version: str = "lightgbm_quantile_v1.0"
+
+
