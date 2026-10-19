@@ -705,3 +705,179 @@ class PlannerResponseData(BaseModel):
     resource_summary: ResourceGapSummary
     operational_note: str = "Decision support only, not emergency dispatch instructions."
 
+
+# --- Methodology & Data Governance Models ---
+
+class DatasetCollectionTimes(BaseModel):
+    earliest: str
+    latest: str
+    frequency: str
+    cadence: str
+
+
+class DatasetCoverage(BaseModel):
+    spatial: str
+    temporal: str
+    total_records: str
+    file_count: int
+    total_bytes: int
+
+
+class DatasetItem(BaseModel):
+    id: str
+    name: str
+    publisher: str
+    source_links: List[str]
+    licence: str
+    collection_times: DatasetCollectionTimes
+    coverage: DatasetCoverage
+    variables_extracted: str
+    credibility_rationale: str
+    status: str
+
+
+class ManifestFileItem(BaseModel):
+    filepath: str
+    source: str
+    source_folder: str
+    licence: str
+    source_url: str
+    fetch_time_utc: str
+    bytes: int
+    sha256_short: str
+
+
+class QualityRuleItem(BaseModel):
+    rule_id: str
+    dataset: str
+    action: str  # keep, fix, fill, flag
+    what: str
+    why: str
+
+
+class MLTargetInfo(BaseModel):
+    primary_target: str
+    secondary_targets: List[str]
+    units: str
+    prediction_horizon: str
+    training_split: str
+    test_split: str
+    architecture: str
+    description: str
+
+
+class MethodologyBaselineInfo(BaseModel):
+    declared_name: str
+    formula: str
+    description: str
+    road_condition_rule: str
+    baseline_mae: float
+    baseline_rmse: float
+    baseline_brier: float
+    success_criterion: str
+
+
+class EvaluationMethodInfo(BaseModel):
+    validation_strategy: str
+    train_period: str
+    train_rows: int
+    test_period: str
+    test_rows: int
+    model_mae: float
+    model_rmse: float
+    model_r2: float
+    model_brier: float
+    mae_improvement_pct: float
+    rmse_improvement_pct: float
+    brier_improvement_pct: float
+    meets_20pct_target: bool
+    uncertainty_interval_80pct_coverage: float
+    average_interval_width_mm: float
+    weakest_group: Dict[str, Any]
+
+
+class LimitationItem(BaseModel):
+    title: str
+    category: str
+    description: str
+    operational_impact: str
+
+
+class RiskLevelDefinition(BaseModel):
+    level: str  # Low, Moderate, High, Severe
+    color: str  # green, yellow, orange, red
+    rainfall_threshold: str
+    wbgt_threshold: str
+    inundation_threshold: str
+    operational_posture: str
+
+
+class EvidenceTierDefinition(BaseModel):
+    tier: str
+    description: str
+    criteria: str
+
+
+class RiverDangerThresholdItem(BaseModel):
+    river_basin: str
+    station_name: str
+    province: str
+    low_flood_cusecs: Optional[int] = None
+    medium_flood_cusecs: Optional[int] = None
+    high_flood_cusecs: Optional[int] = None
+    very_high_flood_cusecs: Optional[int] = None
+    exceptionally_high_cusecs: Optional[int] = None
+
+
+class RiskScoreDefinitions(BaseModel):
+    levels: List[RiskLevelDefinition]
+    evidence_tiers: List[EvidenceTierDefinition]
+    river_thresholds: List[RiverDangerThresholdItem]
+
+
+class KnownGapItem(BaseModel):
+    source: str
+    severity: str  # high, medium, info
+    gap: str
+    handling_strategy: str
+
+
+class EmergencyContactItem(BaseModel):
+    agency: str
+    service_type: str
+    contact_number: str
+    tel_link: str
+    badge_color: str
+
+
+class SafetyBoundaryItem(BaseModel):
+    boundary_title: str
+    icon: str
+    description: str
+    constraint_tag: str
+
+
+class ResponsibleUseNotes(BaseModel):
+    primary_notice: str
+    crop_data_exclusion: str
+    safety_boundaries: List[SafetyBoundaryItem]
+    emergency_contacts: List[EmergencyContactItem]
+
+
+class MethodologyResponseData(BaseModel):
+    system_title: str
+    system_version: str
+    jurisdiction: str
+    audited_at: str
+    datasets: List[DatasetItem]
+    manifest_files: List[ManifestFileItem]
+    quality_rules: List[QualityRuleItem]
+    ml_target: MLTargetInfo
+    baseline: MethodologyBaselineInfo
+    evaluation_method: EvaluationMethodInfo
+    limitations: List[LimitationItem]
+    risk_score_definitions: RiskScoreDefinitions
+    known_gaps: List[KnownGapItem]
+    responsible_use: ResponsibleUseNotes
+
+

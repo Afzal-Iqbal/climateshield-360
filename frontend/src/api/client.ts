@@ -28,6 +28,7 @@ import {
   ZoneGeoJSONFeatureCollection,
   ImpactDomainData,
   PlannerResponseData,
+  MethodologyResponseData,
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -163,6 +164,7 @@ export const api = {
     const qs = q.toString();
     return apiFetch<PlannerResponseData>(`/planner${qs ? `?${qs}` : ''}`);
   },
+  getMethodology: () => apiFetch<MethodologyResponseData>('/methodology'),
 };
 
 /**

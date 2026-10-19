@@ -92,4 +92,31 @@ In compliance with HackInsight 2026 regulations (Chapter 4: Permitted AI Use & D
   - Verified frontend production bundle builds cleanly (`npm run build`) with zero TypeScript errors.
   - Live verified HTTP responses against the local development server.
 
+---
+
+## Log Entry 6: Data Sources & Methodology Implementation
+- **Date & Time (UTC):** 2026-10-19 19:40–19:50 UTC
+- **AI Tool / Agent:** Antigravity Agentic Coding Assistant (Google DeepMind)
+- **Scope & Deliverables:** Data Sources & Methodology (Backend Endpoint + Frontend Transparency Console + Tests)
+- **Activities:**
+  - Implemented `GET /api/methodology` in `backend/routers/methodology.py` reading:
+    - `manifest.csv` (`pipeline/data/manifest.csv`) for file provenance, SHA-256 hashes, collection timestamps, and licences.
+    - `Dataset_Declaration.md` for primary dataset sources (Open-Meteo, OpenStreetMap, NDMA/PMD, PBS), update frequencies, extracted attributes, credibility justifications, and declared persistence baseline ($ŷ_t = y_{t-24\text{h}}$).
+    - `pipeline/reports/model_vs_baseline_metrics.json` for holdout evaluation metrics (MAE 0.0685 vs 0.1055, 35.1% improvement, 97.42% uncertainty interval coverage, and weakest group audit).
+    - `pipeline/reports/cleaning_rules.json` & `quality_report.json` for 31 data governance rules and documented known gaps.
+    - DuckDB warehouse table `pmd_river_danger_levels` for official flood danger limits across 19 hydrometric stations.
+  - Added Pydantic schemas in `backend/schemas.py` (`MethodologyResponseData`, `DatasetItem`, `ManifestFileItem`, `QualityRuleItem`, `MLTargetInfo`, `MethodologyBaselineInfo`, `EvaluationMethodInfo`, `LimitationItem`, `RiskScoreDefinitions`, `KnownGapItem`, `ResponsibleUseNotes`).
+  - Implemented unit and integration test suite in `backend/tests/test_methodology.py` (8 tests, all passing; full suite 68/68 passing).
+  - Built frontend Data Sources & Methodology page in `frontend/src/pages/AboutLimits.tsx` adhering to AGENT_RULES.md (Rule 1: no hard-coding, Rule 2: no synthetic data presented as real, Rule 3: stored UTC & displayed PKT, Rule 6: official notice, Rule 8: visual design matching `frontend/design/about_limits_climateshield_360_karachi`):
+    - Clean sections with structured tables: Primary Datasets, File Manifest Registry (with search & folder filters), Governance & Quality Rules, ML Target vs Declared Baseline, Risk Score Matrix & PMD River Flood Stages, Documented Known Gaps, and Computational Limitations.
+    - Prominent Responsible-Use Notes banner (*"Information only, not professional advice. In an emergency contact official services."*).
+    - Explicit Crop Data Exclusion Callout card (*"All crop flood exposure indicators and agricultural damage models are explicitly excluded from ClimateShield 360 because raw input data was uniformly 0.0 across all 160 districts..."*).
+    - 4 Non-Claims Safety Boundary cards and 24/7 Priority Emergency Escalation Directory with click-to-call links.
+    - Zero hard-coded UI text: every label, description, table cell, and boundary disclosure originates from the API or files.
+- **Human Review & Verification:**
+  - Ran backend test suite (`PYTHONPATH=backend pytest`) with 68/68 passing tests.
+  - Validated frontend production build (`npm run build`) passing with zero TypeScript or bundling errors.
+  - Verified live endpoint `http://127.0.0.1:8000/api/methodology` and Vite proxy `http://localhost:5173/api/methodology`.
+
+
 

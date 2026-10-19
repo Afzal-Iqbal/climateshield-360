@@ -668,3 +668,185 @@ export interface PlannerResponseData {
   operational_note: string;
 }
 
+// --- Methodology & Data Governance Types ---
+
+export interface DatasetCollectionTimes {
+  earliest: string;
+  latest: string;
+  frequency: string;
+  cadence: string;
+}
+
+export interface DatasetCoverage {
+  spatial: string;
+  temporal: string;
+  total_records: string;
+  file_count: number;
+  total_bytes: number;
+}
+
+export interface DatasetItem {
+  id: string;
+  name: string;
+  publisher: string;
+  source_links: string[];
+  licence: string;
+  collection_times: DatasetCollectionTimes;
+  coverage: DatasetCoverage;
+  variables_extracted: string;
+  credibility_rationale: string;
+  status: string;
+}
+
+export interface ManifestFileItem {
+  filepath: string;
+  source: string;
+  source_folder: string;
+  licence: string;
+  source_url: string;
+  fetch_time_utc: string;
+  bytes: number;
+  sha256_short: string;
+}
+
+export interface QualityRuleItem {
+  rule_id: string;
+  dataset: string;
+  action: 'keep' | 'fix' | 'fill' | 'flag' | 'exclude' | string;
+  what: string;
+  why: string;
+}
+
+export interface MLTargetInfo {
+  primary_target: string;
+  secondary_targets: string[];
+  units: string;
+  prediction_horizon: string;
+  training_split: string;
+  test_split: string;
+  architecture: string;
+  description: string;
+}
+
+export interface MethodologyBaselineInfo {
+  declared_name: string;
+  formula: string;
+  description: string;
+  road_condition_rule: string;
+  baseline_mae: number;
+  baseline_rmse: number;
+  baseline_brier: number;
+  success_criterion: string;
+}
+
+export interface EvaluationMethodInfo {
+  validation_strategy: string;
+  train_period: string;
+  train_rows: number;
+  test_period: string;
+  test_rows: number;
+  model_mae: number;
+  model_rmse: number;
+  model_r2: number;
+  model_brier: number;
+  mae_improvement_pct: number;
+  rmse_improvement_pct: number;
+  brier_improvement_pct: number;
+  meets_20pct_target: boolean;
+  uncertainty_interval_80pct_coverage: number;
+  average_interval_width_mm: number;
+  weakest_group: {
+    dimension?: string;
+    name?: string;
+    mae?: number;
+    recommendation?: string;
+    [key: string]: any;
+  };
+}
+
+export interface LimitationItem {
+  title: string;
+  category: string;
+  description: string;
+  operational_impact: string;
+}
+
+export interface RiskLevelDefinition {
+  level: string; // Low, Moderate, High, Severe
+  color: string; // green, yellow, orange, red
+  rainfall_threshold: string;
+  wbgt_threshold: string;
+  inundation_threshold: string;
+  operational_posture: string;
+}
+
+export interface EvidenceTierDefinition {
+  tier: string;
+  description: string;
+  criteria: string;
+}
+
+export interface RiverDangerThresholdItem {
+  river_basin: string;
+  station_name: string;
+  province: string;
+  low_flood_cusecs?: number | null;
+  medium_flood_cusecs?: number | null;
+  high_flood_cusecs?: number | null;
+  very_high_flood_cusecs?: number | null;
+  exceptionally_high_cusecs?: number | null;
+}
+
+export interface RiskScoreDefinitions {
+  levels: RiskLevelDefinition[];
+  evidence_tiers: EvidenceTierDefinition[];
+  river_thresholds: RiverDangerThresholdItem[];
+}
+
+export interface KnownGapItem {
+  source: string;
+  severity: 'high' | 'medium' | 'info' | string;
+  gap: string;
+  handling_strategy: string;
+}
+
+export interface EmergencyContactItem {
+  agency: string;
+  service_type: string;
+  contact_number: string;
+  tel_link: string;
+  badge_color: string;
+}
+
+export interface SafetyBoundaryItem {
+  boundary_title: string;
+  icon: string;
+  description: string;
+  constraint_tag: string;
+}
+
+export interface ResponsibleUseNotes {
+  primary_notice: string;
+  crop_data_exclusion: string;
+  safety_boundaries: SafetyBoundaryItem[];
+  emergency_contacts: EmergencyContactItem[];
+}
+
+export interface MethodologyResponseData {
+  system_title: string;
+  system_version: string;
+  jurisdiction: string;
+  audited_at: string;
+  datasets: DatasetItem[];
+  manifest_files: ManifestFileItem[];
+  quality_rules: QualityRuleItem[];
+  ml_target: MLTargetInfo;
+  baseline: MethodologyBaselineInfo;
+  evaluation_method: EvaluationMethodInfo;
+  limitations: LimitationItem[];
+  risk_score_definitions: RiskScoreDefinitions;
+  known_gaps: KnownGapItem[];
+  responsible_use: ResponsibleUseNotes;
+}
+
+
