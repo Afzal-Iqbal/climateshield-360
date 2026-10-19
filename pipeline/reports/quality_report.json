@@ -1,0 +1,474 @@
+{
+  "generated_at_utc": "2026-10-19T16:30:59.826288+00:00",
+  "started_at_utc": "2026-10-19T16:30:25.796533+00:00",
+  "pipeline": "climateshield.pipeline.run.make_data",
+  "raw_files_unchanged": true,
+  "n_raw_files": 154,
+  "n_inventory_files": 40,
+  "decision_counts": {
+    "keep": 13,
+    "flag": 31,
+    "fix": 15,
+    "fill": 1
+  },
+  "n_decisions": 60,
+  "outputs": {
+    "cleaned": [
+      {
+        "path": "data/cleaned/01_open_meteo_heat_rainfall/city_locations.csv",
+        "bytes": 1325
+      },
+      {
+        "path": "data/cleaned/01_open_meteo_heat_rainfall/city_locations.parquet",
+        "bytes": 5708
+      },
+      {
+        "path": "data/cleaned/01_open_meteo_heat_rainfall/weather_6h_sample.parquet",
+        "bytes": 1377996
+      },
+      {
+        "path": "data/cleaned/01_open_meteo_heat_rainfall/weather_city_stats.csv",
+        "bytes": 862
+      },
+      {
+        "path": "data/cleaned/01_open_meteo_heat_rainfall/weather_city_stats.parquet",
+        "bytes": 6167
+      },
+      {
+        "path": "data/cleaned/01_open_meteo_heat_rainfall/weather_hourly.parquet",
+        "bytes": 11241030
+      },
+      {
+        "path": "data/cleaned/02_openstreetmap_geofabrik/district_name_lookup.csv",
+        "bytes": 8229
+      },
+      {
+        "path": "data/cleaned/02_openstreetmap_geofabrik/health_facilities.parquet",
+        "bytes": 416693
+      },
+      {
+        "path": "data/cleaned/02_openstreetmap_geofabrik/osm_emergency_facilities.csv",
+        "bytes": 8459
+      },
+      {
+        "path": "data/cleaned/02_openstreetmap_geofabrik/osm_emergency_facilities.parquet",
+        "bytes": 7669
+      },
+      {
+        "path": "data/cleaned/02_openstreetmap_geofabrik/osm_flood_exposure.csv",
+        "bytes": 58672
+      },
+      {
+        "path": "data/cleaned/02_openstreetmap_geofabrik/osm_flood_exposure.parquet",
+        "bytes": 84571
+      },
+      {
+        "path": "data/cleaned/02_openstreetmap_geofabrik/osm_hospital_access.csv",
+        "bytes": 14562
+      },
+      {
+        "path": "data/cleaned/02_openstreetmap_geofabrik/osm_hospital_access.parquet",
+        "bytes": 18457
+      },
+      {
+        "path": "data/cleaned/02_openstreetmap_geofabrik/osm_rural_access.csv",
+        "bytes": 22208
+      },
+      {
+        "path": "data/cleaned/02_openstreetmap_geofabrik/osm_rural_access.parquet",
+        "bytes": 33737
+      },
+      {
+        "path": "data/cleaned/02_openstreetmap_geofabrik/populated_places.parquet",
+        "bytes": 3718303
+      },
+      {
+        "path": "data/cleaned/03_ndma_pmd_hazards_warnings/document_catalog.csv",
+        "bytes": 2992
+      },
+      {
+        "path": "data/cleaned/03_ndma_pmd_hazards_warnings/glofas_river_discharge.parquet",
+        "bytes": 10907
+      },
+      {
+        "path": "data/cleaned/03_ndma_pmd_hazards_warnings/pmd_river_danger_levels.csv",
+        "bytes": 4864
+      },
+      {
+        "path": "data/cleaned/03_ndma_pmd_hazards_warnings/pmd_river_danger_levels.parquet",
+        "bytes": 12752
+      },
+      {
+        "path": "data/cleaned/04_pakistan_bureau_of_statistics/pbs_district_demographics.csv",
+        "bytes": 17394
+      },
+      {
+        "path": "data/cleaned/04_pakistan_bureau_of_statistics/pbs_district_demographics.parquet",
+        "bytes": 21011
+      },
+      {
+        "path": "data/cleaned/04_pakistan_bureau_of_statistics/pbs_district_rural_urban.csv",
+        "bytes": 17798
+      },
+      {
+        "path": "data/cleaned/04_pakistan_bureau_of_statistics/pbs_district_rural_urban.parquet",
+        "bytes": 22767
+      }
+    ],
+    "processed": [
+      {
+        "path": "data/processed/city_locations.csv",
+        "bytes": 1325
+      },
+      {
+        "path": "data/processed/city_locations.parquet",
+        "bytes": 5708
+      },
+      {
+        "path": "data/processed/climateshield.duckdb",
+        "bytes": 25702400
+      },
+      {
+        "path": "data/processed/district_name_lookup.csv",
+        "bytes": 8229
+      },
+      {
+        "path": "data/processed/district_snapshot.csv",
+        "bytes": 132333
+      },
+      {
+        "path": "data/processed/district_snapshot.parquet",
+        "bytes": 161022
+      },
+      {
+        "path": "data/processed/document_catalog.csv",
+        "bytes": 2992
+      },
+      {
+        "path": "data/processed/excluded_columns.csv",
+        "bytes": 1606
+      },
+      {
+        "path": "data/processed/glofas_river_discharge.parquet",
+        "bytes": 10907
+      },
+      {
+        "path": "data/processed/health_facilities.parquet",
+        "bytes": 416693
+      },
+      {
+        "path": "data/processed/osm_emergency_facilities.csv",
+        "bytes": 8459
+      },
+      {
+        "path": "data/processed/osm_emergency_facilities.parquet",
+        "bytes": 7669
+      },
+      {
+        "path": "data/processed/osm_flood_exposure.csv",
+        "bytes": 50714
+      },
+      {
+        "path": "data/processed/osm_flood_exposure.parquet",
+        "bytes": 76347
+      },
+      {
+        "path": "data/processed/osm_hospital_access.csv",
+        "bytes": 14562
+      },
+      {
+        "path": "data/processed/osm_hospital_access.parquet",
+        "bytes": 18457
+      },
+      {
+        "path": "data/processed/osm_rural_access.csv",
+        "bytes": 22208
+      },
+      {
+        "path": "data/processed/osm_rural_access.parquet",
+        "bytes": 33737
+      },
+      {
+        "path": "data/processed/pbs_district_demographics.csv",
+        "bytes": 17394
+      },
+      {
+        "path": "data/processed/pbs_district_demographics.parquet",
+        "bytes": 21011
+      },
+      {
+        "path": "data/processed/pbs_district_rural_urban.csv",
+        "bytes": 17798
+      },
+      {
+        "path": "data/processed/pbs_district_rural_urban.parquet",
+        "bytes": 22767
+      },
+      {
+        "path": "data/processed/pmd_river_danger_levels.csv",
+        "bytes": 4864
+      },
+      {
+        "path": "data/processed/pmd_river_danger_levels.parquet",
+        "bytes": 12752
+      },
+      {
+        "path": "data/processed/populated_places.parquet",
+        "bytes": 3718303
+      },
+      {
+        "path": "data/processed/warehouse_catalog.csv",
+        "bytes": 483
+      },
+      {
+        "path": "data/processed/weather_6h_sample.parquet",
+        "bytes": 1377996
+      },
+      {
+        "path": "data/processed/weather_city_stats.csv",
+        "bytes": 862
+      },
+      {
+        "path": "data/processed/weather_city_stats.parquet",
+        "bytes": 6167
+      },
+      {
+        "path": "data/processed/weather_hourly.parquet",
+        "bytes": 11241030
+      }
+    ],
+    "reports": [
+      {
+        "path": "reports/cleaning_rules.json",
+        "bytes": 10574
+      },
+      {
+        "path": "reports/dataset_inventory.json",
+        "bytes": 95250
+      },
+      {
+        "path": "reports/fairness_by_group.csv",
+        "bytes": 1189
+      },
+      {
+        "path": "reports/figures/baseline_vs_model_mae.png",
+        "bytes": 59163
+      },
+      {
+        "path": "reports/figures/fairness_by_city.png",
+        "bytes": 89549
+      },
+      {
+        "path": "reports/hourly_ingest_log.csv",
+        "bytes": 13251
+      },
+      {
+        "path": "reports/hourly_ingest_status.json",
+        "bytes": 12451
+      },
+      {
+        "path": "reports/initial_quality_report.json",
+        "bytes": 4084
+      },
+      {
+        "path": "reports/model_vs_baseline_metrics.json",
+        "bytes": 1003
+      },
+      {
+        "path": "reports/model_vs_baseline_summary.md",
+        "bytes": 2574
+      },
+      {
+        "path": "reports/quality_logs.csv",
+        "bytes": 14815
+      },
+      {
+        "path": "reports/quality_report.json",
+        "bytes": 14645
+      }
+    ]
+  },
+  "gold_tables": {
+    "weather_hourly_rows": 592464,
+    "weather_6h_sample_rows": 98696,
+    "district_snapshot_rows": 160,
+    "health_facilities_rows": 5144,
+    "populated_places_rows": 67781
+  },
+  "warehouse": {
+    "path": "data/processed/climateshield.duckdb",
+    "engine": "duckdb",
+    "tables": {
+      "weather_hourly": 592464,
+      "weather_6h_sample": 98696,
+      "glofas_river_discharge": 72,
+      "weather_city_stats": 12,
+      "city_locations": 12,
+      "district_snapshot": 160,
+      "pbs_district_demographics": 160,
+      "pbs_district_rural_urban": 160,
+      "osm_emergency_facilities": 160,
+      "osm_hospital_access": 160,
+      "osm_flood_exposure": 160,
+      "osm_rural_access": 160,
+      "pmd_river_danger_levels": 19,
+      "health_facilities": 5144,
+      "populated_places": 67781,
+      "document_catalog": 11,
+      "district_name_lookup": 136,
+      "excluded_columns": 12,
+      "quality_logs": 60,
+      "warehouse_catalog": 19
+    }
+  },
+  "initial_quality_issues": [
+    {
+      "dataset": "01_open_meteo_heat_rainfall",
+      "severity": "high",
+      "issue": "Peshawar hourly series starts 2023-01-01 (33288 hours) while 11 cities start 2021-01-01 (50808 hours).",
+      "action_proposed": "flag"
+    },
+    {
+      "dataset": "01_open_meteo_heat_rainfall",
+      "severity": "medium",
+      "issue": "pakistan_cities_hourly_heat_rainfall_sample.csv is 6-hourly (hours 0/6/12/18), not hourly. Peak temperature 49.0 C vs JSON 50.1 C.",
+      "action_proposed": "fix label; flag undersampled peaks"
+    },
+    {
+      "dataset": "01_open_meteo_heat_rainfall",
+      "severity": "info",
+      "issue": "Quetta extreme_heat_hours_ge_40c = 0 because max temperature is 39.7 C. This is a real climate value, not missing data.",
+      "action_proposed": "keep"
+    },
+    {
+      "dataset": "02_openstreetmap_geofabrik",
+      "severity": "high",
+      "issue": "All RP*_crops_* flood-exposure columns are 0.0 for every district.",
+      "action_proposed": "flag as source-unavailable; exclude from gold join"
+    },
+    {
+      "dataset": "02_openstreetmap_geofabrik",
+      "severity": "high",
+      "issue": "OSM facility zeros mean 'none mapped'. Health facilities GeoJSON covers 115 of 160 ADM2 codes and is sparse in Balochistan (79 features).",
+      "action_proposed": "flag"
+    },
+    {
+      "dataset": "02_openstreetmap_geofabrik",
+      "severity": "medium",
+      "issue": "populated_places: 35,237 unnamed of 67,781; population tag null on 66,679; 1,885 features lack ADM codes. Geometry includes 2 LineString and 2 GeometryCollection features.",
+      "action_proposed": "flag; keep features"
+    },
+    {
+      "dataset": "02_openstreetmap_geofabrik",
+      "severity": "medium",
+      "issue": "rural_access_dependency_ratio missing for PK702 and PK712 (0 rural population).",
+      "action_proposed": "flag; do not fill"
+    },
+    {
+      "dataset": "04_pakistan_bureau_of_statistics",
+      "severity": "medium",
+      "issue": "pbs_district_vulnerability_dependency_ratios.csv is an exact column-wise join of the demographics and rural/urban CSVs (160/160).",
+      "action_proposed": "keep raw copies; one canonical processed table"
+    },
+    {
+      "dataset": "04_pakistan_bureau_of_statistics",
+      "severity": "info",
+      "issue": "PBS tables have ADM2 codes but no district names. ADM_PCODE duplicates ADM2_PCODE.",
+      "action_proposed": "fix redundant column; attach names from OSM where codes match"
+    },
+    {
+      "dataset": "03_ndma_pmd_hazards_warnings",
+      "severity": "info",
+      "issue": "River thresholds are in cusecs, 19 stations, no time series. PDFs are not tabular.",
+      "action_proposed": "keep thresholds; add cms conversion; catalog PDFs"
+    },
+    {
+      "dataset": "integration",
+      "severity": "high",
+      "issue": "District OSM CSVs and PBS CSVs share the same 160 ADM2_PCODE values and can be joined. City weather and river stations cannot be joined to districts without a reviewed spatial assignment.",
+      "action_proposed": "join district snapshots only; keep weather and rivers separate"
+    }
+  ],
+  "cleaning_rules_path": "reports/cleaning_rules.json",
+  "quality_agent": {
+    "tool": "pandera",
+    "tables_checked": 4,
+    "schema_passed": 4,
+    "schema_failed": 0,
+    "findings": [
+      {
+        "table": "weather_hourly",
+        "check_id": "hourly_short_gap",
+        "action": "fill",
+        "passed": true,
+        "n_rows": 0,
+        "message": "Short gaps (<= 6h) filled=0; long internal gap hours left missing=0. Precipitation is not interpolated."
+      },
+      {
+        "table": "weather_hourly",
+        "check_id": "schema",
+        "action": "keep",
+        "passed": true,
+        "n_rows": 592464,
+        "message": "Pandera schema passed for weather_hourly (592464 rows)."
+      },
+      {
+        "table": "district_snapshot",
+        "check_id": "schema",
+        "action": "keep",
+        "passed": true,
+        "n_rows": 160,
+        "message": "Pandera schema passed for district_snapshot (160 rows)."
+      },
+      {
+        "table": "pmd_river_danger_levels",
+        "check_id": "schema",
+        "action": "keep",
+        "passed": true,
+        "n_rows": 19,
+        "message": "Pandera schema passed for pmd_river_danger_levels (19 rows)."
+      },
+      {
+        "table": "osm_emergency_facilities",
+        "check_id": "schema",
+        "action": "keep",
+        "passed": true,
+        "n_rows": 160,
+        "message": "Pandera schema passed for osm_emergency_facilities (160 rows)."
+      },
+      {
+        "table": "weather_hourly",
+        "check_id": "extreme_heat_kept",
+        "action": "keep",
+        "passed": true,
+        "n_rows": 10886,
+        "message": "Observations >= 40 C remain in the gold table (not treated as outliers)."
+      },
+      {
+        "table": "weather_hourly",
+        "check_id": "peshawar_coverage",
+        "action": "flag",
+        "passed": false,
+        "n_rows": 33312,
+        "message": "Peshawar series starts 2023-01-01T00:00:00+00:00 (not 2021-01-01). Long gap: flag, do not fill."
+      },
+      {
+        "table": "osm_flood_exposure",
+        "check_id": "crop_flood_all_zero",
+        "action": "flag",
+        "passed": false,
+        "n_rows": 160,
+        "message": "All crop-flood columns are 0.0. Source unavailable; not zero exposure."
+      }
+    ]
+  },
+  "notes": [
+    "Original datasets were not overwritten.",
+    "The Quality Agent ran Pandera on gold tables and logged fix/fill/flag for each finding.",
+    "Short hourly gaps (<= 6h) in smooth variables may be filled and marked; precipitation is never interpolated.",
+    "Extreme heat observations were kept.",
+    "District join is ADM2-only; weather and river thresholds remain separate tables.",
+    "ML training is not part of this pipeline.",
+    "Gold tables are queryable in data/processed/climateshield.duckdb."
+  ]
+}

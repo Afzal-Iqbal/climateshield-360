@@ -32,3 +32,18 @@ In compliance with HackInsight 2026 regulations (Chapter 4: Permitted AI Use & D
   - Executed training pipeline on Camber Cloud Linux environment.
   - Verified relative MAE improvement reached **`+93.26%`** (surpassing the $\ge 20\%$ hackathon target).
   - Confirmed generated model binaries, JSON metrics, and markdown summary reports.
+
+---
+
+## Log Entry 3: Repository Restructuring — Merge Tasks 1-3 into Unified Codebase
+- **Date & Time (UTC):** 2026-10-19 16:00–16:15 UTC
+- **AI Tool / Agent:** Antigravity Agentic Coding Assistant (Google DeepMind)
+- **Scope & Deliverables:** Repository consolidation across Deliverables 1–3 + Full-Stack Dashboard
+- **Activities:**
+  - Renamed `pipline/` → `pipeline/` (fixed typo) and established canonical directory layout: `pipeline/`, `src/models/`, `backend/`, `frontend/`, `scripts/`, `warehouse/`.
+  - De-duplicated `AI_Use_Log.md`, `Dataset_Declaration.md`, `.gitignore` — single copies kept at project root.
+  - Merged pipeline reports (`pipeline/reports/`) with root-level ML evaluation outputs; removed stale root `quality_report.json` and `quality_logs.csv` stubs.
+  - Verified DuckDB warehouse integrity (`pipeline/data/processed/climateshield.duckdb`) and test suite via `make data` and `pytest`.
+- **Human Review & Verification:**
+  - Inspected final directory tree and confirmed no orphaned duplicates remain.
+  - Verified all tests pass and the DuckDB warehouse file is correctly generated.

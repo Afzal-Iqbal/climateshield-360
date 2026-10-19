@@ -1,0 +1,13 @@
+table,column,reason
+osm_flood_exposure,RP10_crops_30cm_km2,"all values 0.0 across 160 districts; treated as missing source layer, not zero exposure"
+osm_flood_exposure,RP10_crops_30cm_areapct,"all values 0.0 across 160 districts; treated as missing source layer, not zero exposure"
+osm_flood_exposure,RP10_crops_30cm_croppct,"all values 0.0 across 160 districts; treated as missing source layer, not zero exposure"
+osm_flood_exposure,RP50_crops_30cm_km2,"all values 0.0 across 160 districts; treated as missing source layer, not zero exposure"
+osm_flood_exposure,RP50_crops_30cm_areapct,"all values 0.0 across 160 districts; treated as missing source layer, not zero exposure"
+osm_flood_exposure,RP50_crops_30cm_croppct,"all values 0.0 across 160 districts; treated as missing source layer, not zero exposure"
+osm_flood_exposure,RP100_crops_30cm_km2,"all values 0.0 across 160 districts; treated as missing source layer, not zero exposure"
+osm_flood_exposure,RP100_crops_30cm_areapct,"all values 0.0 across 160 districts; treated as missing source layer, not zero exposure"
+osm_flood_exposure,RP100_crops_30cm_croppct,"all values 0.0 across 160 districts; treated as missing source layer, not zero exposure"
+osm_flood_exposure,RP500_crops_30cm_km2,"all values 0.0 across 160 districts; treated as missing source layer, not zero exposure"
+osm_flood_exposure,RP500_crops_30cm_areapct,"all values 0.0 across 160 districts; treated as missing source layer, not zero exposure"
+osm_flood_exposure,RP500_crops_30cm_croppct,"all values 0.0 across 160 districts; treated as missing source layer, not zero exposure"

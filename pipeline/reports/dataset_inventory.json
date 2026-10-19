@@ -1,0 +1,3105 @@
+{
+  "generated_at_utc": "2026-10-19T16:30:34.024968+00:00",
+  "archive": "Pakistan_MultiSource_Datasets_Collection.zip",
+  "extracted_to": "data/raw/collected_datasets",
+  "n_files": 40,
+  "files": [
+    {
+      "relative_path": "01_open_meteo_heat_rainfall/pakistan_cities_heat_and_rainfall_stats.csv",
+      "filename": "pakistan_cities_heat_and_rainfall_stats.csv",
+      "folder": "01_open_meteo_heat_rainfall",
+      "bytes": 517,
+      "sha256": "60ebbeaa505952c0db10d9c61c4c156bf8439f83cb5db0fb4bfd60bdddcf66d3",
+      "source": "Open-Meteo",
+      "licence": "CC-BY-4.0",
+      "source_url": "https://open-meteo.com/",
+      "profile": {
+        "format": "csv",
+        "rows": 12,
+        "columns": [
+          "city",
+          "total_hours",
+          "max_temperature_c",
+          "total_rainfall_mm",
+          "rainy_hours_count",
+          "extreme_heat_hours_ge_40c"
+        ],
+        "dtypes": {
+          "city": "str",
+          "total_hours": "int64",
+          "max_temperature_c": "float64",
+          "total_rainfall_mm": "float64",
+          "rainy_hours_count": "int64",
+          "extreme_heat_hours_ge_40c": "int64"
+        },
+        "missing_null": {
+          "city": 0,
+          "total_hours": 0,
+          "max_temperature_c": 0,
+          "total_rainfall_mm": 0,
+          "rainy_hours_count": 0,
+          "extreme_heat_hours_ge_40c": 0
+        },
+        "duplicate_rows": 0,
+        "numeric_min_max": {
+          "total_hours": {
+            "min": 33288.0,
+            "max": 50808.0,
+            "zeros": 0
+          },
+          "max_temperature_c": {
+            "min": 39.7,
+            "max": 50.1,
+            "zeros": 0
+          },
+          "total_rainfall_mm": {
+            "min": 902.8,
+            "max": 8026.5,
+            "zeros": 0
+          },
+          "rainy_hours_count": {
+            "min": 676.0,
+            "max": 6947.0,
+            "zeros": 0
+          },
+          "extreme_heat_hours_ge_40c": {
+            "min": 0.0,
+            "max": 3693.0,
+            "zeros": 1
+          }
+        },
+        "geographic_coverage": {
+          "grain": "city",
+          "cities": [
+            "Faisalabad",
+            "Gilgit",
+            "Gwadar",
+            "Hyderabad",
+            "Islamabad",
+            "Karachi",
+            "Lahore",
+            "Multan",
+            "Peshawar",
+            "Quetta",
+            "Rawalpindi",
+            "Sukkur"
+          ]
+        }
+      }
+    },
+    {
+      "relative_path": "01_open_meteo_heat_rainfall/pakistan_cities_hourly_heat_rainfall_sample.csv",
+      "filename": "pakistan_cities_hourly_heat_rainfall_sample.csv",
+      "folder": "01_open_meteo_heat_rainfall",
+      "bytes": 4750005,
+      "sha256": "ef592d09ab5b9ed284e06b3c5363d986624712d2a9d98dc75a5b98a4ea4703c4",
+      "source": "Open-Meteo",
+      "licence": "CC-BY-4.0",
+      "source_url": "https://open-meteo.com/",
+      "profile": {
+        "format": "csv",
+        "rows": 98696,
+        "columns": [
+          "timestamp_utc",
+          "city",
+          "temperature_2m_c",
+          "relative_humidity_pct",
+          "dew_point_c",
+          "precipitation_mm",
+          "rain_mm",
+          "weather_code"
+        ],
+        "dtypes": {
+          "timestamp_utc": "str",
+          "city": "str",
+          "temperature_2m_c": "float64",
+          "relative_humidity_pct": "int64",
+          "dew_point_c": "float64",
+          "precipitation_mm": "float64",
+          "rain_mm": "float64",
+          "weather_code": "int64"
+        },
+        "missing_null": {
+          "timestamp_utc": 0,
+          "city": 0,
+          "temperature_2m_c": 0,
+          "relative_humidity_pct": 0,
+          "dew_point_c": 0,
+          "precipitation_mm": 0,
+          "rain_mm": 0,
+          "weather_code": 0
+        },
+        "duplicate_rows": 0,
+        "numeric_min_max": {
+          "temperature_2m_c": {
+            "min": -11.8,
+            "max": 49.0,
+            "zeros": 16
+          },
+          "relative_humidity_pct": {
+            "min": 2.0,
+            "max": 100.0,
+            "zeros": 0
+          },
+          "dew_point_c": {
+            "min": -32.0,
+            "max": 28.9,
+            "zeros": 80
+          },
+          "precipitation_mm": {
+            "min": 0.0,
+            "max": 43.2,
+            "zeros": 92038
+          },
+          "rain_mm": {
+            "min": 0.0,
+            "max": 43.2,
+            "zeros": 92055
+          },
+          "weather_code": {
+            "min": 0.0,
+            "max": 75.0,
+            "zeros": 60745
+          }
+        },
+        "geographic_coverage": {
+          "grain": "city",
+          "cities": [
+            "Faisalabad",
+            "Gilgit",
+            "Gwadar",
+            "Hyderabad",
+            "Islamabad",
+            "Karachi",
+            "Lahore",
+            "Multan",
+            "Peshawar",
+            "Quetta",
+            "Rawalpindi",
+            "Sukkur"
+          ]
+        },
+        "date_coverage": {
+          "min": "2021-01-01 00:00:00+00:00",
+          "max": "2026-10-18 18:00:00+00:00",
+          "hours_present": [
+            0,
+            6,
+            12,
+            18
+          ]
+        }
+      }
+    },
+    {
+      "relative_path": "01_open_meteo_heat_rainfall/weather_faisalabad_raw.json",
+      "filename": "weather_faisalabad_raw.json",
+      "folder": "01_open_meteo_heat_rainfall",
+      "bytes": 3663357,
+      "sha256": "9c3d16c4f1962b4018bd34197c26f6d85a959d19160d4f6f81c0599d3c7bf8c7",
+      "source": "Open-Meteo",
+      "licence": "CC-BY-4.0",
+      "source_url": "https://open-meteo.com/",
+      "profile": {
+        "format": "open_meteo_json",
+        "rows": 50808,
+        "columns": [
+          "time",
+          "precipitation",
+          "rain",
+          "relative_humidity_2m",
+          "temperature_2m",
+          "surface_pressure",
+          "soil_moisture_0_to_7cm",
+          "soil_moisture_7_to_28cm",
+          "weather_code",
+          "wind_speed_10m",
+          "wind_direction_10m",
+          "cloud_cover",
+          "dew_point_2m"
+        ],
+        "units": {
+          "time": "iso8601",
+          "precipitation": "mm",
+          "rain": "mm",
+          "relative_humidity_2m": "%",
+          "temperature_2m": "\u00b0C",
+          "surface_pressure": "hPa",
+          "soil_moisture_0_to_7cm": "m\u00b3/m\u00b3",
+          "soil_moisture_7_to_28cm": "m\u00b3/m\u00b3",
+          "weather_code": "wmo code",
+          "wind_speed_10m": "km/h",
+          "wind_direction_10m": "\u00b0",
+          "cloud_cover": "%",
+          "dew_point_2m": "\u00b0C"
+        },
+        "latitude": 31.458698,
+        "longitude": 73.11828,
+        "elevation_m": 188.0,
+        "timezone": "GMT",
+        "utc_offset_seconds": 0,
+        "date_coverage": {
+          "min": "2021-01-01T00:00",
+          "max": "2026-10-18T23:00"
+        },
+        "geographic_coverage": {
+          "grain": "city point",
+          "lat": 31.458698,
+          "lon": 73.11828
+        },
+        "missing_null": {
+          "precipitation": 0,
+          "rain": 0,
+          "relative_humidity_2m": 0,
+          "temperature_2m": 0,
+          "surface_pressure": 0,
+          "soil_moisture_0_to_7cm": 0,
+          "soil_moisture_7_to_28cm": 0,
+          "weather_code": 0,
+          "wind_speed_10m": 0,
+          "wind_direction_10m": 0,
+          "cloud_cover": 0,
+          "dew_point_2m": 0
+        }
+      }
+    },
+    {
+      "relative_path": "01_open_meteo_heat_rainfall/weather_gilgit_raw.json",
+      "filename": "weather_gilgit_raw.json",
+      "folder": "01_open_meteo_heat_rainfall",
+      "bytes": 3671466,
+      "sha256": "99bea70d4b8755a116de570e7bc41ce119fd121c9f286d8b8e9b91bda7e0576e",
+      "source": "Open-Meteo",
+      "licence": "CC-BY-4.0",
+      "source_url": "https://open-meteo.com/",
+      "profile": {
+        "format": "open_meteo_json",
+        "rows": 50808,
+        "columns": [
+          "time",
+          "precipitation",
+          "rain",
+          "relative_humidity_2m",
+          "temperature_2m",
+          "surface_pressure",
+          "soil_moisture_0_to_7cm",
+          "soil_moisture_7_to_28cm",
+          "weather_code",
+          "wind_speed_10m",
+          "wind_direction_10m",
+          "cloud_cover",
+          "dew_point_2m"
+        ],
+        "units": {
+          "time": "iso8601",
+          "precipitation": "mm",
+          "rain": "mm",
+          "relative_humidity_2m": "%",
+          "temperature_2m": "\u00b0C",
+          "surface_pressure": "hPa",
+          "soil_moisture_0_to_7cm": "m\u00b3/m\u00b3",
+          "soil_moisture_7_to_28cm": "m\u00b3/m\u00b3",
+          "weather_code": "wmo code",
+          "wind_speed_10m": "km/h",
+          "wind_direction_10m": "\u00b0",
+          "cloud_cover": "%",
+          "dew_point_2m": "\u00b0C"
+        },
+        "latitude": 35.95782,
+        "longitude": 74.28201,
+        "elevation_m": 1468.0,
+        "timezone": "GMT",
+        "utc_offset_seconds": 0,
+        "date_coverage": {
+          "min": "2021-01-01T00:00",
+          "max": "2026-10-18T23:00"
+        },
+        "geographic_coverage": {
+          "grain": "city point",
+          "lat": 35.95782,
+          "lon": 74.28201
+        },
+        "missing_null": {
+          "precipitation": 0,
+          "rain": 0,
+          "relative_humidity_2m": 0,
+          "temperature_2m": 0,
+          "surface_pressure": 0,
+          "soil_moisture_0_to_7cm": 0,
+          "soil_moisture_7_to_28cm": 0,
+          "weather_code": 0,
+          "wind_speed_10m": 0,
+          "wind_direction_10m": 0,
+          "cloud_cover": 0,
+          "dew_point_2m": 0
+        }
+      }
+    },
+    {
+      "relative_path": "01_open_meteo_heat_rainfall/weather_gwadar_raw.json",
+      "filename": "weather_gwadar_raw.json",
+      "folder": "01_open_meteo_heat_rainfall",
+      "bytes": 3753515,
+      "sha256": "6f1ddbda0925621d0e56cfd274afa2a1bcdca6690e88d28b90950216fc3a0686",
+      "source": "Open-Meteo",
+      "licence": "CC-BY-4.0",
+      "source_url": "https://open-meteo.com/",
+      "profile": {
+        "format": "open_meteo_json",
+        "rows": 50808,
+        "columns": [
+          "time",
+          "precipitation",
+          "rain",
+          "relative_humidity_2m",
+          "temperature_2m",
+          "surface_pressure",
+          "soil_moisture_0_to_7cm",
+          "soil_moisture_7_to_28cm",
+          "weather_code",
+          "wind_speed_10m",
+          "wind_direction_10m",
+          "cloud_cover",
+          "dew_point_2m"
+        ],
+        "units": {
+          "time": "iso8601",
+          "precipitation": "mm",
+          "rain": "mm",
+          "relative_humidity_2m": "%",
+          "temperature_2m": "\u00b0C",
+          "surface_pressure": "hPa",
+          "soil_moisture_0_to_7cm": "m\u00b3/m\u00b3",
+          "soil_moisture_7_to_28cm": "m\u00b3/m\u00b3",
+          "weather_code": "wmo code",
+          "wind_speed_10m": "km/h",
+          "wind_direction_10m": "\u00b0",
+          "cloud_cover": "%",
+          "dew_point_2m": "\u00b0C"
+        },
+        "latitude": 25.202108,
+        "longitude": 62.300217,
+        "elevation_m": 6.0,
+        "timezone": "GMT",
+        "utc_offset_seconds": 0,
+        "date_coverage": {
+          "min": "2021-01-01T00:00",
+          "max": "2026-10-18T23:00"
+        },
+        "geographic_coverage": {
+          "grain": "city point",
+          "lat": 25.202108,
+          "lon": 62.300217
+        },
+        "missing_null": {
+          "precipitation": 0,
+          "rain": 0,
+          "relative_humidity_2m": 0,
+          "temperature_2m": 0,
+          "surface_pressure": 0,
+          "soil_moisture_0_to_7cm": 0,
+          "soil_moisture_7_to_28cm": 0,
+          "weather_code": 0,
+          "wind_speed_10m": 0,
+          "wind_direction_10m": 0,
+          "cloud_cover": 0,
+          "dew_point_2m": 0
+        }
+      }
+    },
+    {
+      "relative_path": "01_open_meteo_heat_rainfall/weather_hyderabad_raw.json",
+      "filename": "weather_hyderabad_raw.json",
+      "folder": "01_open_meteo_heat_rainfall",
+      "bytes": 3724387,
+      "sha256": "8dad78635a6624adcfae8b3eb1371e1104639b4c63ccdca583220aed79a71c71",
+      "source": "Open-Meteo",
+      "licence": "CC-BY-4.0",
+      "source_url": "https://open-meteo.com/",
+      "profile": {
+        "format": "open_meteo_json",
+        "rows": 50808,
+        "columns": [
+          "time",
+          "precipitation",
+          "rain",
+          "relative_humidity_2m",
+          "temperature_2m",
+          "surface_pressure",
+          "soil_moisture_0_to_7cm",
+          "soil_moisture_7_to_28cm",
+          "weather_code",
+          "wind_speed_10m",
+          "wind_direction_10m",
+          "cloud_cover",
+          "dew_point_2m"
+        ],
+        "units": {
+          "time": "iso8601",
+          "precipitation": "mm",
+          "rain": "mm",
+          "relative_humidity_2m": "%",
+          "temperature_2m": "\u00b0C",
+          "surface_pressure": "hPa",
+          "soil_moisture_0_to_7cm": "m\u00b3/m\u00b3",
+          "soil_moisture_7_to_28cm": "m\u00b3/m\u00b3",
+          "weather_code": "wmo code",
+          "wind_speed_10m": "km/h",
+          "wind_direction_10m": "\u00b0",
+          "cloud_cover": "%",
+          "dew_point_2m": "\u00b0C"
+        },
+        "latitude": 25.413004,
+        "longitude": 68.353195,
+        "elevation_m": 29.0,
+        "timezone": "GMT",
+        "utc_offset_seconds": 0,
+        "date_coverage": {
+          "min": "2021-01-01T00:00",
+          "max": "2026-10-18T23:00"
+        },
+        "geographic_coverage": {
+          "grain": "city point",
+          "lat": 25.413004,
+          "lon": 68.353195
+        },
+        "missing_null": {
+          "precipitation": 0,
+          "rain": 0,
+          "relative_humidity_2m": 0,
+          "temperature_2m": 0,
+          "surface_pressure": 0,
+          "soil_moisture_0_to_7cm": 0,
+          "soil_moisture_7_to_28cm": 0,
+          "weather_code": 0,
+          "wind_speed_10m": 0,
+          "wind_direction_10m": 0,
+          "cloud_cover": 0,
+          "dew_point_2m": 0
+        }
+      }
+    },
+    {
+      "relative_path": "01_open_meteo_heat_rainfall/weather_islamabad_raw.json",
+      "filename": "weather_islamabad_raw.json",
+      "folder": "01_open_meteo_heat_rainfall",
+      "bytes": 3664576,
+      "sha256": "9b37d3b20aba49e20da38f4153db14757e59271d34cfa992e92eaffdcd52bbe5",
+      "source": "Open-Meteo",
+      "licence": "CC-BY-4.0",
+      "source_url": "https://open-meteo.com/",
+      "profile": {
+        "format": "open_meteo_json",
+        "rows": 50808,
+        "columns": [
+          "time",
+          "precipitation",
+          "rain",
+          "relative_humidity_2m",
+          "temperature_2m",
+          "surface_pressure",
+          "soil_moisture_0_to_7cm",
+          "soil_moisture_7_to_28cm",
+          "weather_code",
+          "wind_speed_10m",
+          "wind_direction_10m",
+          "cloud_cover",
+          "dew_point_2m"
+        ],
+        "units": {
+          "time": "iso8601",
+          "precipitation": "mm",
+          "rain": "mm",
+          "relative_humidity_2m": "%",
+          "temperature_2m": "\u00b0C",
+          "surface_pressure": "hPa",
+          "soil_moisture_0_to_7cm": "m\u00b3/m\u00b3",
+          "soil_moisture_7_to_28cm": "m\u00b3/m\u00b3",
+          "weather_code": "wmo code",
+          "wind_speed_10m": "km/h",
+          "wind_direction_10m": "\u00b0",
+          "cloud_cover": "%",
+          "dew_point_2m": "\u00b0C"
+        },
+        "latitude": 33.63796,
+        "longitude": 73.0273,
+        "elevation_m": 527.0,
+        "timezone": "GMT",
+        "utc_offset_seconds": 0,
+        "date_coverage": {
+          "min": "2021-01-01T00:00",
+          "max": "2026-10-18T23:00"
+        },
+        "geographic_coverage": {
+          "grain": "city point",
+          "lat": 33.63796,
+          "lon": 73.0273
+        },
+        "missing_null": {
+          "precipitation": 0,
+          "rain": 0,
+          "relative_humidity_2m": 0,
+          "temperature_2m": 0,
+          "surface_pressure": 0,
+          "soil_moisture_0_to_7cm": 0,
+          "soil_moisture_7_to_28cm": 0,
+          "weather_code": 0,
+          "wind_speed_10m": 0,
+          "wind_direction_10m": 0,
+          "cloud_cover": 0,
+          "dew_point_2m": 0
+        }
+      }
+    },
+    {
+      "relative_path": "01_open_meteo_heat_rainfall/weather_karachi_raw.json",
+      "filename": "weather_karachi_raw.json",
+      "folder": "01_open_meteo_heat_rainfall",
+      "bytes": 3759620,
+      "sha256": "2eb100fa6ea1ec9a9db94402aa9a8fe029f48f14736b188ca9715193c45a517e",
+      "source": "Open-Meteo",
+      "licence": "CC-BY-4.0",
+      "source_url": "https://open-meteo.com/",
+      "profile": {
+        "format": "open_meteo_json",
+        "rows": 50808,
+        "columns": [
+          "time",
+          "precipitation",
+          "rain",
+          "relative_humidity_2m",
+          "temperature_2m",
+          "surface_pressure",
+          "soil_moisture_0_to_7cm",
+          "soil_moisture_7_to_28cm",
+          "weather_code",
+          "wind_speed_10m",
+          "wind_direction_10m",
+          "cloud_cover",
+          "dew_point_2m"
+        ],
+        "units": {
+          "time": "iso8601",
+          "precipitation": "mm",
+          "rain": "mm",
+          "relative_humidity_2m": "%",
+          "temperature_2m": "\u00b0C",
+          "surface_pressure": "hPa",
+          "soil_moisture_0_to_7cm": "m\u00b3/m\u00b3",
+          "soil_moisture_7_to_28cm": "m\u00b3/m\u00b3",
+          "weather_code": "wmo code",
+          "wind_speed_10m": "km/h",
+          "wind_direction_10m": "\u00b0",
+          "cloud_cover": "%",
+          "dew_point_2m": "\u00b0C"
+        },
+        "latitude": 24.850615,
+        "longitude": 66.992485,
+        "elevation_m": 7.0,
+        "timezone": "GMT",
+        "utc_offset_seconds": 0,
+        "date_coverage": {
+          "min": "2021-01-01T00:00",
+          "max": "2026-10-18T23:00"
+        },
+        "geographic_coverage": {
+          "grain": "city point",
+          "lat": 24.850615,
+          "lon": 66.992485
+        },
+        "missing_null": {
+          "precipitation": 0,
+          "rain": 0,
+          "relative_humidity_2m": 0,
+          "temperature_2m": 0,
+          "surface_pressure": 0,
+          "soil_moisture_0_to_7cm": 0,
+          "soil_moisture_7_to_28cm": 0,
+          "weather_code": 0,
+          "wind_speed_10m": 0,
+          "wind_direction_10m": 0,
+          "cloud_cover": 0,
+          "dew_point_2m": 0
+        }
+      }
+    },
+    {
+      "relative_path": "01_open_meteo_heat_rainfall/weather_lahore_raw.json",
+      "filename": "weather_lahore_raw.json",
+      "folder": "01_open_meteo_heat_rainfall",
+      "bytes": 3670107,
+      "sha256": "f8379cd7059aa4baa3ec8c526b97c6f6afeae2f43e5bbe4a0c35b982ee817f2d",
+      "source": "Open-Meteo",
+      "licence": "CC-BY-4.0",
+      "source_url": "https://open-meteo.com/",
+      "profile": {
+        "format": "open_meteo_json",
+        "rows": 50808,
+        "columns": [
+          "time",
+          "precipitation",
+          "rain",
+          "relative_humidity_2m",
+          "temperature_2m",
+          "surface_pressure",
+          "soil_moisture_0_to_7cm",
+          "soil_moisture_7_to_28cm",
+          "weather_code",
+          "wind_speed_10m",
+          "wind_direction_10m",
+          "cloud_cover",
+          "dew_point_2m"
+        ],
+        "units": {
+          "time": "iso8601",
+          "precipitation": "mm",
+          "rain": "mm",
+          "relative_humidity_2m": "%",
+          "temperature_2m": "\u00b0C",
+          "surface_pressure": "hPa",
+          "soil_moisture_0_to_7cm": "m\u00b3/m\u00b3",
+          "soil_moisture_7_to_28cm": "m\u00b3/m\u00b3",
+          "weather_code": "wmo code",
+          "wind_speed_10m": "km/h",
+          "wind_direction_10m": "\u00b0",
+          "cloud_cover": "%",
+          "dew_point_2m": "\u00b0C"
+        },
+        "latitude": 31.528997,
+        "longitude": 74.38995,
+        "elevation_m": 220.0,
+        "timezone": "GMT",
+        "utc_offset_seconds": 0,
+        "date_coverage": {
+          "min": "2021-01-01T00:00",
+          "max": "2026-10-18T23:00"
+        },
+        "geographic_coverage": {
+          "grain": "city point",
+          "lat": 31.528997,
+          "lon": 74.38995
+        },
+        "missing_null": {
+          "precipitation": 0,
+          "rain": 0,
+          "relative_humidity_2m": 0,
+          "temperature_2m": 0,
+          "surface_pressure": 0,
+          "soil_moisture_0_to_7cm": 0,
+          "soil_moisture_7_to_28cm": 0,
+          "weather_code": 0,
+          "wind_speed_10m": 0,
+          "wind_direction_10m": 0,
+          "cloud_cover": 0,
+          "dew_point_2m": 0
+        }
+      }
+    },
+    {
+      "relative_path": "01_open_meteo_heat_rainfall/weather_multan_raw.json",
+      "filename": "weather_multan_raw.json",
+      "folder": "01_open_meteo_heat_rainfall",
+      "bytes": 3675494,
+      "sha256": "4d2b9086fb7e9c7ced5ebf5165ae7337f9962eb7710ae43e56e8e6b981058151",
+      "source": "Open-Meteo",
+      "licence": "CC-BY-4.0",
+      "source_url": "https://open-meteo.com/",
+      "profile": {
+        "format": "open_meteo_json",
+        "rows": 50808,
+        "columns": [
+          "time",
+          "precipitation",
+          "rain",
+          "relative_humidity_2m",
+          "temperature_2m",
+          "surface_pressure",
+          "soil_moisture_0_to_7cm",
+          "soil_moisture_7_to_28cm",
+          "weather_code",
+          "wind_speed_10m",
+          "wind_direction_10m",
+          "cloud_cover",
+          "dew_point_2m"
+        ],
+        "units": {
+          "time": "iso8601",
+          "precipitation": "mm",
+          "rain": "mm",
+          "relative_humidity_2m": "%",
+          "temperature_2m": "\u00b0C",
+          "surface_pressure": "hPa",
+          "soil_moisture_0_to_7cm": "m\u00b3/m\u00b3",
+          "soil_moisture_7_to_28cm": "m\u00b3/m\u00b3",
+          "weather_code": "wmo code",
+          "wind_speed_10m": "km/h",
+          "wind_direction_10m": "\u00b0",
+          "cloud_cover": "%",
+          "dew_point_2m": "\u00b0C"
+        },
+        "latitude": 30.123022,
+        "longitude": 71.49533,
+        "elevation_m": 125.0,
+        "timezone": "GMT",
+        "utc_offset_seconds": 0,
+        "date_coverage": {
+          "min": "2021-01-01T00:00",
+          "max": "2026-10-18T23:00"
+        },
+        "geographic_coverage": {
+          "grain": "city point",
+          "lat": 30.123022,
+          "lon": 71.49533
+        },
+        "missing_null": {
+          "precipitation": 0,
+          "rain": 0,
+          "relative_humidity_2m": 0,
+          "temperature_2m": 0,
+          "surface_pressure": 0,
+          "soil_moisture_0_to_7cm": 0,
+          "soil_moisture_7_to_28cm": 0,
+          "weather_code": 0,
+          "wind_speed_10m": 0,
+          "wind_direction_10m": 0,
+          "cloud_cover": 0,
+          "dew_point_2m": 0
+        }
+      }
+    },
+    {
+      "relative_path": "01_open_meteo_heat_rainfall/weather_peshawar_raw.json",
+      "filename": "weather_peshawar_raw.json",
+      "folder": "01_open_meteo_heat_rainfall",
+      "bytes": 2395676,
+      "sha256": "120a6ba10ad45e50dc2d7c5e1304f85a60fd1d620a82cfb0475778b28c0e56dc",
+      "source": "Open-Meteo",
+      "licence": "CC-BY-4.0",
+      "source_url": "https://open-meteo.com/",
+      "profile": {
+        "format": "open_meteo_json",
+        "rows": 33288,
+        "columns": [
+          "time",
+          "precipitation",
+          "rain",
+          "relative_humidity_2m",
+          "temperature_2m",
+          "surface_pressure",
+          "soil_moisture_0_to_7cm",
+          "soil_moisture_7_to_28cm",
+          "weather_code",
+          "wind_speed_10m",
+          "wind_direction_10m",
+          "cloud_cover",
+          "dew_point_2m"
+        ],
+        "units": {
+          "time": "iso8601",
+          "precipitation": "mm",
+          "rain": "mm",
+          "relative_humidity_2m": "%",
+          "temperature_2m": "\u00b0C",
+          "surface_pressure": "hPa",
+          "soil_moisture_0_to_7cm": "m\u00b3/m\u00b3",
+          "soil_moisture_7_to_28cm": "m\u00b3/m\u00b3",
+          "weather_code": "wmo code",
+          "wind_speed_10m": "km/h",
+          "wind_direction_10m": "\u00b0",
+          "cloud_cover": "%",
+          "dew_point_2m": "\u00b0C"
+        },
+        "latitude": 34.059753,
+        "longitude": 71.549995,
+        "elevation_m": 349.0,
+        "timezone": "GMT",
+        "utc_offset_seconds": 0,
+        "date_coverage": {
+          "min": "2023-01-01T00:00",
+          "max": "2026-10-18T23:00"
+        },
+        "geographic_coverage": {
+          "grain": "city point",
+          "lat": 34.059753,
+          "lon": 71.549995
+        },
+        "missing_null": {
+          "precipitation": 0,
+          "rain": 0,
+          "relative_humidity_2m": 0,
+          "temperature_2m": 0,
+          "surface_pressure": 0,
+          "soil_moisture_0_to_7cm": 0,
+          "soil_moisture_7_to_28cm": 0,
+          "weather_code": 0,
+          "wind_speed_10m": 0,
+          "wind_direction_10m": 0,
+          "cloud_cover": 0,
+          "dew_point_2m": 0
+        }
+      }
+    },
+    {
+      "relative_path": "01_open_meteo_heat_rainfall/weather_quetta_raw.json",
+      "filename": "weather_quetta_raw.json",
+      "folder": "01_open_meteo_heat_rainfall",
+      "bytes": 3665991,
+      "sha256": "d2b7b1c38052d55e049d5b58edf08e494390926e53879fc871164ebac01ff044",
+      "source": "Open-Meteo",
+      "licence": "CC-BY-4.0",
+      "source_url": "https://open-meteo.com/",
+      "profile": {
+        "format": "open_meteo_json",
+        "rows": 50808,
+        "columns": [
+          "time",
+          "precipitation",
+          "rain",
+          "relative_humidity_2m",
+          "temperature_2m",
+          "surface_pressure",
+          "soil_moisture_0_to_7cm",
+          "soil_moisture_7_to_28cm",
+          "weather_code",
+          "wind_speed_10m",
+          "wind_direction_10m",
+          "cloud_cover",
+          "dew_point_2m"
+        ],
+        "units": {
+          "time": "iso8601",
+          "precipitation": "mm",
+          "rain": "mm",
+          "relative_humidity_2m": "%",
+          "temperature_2m": "\u00b0C",
+          "surface_pressure": "hPa",
+          "soil_moisture_0_to_7cm": "m\u00b3/m\u00b3",
+          "soil_moisture_7_to_28cm": "m\u00b3/m\u00b3",
+          "weather_code": "wmo code",
+          "wind_speed_10m": "km/h",
+          "wind_direction_10m": "\u00b0",
+          "cloud_cover": "%",
+          "dew_point_2m": "\u00b0C"
+        },
+        "latitude": 30.193321,
+        "longitude": 66.94737,
+        "elevation_m": 1645.0,
+        "timezone": "GMT",
+        "utc_offset_seconds": 0,
+        "date_coverage": {
+          "min": "2021-01-01T00:00",
+          "max": "2026-10-18T23:00"
+        },
+        "geographic_coverage": {
+          "grain": "city point",
+          "lat": 30.193321,
+          "lon": 66.94737
+        },
+        "missing_null": {
+          "precipitation": 0,
+          "rain": 0,
+          "relative_humidity_2m": 0,
+          "temperature_2m": 0,
+          "surface_pressure": 0,
+          "soil_moisture_0_to_7cm": 0,
+          "soil_moisture_7_to_28cm": 0,
+          "weather_code": 0,
+          "wind_speed_10m": 0,
+          "wind_direction_10m": 0,
+          "cloud_cover": 0,
+          "dew_point_2m": 0
+        }
+      }
+    },
+    {
+      "relative_path": "01_open_meteo_heat_rainfall/weather_rawalpindi_raw.json",
+      "filename": "weather_rawalpindi_raw.json",
+      "folder": "01_open_meteo_heat_rainfall",
+      "bytes": 3662453,
+      "sha256": "8bb43d087bfe09d93ee8e1e130354ec5b0952d5971d3e26ce1d874937669061a",
+      "source": "Open-Meteo",
+      "licence": "CC-BY-4.0",
+      "source_url": "https://open-meteo.com/",
+      "profile": {
+        "format": "open_meteo_json",
+        "rows": 50808,
+        "columns": [
+          "time",
+          "precipitation",
+          "rain",
+          "relative_humidity_2m",
+          "temperature_2m",
+          "surface_pressure",
+          "soil_moisture_0_to_7cm",
+          "soil_moisture_7_to_28cm",
+          "weather_code",
+          "wind_speed_10m",
+          "wind_direction_10m",
+          "cloud_cover",
+          "dew_point_2m"
+        ],
+        "units": {
+          "time": "iso8601",
+          "precipitation": "mm",
+          "rain": "mm",
+          "relative_humidity_2m": "%",
+          "temperature_2m": "\u00b0C",
+          "surface_pressure": "hPa",
+          "soil_moisture_0_to_7cm": "m\u00b3/m\u00b3",
+          "soil_moisture_7_to_28cm": "m\u00b3/m\u00b3",
+          "weather_code": "wmo code",
+          "wind_speed_10m": "km/h",
+          "wind_direction_10m": "\u00b0",
+          "cloud_cover": "%",
+          "dew_point_2m": "\u00b0C"
+        },
+        "latitude": 33.56766,
+        "longitude": 73.048325,
+        "elevation_m": 510.0,
+        "timezone": "GMT",
+        "utc_offset_seconds": 0,
+        "date_coverage": {
+          "min": "2021-01-01T00:00",
+          "max": "2026-10-18T23:00"
+        },
+        "geographic_coverage": {
+          "grain": "city point",
+          "lat": 33.56766,
+          "lon": 73.048325
+        },
+        "missing_null": {
+          "precipitation": 0,
+          "rain": 0,
+          "relative_humidity_2m": 0,
+          "temperature_2m": 0,
+          "surface_pressure": 0,
+          "soil_moisture_0_to_7cm": 0,
+          "soil_moisture_7_to_28cm": 0,
+          "weather_code": 0,
+          "wind_speed_10m": 0,
+          "wind_direction_10m": 0,
+          "cloud_cover": 0,
+          "dew_point_2m": 0
+        }
+      }
+    },
+    {
+      "relative_path": "01_open_meteo_heat_rainfall/weather_sukkur_raw.json",
+      "filename": "weather_sukkur_raw.json",
+      "folder": "01_open_meteo_heat_rainfall",
+      "bytes": 3688184,
+      "sha256": "390b1fb985665b6f8eba0fa3bab853d7ab7a1901f13fb3d297043cf8625256a9",
+      "source": "Open-Meteo",
+      "licence": "CC-BY-4.0",
+      "source_url": "https://open-meteo.com/",
+      "profile": {
+        "format": "open_meteo_json",
+        "rows": 50808,
+        "columns": [
+          "time",
+          "precipitation",
+          "rain",
+          "relative_humidity_2m",
+          "temperature_2m",
+          "surface_pressure",
+          "soil_moisture_0_to_7cm",
+          "soil_moisture_7_to_28cm",
+          "weather_code",
+          "wind_speed_10m",
+          "wind_direction_10m",
+          "cloud_cover",
+          "dew_point_2m"
+        ],
+        "units": {
+          "time": "iso8601",
+          "precipitation": "mm",
+          "rain": "mm",
+          "relative_humidity_2m": "%",
+          "temperature_2m": "\u00b0C",
+          "surface_pressure": "hPa",
+          "soil_moisture_0_to_7cm": "m\u00b3/m\u00b3",
+          "soil_moisture_7_to_28cm": "m\u00b3/m\u00b3",
+          "weather_code": "wmo code",
+          "wind_speed_10m": "km/h",
+          "wind_direction_10m": "\u00b0",
+          "cloud_cover": "%",
+          "dew_point_2m": "\u00b0C"
+        },
+        "latitude": 27.732864,
+        "longitude": 68.865166,
+        "elevation_m": 72.0,
+        "timezone": "GMT",
+        "utc_offset_seconds": 0,
+        "date_coverage": {
+          "min": "2021-01-01T00:00",
+          "max": "2026-10-18T23:00"
+        },
+        "geographic_coverage": {
+          "grain": "city point",
+          "lat": 27.732864,
+          "lon": 68.865166
+        },
+        "missing_null": {
+          "precipitation": 0,
+          "rain": 0,
+          "relative_humidity_2m": 0,
+          "temperature_2m": 0,
+          "surface_pressure": 0,
+          "soil_moisture_0_to_7cm": 0,
+          "soil_moisture_7_to_28cm": 0,
+          "weather_code": 0,
+          "wind_speed_10m": 0,
+          "wind_direction_10m": 0,
+          "cloud_cover": 0,
+          "dew_point_2m": 0
+        }
+      }
+    },
+    {
+      "relative_path": "02_openstreetmap_geofabrik/README.txt",
+      "filename": "README.txt",
+      "folder": "02_openstreetmap_geofabrik",
+      "bytes": 1024,
+      "sha256": "5ea011f5b85efa638ed77063280b608ff5aad0dd624d79b5f90e96a9d60d4a78",
+      "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
+      "licence": "ODbL-1.0",
+      "source_url": "https://www.openstreetmap.org/",
+      "profile": {
+        "format": "txt",
+        "rows": null,
+        "columns": []
+      }
+    },
+    {
+      "relative_path": "02_openstreetmap_geofabrik/config.yaml",
+      "filename": "config.yaml",
+      "folder": "02_openstreetmap_geofabrik",
+      "bytes": 2141,
+      "sha256": "d1a3446094c6a42ac3f48913955b79f759af22a40c260f23dfd6ebde8aea5cf2",
+      "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
+      "licence": "ODbL-1.0",
+      "source_url": "https://www.openstreetmap.org/",
+      "profile": {
+        "format": "yaml",
+        "rows": null,
+        "columns": []
+      }
+    },
+    {
+      "relative_path": "02_openstreetmap_geofabrik/geofabrik_pakistan_latest.osm.pbf.md5",
+      "filename": "geofabrik_pakistan_latest.osm.pbf.md5",
+      "folder": "02_openstreetmap_geofabrik",
+      "bytes": 58,
+      "sha256": "623371af193352d79b0c9ed3eda1078fbdb24f927aedb941a9bc935934d7cc66",
+      "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
+      "licence": "ODbL-1.0",
+      "source_url": "https://www.openstreetmap.org/",
+      "profile": {
+        "format": "md5",
+        "rows": null,
+        "columns": []
+      }
+    },
+    {
+      "relative_path": "02_openstreetmap_geofabrik/health_facilities.geojson",
+      "filename": "health_facilities.geojson",
+      "folder": "02_openstreetmap_geofabrik",
+      "bytes": 3701516,
+      "sha256": "9fc62b0dcc92c5af2f8f50169f70cbe1b8f8408e8cad06f9b3cfbcf6c15c3645",
+      "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
+      "licence": "ODbL-1.0",
+      "source_url": "https://www.openstreetmap.org/",
+      "profile": {
+        "format": "geojson",
+        "rows": 5144,
+        "columns": [
+          "addr_city",
+          "addr_full",
+          "adm0_name",
+          "adm0_pcode",
+          "adm1_name",
+          "adm1_pcode",
+          "adm2_name",
+          "adm2_pcode",
+          "adm3_name",
+          "adm3_pcode",
+          "adm4_name",
+          "adm4_pcode",
+          "amenity",
+          "building",
+          "capacity_persons",
+          "healthcare",
+          "healthcare_speciality",
+          "id",
+          "name",
+          "name_en",
+          "name_latin",
+          "name_ur",
+          "operator_type",
+          "source"
+        ],
+        "geometry_types": {
+          "Point": 4396,
+          "Polygon": 748
+        },
+        "unnamed_features": 276,
+        "missing_null": {
+          "name_ur": 4902,
+          "building": 4907,
+          "healthcare": 1993,
+          "healthcare_speciality": 4869,
+          "operator_type": 4871,
+          "capacity_persons": 5144,
+          "addr_full": 5130,
+          "addr_city": 2121,
+          "source": 5144,
+          "adm4_pcode": 5144,
+          "adm4_name": 5144,
+          "name_en": 4835,
+          "amenity": 402,
+          "name": 291,
+          "name_latin": 276,
+          "adm1_pcode": 223,
+          "adm1_name": 223,
+          "adm2_pcode": 223,
+          "adm2_name": 223,
+          "adm3_pcode": 223,
+          "adm3_name": 223
+        },
+        "geographic_coverage": {
+          "grain": "OSM feature",
+          "adm1": {
+            "Punjab": 1461,
+            "Sindh": 2846,
+            "Balochistan": 79,
+            "Khyber Pakhtunkhwa": 358,
+            "Islamabad": 177
+          },
+          "crs": {
+            "type": "name",
+            "properties": {
+              "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+            }
+          }
+        },
+        "date_coverage": "OSM snapshot 2026-10-12 (see folder README/metadata)"
+      }
+    },
+    {
+      "relative_path": "02_openstreetmap_geofabrik/metadata.json",
+      "filename": "metadata.json",
+      "folder": "02_openstreetmap_geofabrik",
+      "bytes": 10599,
+      "sha256": "547ba86b4e66ac8333e6ea23a48ae2a9c8cd54aec140128c896f0934a2ca3392",
+      "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
+      "licence": "ODbL-1.0",
+      "source_url": "https://www.openstreetmap.org/",
+      "profile": {
+        "format": "json",
+        "rows": null,
+        "columns": []
+      }
+    },
+    {
+      "relative_path": "02_openstreetmap_geofabrik/osm_pak_emergency_facilities_infrastructure.csv",
+      "filename": "osm_pak_emergency_facilities_infrastructure.csv",
+      "folder": "02_openstreetmap_geofabrik",
+      "bytes": 3105,
+      "sha256": "57918360f14c76f7991b1b1e4ee9d025c0a9b5ac155d4920c185f072652af551",
+      "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
+      "licence": "ODbL-1.0",
+      "source_url": "https://www.openstreetmap.org/",
+      "profile": {
+        "format": "csv",
+        "rows": 160,
+        "columns": [
+          "ADM2_PCODE",
+          "ADM_PCODE",
+          "education_count",
+          "hospitals_count",
+          "primary_healthcare_count"
+        ],
+        "dtypes": {
+          "ADM2_PCODE": "str",
+          "ADM_PCODE": "str",
+          "education_count": "int64",
+          "hospitals_count": "int64",
+          "primary_healthcare_count": "int64"
+        },
+        "missing_null": {
+          "ADM2_PCODE": 0,
+          "ADM_PCODE": 0,
+          "education_count": 0,
+          "hospitals_count": 0,
+          "primary_healthcare_count": 0
+        },
+        "duplicate_rows": 0,
+        "numeric_min_max": {
+          "education_count": {
+            "min": 0.0,
+            "max": 349.0,
+            "zeros": 35
+          },
+          "hospitals_count": {
+            "min": 0.0,
+            "max": 243.0,
+            "zeros": 30
+          },
+          "primary_healthcare_count": {
+            "min": 0.0,
+            "max": 189.0,
+            "zeros": 70
+          }
+        },
+        "geographic_coverage": {
+          "grain": "ADM2_PCODE district",
+          "n_codes": 160,
+          "prefixes": [
+            "PK1",
+            "PK2",
+            "PK3",
+            "PK4",
+            "PK5",
+            "PK6",
+            "PK7"
+          ]
+        },
+        "date_coverage": "snapshot; no date column"
+      }
+    },
+    {
+      "relative_path": "02_openstreetmap_geofabrik/osm_pak_hospital_travel_access_times.csv",
+      "filename": "osm_pak_hospital_travel_access_times.csv",
+      "folder": "02_openstreetmap_geofabrik",
+      "bytes": 10371,
+      "sha256": "a96b4a7b2af7c6241a985d6f87f6839e5b7194663358c1842204928c19a55f21",
+      "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
+      "licence": "ODbL-1.0",
+      "source_url": "https://www.openstreetmap.org/",
+      "profile": {
+        "format": "csv",
+        "rows": 160,
+        "columns": [
+          "ADM2_PCODE",
+          "ADM_PCODE",
+          "access_pop_education_5km",
+          "access_pop_education_10km",
+          "access_pop_education_20km",
+          "access_pop_hospitals_30min",
+          "access_pop_hospitals_1h",
+          "access_pop_hospitals_2h",
+          "access_pop_primary_healthcare_30min",
+          "access_pop_primary_healthcare_1h",
+          "access_pop_primary_healthcare_2h"
+        ],
+        "dtypes": {
+          "ADM2_PCODE": "str",
+          "ADM_PCODE": "str",
+          "access_pop_education_5km": "int64",
+          "access_pop_education_10km": "int64",
+          "access_pop_education_20km": "int64",
+          "access_pop_hospitals_30min": "int64",
+          "access_pop_hospitals_1h": "int64",
+          "access_pop_hospitals_2h": "int64",
+          "access_pop_primary_healthcare_30min": "int64",
+          "access_pop_primary_healthcare_1h": "int64",
+          "access_pop_primary_healthcare_2h": "int64"
+        },
+        "missing_null": {
+          "ADM2_PCODE": 0,
+          "ADM_PCODE": 0,
+          "access_pop_education_5km": 0,
+          "access_pop_education_10km": 0,
+          "access_pop_education_20km": 0,
+          "access_pop_hospitals_30min": 0,
+          "access_pop_hospitals_1h": 0,
+          "access_pop_hospitals_2h": 0,
+          "access_pop_primary_healthcare_30min": 0,
+          "access_pop_primary_healthcare_1h": 0,
+          "access_pop_primary_healthcare_2h": 0
+        },
+        "duplicate_rows": 0,
+        "numeric_min_max": {
+          "access_pop_education_5km": {
+            "min": 0.0,
+            "max": 12329022.0,
+            "zeros": 39
+          },
+          "access_pop_education_10km": {
+            "min": 0.0,
+            "max": 13708022.0,
+            "zeros": 33
+          },
+          "access_pop_education_20km": {
+            "min": 0.0,
+            "max": 14132696.0,
+            "zeros": 26
+          },
+          "access_pop_hospitals_30min": {
+            "min": 0.0,
+            "max": 14131289.0,
+            "zeros": 64
+          },
+          "access_pop_hospitals_1h": {
+            "min": 0.0,
+            "max": 14242912.0,
+            "zeros": 42
+          },
+          "access_pop_hospitals_2h": {
+            "min": 0.0,
+            "max": 14246827.0,
+            "zeros": 19
+          },
+          "access_pop_primary_healthcare_30min": {
+            "min": 0.0,
+            "max": 14096390.0,
+            "zeros": 85
+          },
+          "access_pop_primary_healthcare_1h": {
+            "min": 0.0,
+            "max": 14240766.0,
+            "zeros": 55
+          },
+          "access_pop_primary_healthcare_2h": {
+            "min": 0.0,
+            "max": 14246759.0,
+            "zeros": 24
+          }
+        },
+        "geographic_coverage": {
+          "grain": "ADM2_PCODE district",
+          "n_codes": 160,
+          "prefixes": [
+            "PK1",
+            "PK2",
+            "PK3",
+            "PK4",
+            "PK5",
+            "PK6",
+            "PK7"
+          ]
+        },
+        "date_coverage": "snapshot; no date column"
+      }
+    },
+    {
+      "relative_path": "02_openstreetmap_geofabrik/osm_pak_road_network_flood_exposure.csv",
+      "filename": "osm_pak_road_network_flood_exposure.csv",
+      "folder": "02_openstreetmap_geofabrik",
+      "bytes": 46832,
+      "sha256": "bf8877f121b70cc099815a3b5b57a0b43d860cc280511b3be1373f40de6fa631",
+      "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
+      "licence": "ODbL-1.0",
+      "source_url": "https://www.openstreetmap.org/",
+      "profile": {
+        "format": "csv",
+        "rows": 160,
+        "columns": [
+          "ADM2_PCODE",
+          "RP10_crops_30cm_km2",
+          "RP10_crops_30cm_areapct",
+          "RP10_crops_30cm_croppct",
+          "RP10_female_pop_30cm",
+          "RP10_children_u5_30cm",
+          "RP10_female_u5_30cm",
+          "RP10_elderly_30cm",
+          "RP10_pop_u15_30cm",
+          "RP10_female_u15_30cm",
+          "RP10_wra_pop_30cm",
+          "RP10_dependency_ratio_30cm",
+          "RP10_education_30cm_pct",
+          "RP10_education_30cm_count",
+          "RP10_hospitals_30cm_pct",
+          "RP10_hospitals_30cm_count",
+          "RP10_primary_healthcare_30cm_pct",
+          "RP10_primary_healthcare_30cm_count",
+          "RP50_crops_30cm_km2",
+          "RP50_crops_30cm_areapct",
+          "RP50_crops_30cm_croppct",
+          "RP50_female_pop_30cm",
+          "RP50_children_u5_30cm",
+          "RP50_female_u5_30cm",
+          "RP50_elderly_30cm",
+          "RP50_pop_u15_30cm",
+          "RP50_female_u15_30cm",
+          "RP50_wra_pop_30cm",
+          "RP50_dependency_ratio_30cm",
+          "RP50_education_30cm_pct",
+          "RP50_education_30cm_count",
+          "RP50_hospitals_30cm_pct",
+          "RP50_hospitals_30cm_count",
+          "RP50_primary_healthcare_30cm_pct",
+          "RP50_primary_healthcare_30cm_count",
+          "RP100_crops_30cm_km2",
+          "RP100_crops_30cm_areapct",
+          "RP100_crops_30cm_croppct",
+          "RP100_female_pop_30cm",
+          "RP100_children_u5_30cm",
+          "RP100_female_u5_30cm",
+          "RP100_elderly_30cm",
+          "RP100_pop_u15_30cm",
+          "RP100_female_u15_30cm",
+          "RP100_wra_pop_30cm",
+          "RP100_dependency_ratio_30cm",
+          "RP100_education_30cm_pct",
+          "RP100_education_30cm_count",
+          "RP100_hospitals_30cm_pct",
+          "RP100_hospitals_30cm_count",
+          "RP100_primary_healthcare_30cm_pct",
+          "RP100_primary_healthcare_30cm_count",
+          "RP500_crops_30cm_km2",
+          "RP500_crops_30cm_areapct",
+          "RP500_crops_30cm_croppct",
+          "RP500_female_pop_30cm",
+          "RP500_children_u5_30cm",
+          "RP500_female_u5_30cm",
+          "RP500_elderly_30cm",
+          "RP500_pop_u15_30cm",
+          "RP500_female_u15_30cm",
+          "RP500_wra_pop_30cm",
+          "RP500_dependency_ratio_30cm",
+          "RP500_education_30cm_pct",
+          "RP500_education_30cm_count",
+          "RP500_hospitals_30cm_pct",
+          "RP500_hospitals_30cm_count",
+          "RP500_primary_healthcare_30cm_pct",
+          "RP500_primary_healthcare_30cm_count"
+        ],
+        "dtypes": {
+          "ADM2_PCODE": "str",
+          "RP10_crops_30cm_km2": "float64",
+          "RP10_crops_30cm_areapct": "float64",
+          "RP10_crops_30cm_croppct": "float64",
+          "RP10_female_pop_30cm": "int64",
+          "RP10_children_u5_30cm": "int64",
+          "RP10_female_u5_30cm": "int64",
+          "RP10_elderly_30cm": "int64",
+          "RP10_pop_u15_30cm": "int64",
+          "RP10_female_u15_30cm": "int64",
+          "RP10_wra_pop_30cm": "int64",
+          "RP10_dependency_ratio_30cm": "float64",
+          "RP10_education_30cm_pct": "int64",
+          "RP10_education_30cm_count": "int64",
+          "RP10_hospitals_30cm_pct": "int64",
+          "RP10_hospitals_30cm_count": "int64",
+          "RP10_primary_healthcare_30cm_pct": "int64",
+          "RP10_primary_healthcare_30cm_count": "int64",
+          "RP50_crops_30cm_km2": "float64",
+          "RP50_crops_30cm_areapct": "float64",
+          "RP50_crops_30cm_croppct": "float64",
+          "RP50_female_pop_30cm": "int64",
+          "RP50_children_u5_30cm": "int64",
+          "RP50_female_u5_30cm": "int64",
+          "RP50_elderly_30cm": "int64",
+          "RP50_pop_u15_30cm": "int64",
+          "RP50_female_u15_30cm": "int64",
+          "RP50_wra_pop_30cm": "int64",
+          "RP50_dependency_ratio_30cm": "float64",
+          "RP50_education_30cm_pct": "int64",
+          "RP50_education_30cm_count": "int64",
+          "RP50_hospitals_30cm_pct": "int64",
+          "RP50_hospitals_30cm_count": "int64",
+          "RP50_primary_healthcare_30cm_pct": "int64",
+          "RP50_primary_healthcare_30cm_count": "int64",
+          "RP100_crops_30cm_km2": "float64",
+          "RP100_crops_30cm_areapct": "float64",
+          "RP100_crops_30cm_croppct": "float64",
+          "RP100_female_pop_30cm": "int64",
+          "RP100_children_u5_30cm": "int64",
+          "RP100_female_u5_30cm": "int64",
+          "RP100_elderly_30cm": "int64",
+          "RP100_pop_u15_30cm": "int64",
+          "RP100_female_u15_30cm": "int64",
+          "RP100_wra_pop_30cm": "int64",
+          "RP100_dependency_ratio_30cm": "float64",
+          "RP100_education_30cm_pct": "int64",
+          "RP100_education_30cm_count": "int64",
+          "RP100_hospitals_30cm_pct": "int64",
+          "RP100_hospitals_30cm_count": "int64",
+          "RP100_primary_healthcare_30cm_pct": "int64",
+          "RP100_primary_healthcare_30cm_count": "int64",
+          "RP500_crops_30cm_km2": "float64",
+          "RP500_crops_30cm_areapct": "float64",
+          "RP500_crops_30cm_croppct": "float64",
+          "RP500_female_pop_30cm": "int64",
+          "RP500_children_u5_30cm": "int64",
+          "RP500_female_u5_30cm": "int64",
+          "RP500_elderly_30cm": "int64",
+          "RP500_pop_u15_30cm": "int64",
+          "RP500_female_u15_30cm": "int64",
+          "RP500_wra_pop_30cm": "int64",
+          "RP500_dependency_ratio_30cm": "float64",
+          "RP500_education_30cm_pct": "int64",
+          "RP500_education_30cm_count": "int64",
+          "RP500_hospitals_30cm_pct": "int64",
+          "RP500_hospitals_30cm_count": "int64",
+          "RP500_primary_healthcare_30cm_pct": "int64",
+          "RP500_primary_healthcare_30cm_count": "int64"
+        },
+        "missing_null": {
+          "ADM2_PCODE": 0,
+          "RP10_crops_30cm_km2": 0,
+          "RP10_crops_30cm_areapct": 0,
+          "RP10_crops_30cm_croppct": 0,
+          "RP10_female_pop_30cm": 0,
+          "RP10_children_u5_30cm": 0,
+          "RP10_female_u5_30cm": 0,
+          "RP10_elderly_30cm": 0,
+          "RP10_pop_u15_30cm": 0,
+          "RP10_female_u15_30cm": 0,
+          "RP10_wra_pop_30cm": 0,
+          "RP10_dependency_ratio_30cm": 0,
+          "RP10_education_30cm_pct": 0,
+          "RP10_education_30cm_count": 0,
+          "RP10_hospitals_30cm_pct": 0,
+          "RP10_hospitals_30cm_count": 0,
+          "RP10_primary_healthcare_30cm_pct": 0,
+          "RP10_primary_healthcare_30cm_count": 0,
+          "RP50_crops_30cm_km2": 0,
+          "RP50_crops_30cm_areapct": 0,
+          "RP50_crops_30cm_croppct": 0,
+          "RP50_female_pop_30cm": 0,
+          "RP50_children_u5_30cm": 0,
+          "RP50_female_u5_30cm": 0,
+          "RP50_elderly_30cm": 0,
+          "RP50_pop_u15_30cm": 0,
+          "RP50_female_u15_30cm": 0,
+          "RP50_wra_pop_30cm": 0,
+          "RP50_dependency_ratio_30cm": 0,
+          "RP50_education_30cm_pct": 0,
+          "RP50_education_30cm_count": 0,
+          "RP50_hospitals_30cm_pct": 0,
+          "RP50_hospitals_30cm_count": 0,
+          "RP50_primary_healthcare_30cm_pct": 0,
+          "RP50_primary_healthcare_30cm_count": 0,
+          "RP100_crops_30cm_km2": 0,
+          "RP100_crops_30cm_areapct": 0,
+          "RP100_crops_30cm_croppct": 0,
+          "RP100_female_pop_30cm": 0,
+          "RP100_children_u5_30cm": 0,
+          "RP100_female_u5_30cm": 0,
+          "RP100_elderly_30cm": 0,
+          "RP100_pop_u15_30cm": 0,
+          "RP100_female_u15_30cm": 0,
+          "RP100_wra_pop_30cm": 0,
+          "RP100_dependency_ratio_30cm": 0,
+          "RP100_education_30cm_pct": 0,
+          "RP100_education_30cm_count": 0,
+          "RP100_hospitals_30cm_pct": 0,
+          "RP100_hospitals_30cm_count": 0,
+          "RP100_primary_healthcare_30cm_pct": 0,
+          "RP100_primary_healthcare_30cm_count": 0,
+          "RP500_crops_30cm_km2": 0,
+          "RP500_crops_30cm_areapct": 0,
+          "RP500_crops_30cm_croppct": 0,
+          "RP500_female_pop_30cm": 0,
+          "RP500_children_u5_30cm": 0,
+          "RP500_female_u5_30cm": 0,
+          "RP500_elderly_30cm": 0,
+          "RP500_pop_u15_30cm": 0,
+          "RP500_female_u15_30cm": 0,
+          "RP500_wra_pop_30cm": 0,
+          "RP500_dependency_ratio_30cm": 0,
+          "RP500_education_30cm_pct": 0,
+          "RP500_education_30cm_count": 0,
+          "RP500_hospitals_30cm_pct": 0,
+          "RP500_hospitals_30cm_count": 0,
+          "RP500_primary_healthcare_30cm_pct": 0,
+          "RP500_primary_healthcare_30cm_count": 0
+        },
+        "duplicate_rows": 0,
+        "numeric_min_max": {
+          "RP10_crops_30cm_km2": {
+            "min": 0.0,
+            "max": 0.0,
+            "zeros": 160
+          },
+          "RP10_crops_30cm_areapct": {
+            "min": 0.0,
+            "max": 0.0,
+            "zeros": 160
+          },
+          "RP10_crops_30cm_croppct": {
+            "min": 0.0,
+            "max": 0.0,
+            "zeros": 160
+          },
+          "RP10_female_pop_30cm": {
+            "min": 0.0,
+            "max": 2616682.0,
+            "zeros": 2
+          },
+          "RP10_children_u5_30cm": {
+            "min": 0.0,
+            "max": 655965.0,
+            "zeros": 2
+          },
+          "RP10_female_u5_30cm": {
+            "min": 0.0,
+            "max": 321047.0,
+            "zeros": 2
+          },
+          "RP10_elderly_30cm": {
+            "min": 0.0,
+            "max": 239983.0,
+            "zeros": 2
+          },
+          "RP10_pop_u15_30cm": {
+            "min": 0.0,
+            "max": 1915629.0,
+            "zeros": 2
+          },
+          "RP10_female_u15_30cm": {
+            "min": 0.0,
+            "max": 935082.0,
+            "zeros": 2
+          },
+          "RP10_wra_pop_30cm": {
+            "min": 0.0,
+            "max": 1316392.0,
+            "zeros": 2
+          },
+          "RP10_dependency_ratio_30cm": {
+            "min": 0.0,
+            "max": 128.73,
+            "zeros": 2
+          },
+          "RP10_education_30cm_pct": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 105
+          },
+          "RP10_education_30cm_count": {
+            "min": 0.0,
+            "max": 83.0,
+            "zeros": 103
+          },
+          "RP10_hospitals_30cm_pct": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 120
+          },
+          "RP10_hospitals_30cm_count": {
+            "min": 0.0,
+            "max": 27.0,
+            "zeros": 120
+          },
+          "RP10_primary_healthcare_30cm_pct": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 133
+          },
+          "RP10_primary_healthcare_30cm_count": {
+            "min": 0.0,
+            "max": 5.0,
+            "zeros": 133
+          },
+          "RP50_crops_30cm_km2": {
+            "min": 0.0,
+            "max": 0.0,
+            "zeros": 160
+          },
+          "RP50_crops_30cm_areapct": {
+            "min": 0.0,
+            "max": 0.0,
+            "zeros": 160
+          },
+          "RP50_crops_30cm_croppct": {
+            "min": 0.0,
+            "max": 0.0,
+            "zeros": 160
+          },
+          "RP50_female_pop_30cm": {
+            "min": 0.0,
+            "max": 2821039.0,
+            "zeros": 2
+          },
+          "RP50_children_u5_30cm": {
+            "min": 0.0,
+            "max": 707531.0,
+            "zeros": 2
+          },
+          "RP50_female_u5_30cm": {
+            "min": 0.0,
+            "max": 346284.0,
+            "zeros": 2
+          },
+          "RP50_elderly_30cm": {
+            "min": 0.0,
+            "max": 258419.0,
+            "zeros": 2
+          },
+          "RP50_pop_u15_30cm": {
+            "min": 0.0,
+            "max": 2065684.0,
+            "zeros": 2
+          },
+          "RP50_female_u15_30cm": {
+            "min": 0.0,
+            "max": 1008325.0,
+            "zeros": 2
+          },
+          "RP50_wra_pop_30cm": {
+            "min": 0.0,
+            "max": 1419268.0,
+            "zeros": 2
+          },
+          "RP50_dependency_ratio_30cm": {
+            "min": 0.0,
+            "max": 128.73,
+            "zeros": 2
+          },
+          "RP50_education_30cm_pct": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 96
+          },
+          "RP50_education_30cm_count": {
+            "min": 0.0,
+            "max": 99.0,
+            "zeros": 95
+          },
+          "RP50_hospitals_30cm_pct": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 114
+          },
+          "RP50_hospitals_30cm_count": {
+            "min": 0.0,
+            "max": 43.0,
+            "zeros": 114
+          },
+          "RP50_primary_healthcare_30cm_pct": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 131
+          },
+          "RP50_primary_healthcare_30cm_count": {
+            "min": 0.0,
+            "max": 6.0,
+            "zeros": 131
+          },
+          "RP100_crops_30cm_km2": {
+            "min": 0.0,
+            "max": 0.0,
+            "zeros": 160
+          },
+          "RP100_crops_30cm_areapct": {
+            "min": 0.0,
+            "max": 0.0,
+            "zeros": 160
+          },
+          "RP100_crops_30cm_croppct": {
+            "min": 0.0,
+            "max": 0.0,
+            "zeros": 160
+          },
+          "RP100_female_pop_30cm": {
+            "min": 0.0,
+            "max": 2846564.0,
+            "zeros": 2
+          },
+          "RP100_children_u5_30cm": {
+            "min": 0.0,
+            "max": 713769.0,
+            "zeros": 2
+          },
+          "RP100_female_u5_30cm": {
+            "min": 0.0,
+            "max": 349331.0,
+            "zeros": 2
+          },
+          "RP100_elderly_30cm": {
+            "min": 0.0,
+            "max": 260699.0,
+            "zeros": 2
+          },
+          "RP100_pop_u15_30cm": {
+            "min": 0.0,
+            "max": 2083997.0,
+            "zeros": 2
+          },
+          "RP100_female_u15_30cm": {
+            "min": 0.0,
+            "max": 1017274.0,
+            "zeros": 2
+          },
+          "RP100_wra_pop_30cm": {
+            "min": 0.0,
+            "max": 1432313.0,
+            "zeros": 2
+          },
+          "RP100_dependency_ratio_30cm": {
+            "min": 0.0,
+            "max": 128.73,
+            "zeros": 2
+          },
+          "RP100_education_30cm_pct": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 95
+          },
+          "RP100_education_30cm_count": {
+            "min": 0.0,
+            "max": 102.0,
+            "zeros": 94
+          },
+          "RP100_hospitals_30cm_pct": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 113
+          },
+          "RP100_hospitals_30cm_count": {
+            "min": 0.0,
+            "max": 48.0,
+            "zeros": 112
+          },
+          "RP100_primary_healthcare_30cm_pct": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 129
+          },
+          "RP100_primary_healthcare_30cm_count": {
+            "min": 0.0,
+            "max": 10.0,
+            "zeros": 129
+          },
+          "RP500_crops_30cm_km2": {
+            "min": 0.0,
+            "max": 0.0,
+            "zeros": 160
+          },
+          "RP500_crops_30cm_areapct": {
+            "min": 0.0,
+            "max": 0.0,
+            "zeros": 160
+          },
+          "RP500_crops_30cm_croppct": {
+            "min": 0.0,
+            "max": 0.0,
+            "zeros": 160
+          },
+          "RP500_female_pop_30cm": {
+            "min": 0.0,
+            "max": 2917104.0,
+            "zeros": 2
+          },
+          "RP500_children_u5_30cm": {
+            "min": 0.0,
+            "max": 731351.0,
+            "zeros": 2
+          },
+          "RP500_female_u5_30cm": {
+            "min": 0.0,
+            "max": 357930.0,
+            "zeros": 2
+          },
+          "RP500_elderly_30cm": {
+            "min": 0.0,
+            "max": 267023.0,
+            "zeros": 2
+          },
+          "RP500_pop_u15_30cm": {
+            "min": 0.0,
+            "max": 2135308.0,
+            "zeros": 2
+          },
+          "RP500_female_u15_30cm": {
+            "min": 0.0,
+            "max": 1042327.0,
+            "zeros": 2
+          },
+          "RP500_wra_pop_30cm": {
+            "min": 0.0,
+            "max": 1468064.0,
+            "zeros": 2
+          },
+          "RP500_dependency_ratio_30cm": {
+            "min": 0.0,
+            "max": 128.73,
+            "zeros": 2
+          },
+          "RP500_education_30cm_pct": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 94
+          },
+          "RP500_education_30cm_count": {
+            "min": 0.0,
+            "max": 119.0,
+            "zeros": 93
+          },
+          "RP500_hospitals_30cm_pct": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 110
+          },
+          "RP500_hospitals_30cm_count": {
+            "min": 0.0,
+            "max": 58.0,
+            "zeros": 109
+          },
+          "RP500_primary_healthcare_30cm_pct": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 127
+          },
+          "RP500_primary_healthcare_30cm_count": {
+            "min": 0.0,
+            "max": 13.0,
+            "zeros": 127
+          }
+        },
+        "geographic_coverage": {
+          "grain": "ADM2_PCODE district",
+          "n_codes": 160,
+          "prefixes": [
+            "PK1",
+            "PK2",
+            "PK3",
+            "PK4",
+            "PK5",
+            "PK6",
+            "PK7"
+          ]
+        },
+        "date_coverage": "snapshot; no date column"
+      }
+    },
+    {
+      "relative_path": "02_openstreetmap_geofabrik/osm_pak_rural_access_index_roads.csv",
+      "filename": "osm_pak_rural_access_index_roads.csv",
+      "folder": "02_openstreetmap_geofabrik",
+      "bytes": 17662,
+      "sha256": "807e24eb4f98c88d302cfed690aee1d609e26657f668342c400cdef20862fe3b",
+      "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
+      "licence": "ODbL-1.0",
+      "source_url": "https://www.openstreetmap.org/",
+      "profile": {
+        "format": "csv",
+        "rows": 160,
+        "columns": [
+          "ADM2_PCODE",
+          "rural_access_children_u5",
+          "rural_access_dependents",
+          "rural_access_working",
+          "rural_access_elderly",
+          "rural_access_female_pop",
+          "rural_access_female_u15",
+          "rural_access_female_u5",
+          "rural_access_pop_u15",
+          "rural_access_total_pop",
+          "rural_access_wra_pop",
+          "rural_access_dependency_ratio",
+          "RAI_total_pop",
+          "RAI_female_pop",
+          "RAI_children_u5",
+          "RAI_female_u5",
+          "RAI_elderly",
+          "RAI_pop_u15",
+          "RAI_female_u15",
+          "RAI_wra_pop"
+        ],
+        "dtypes": {
+          "ADM2_PCODE": "str",
+          "rural_access_children_u5": "int64",
+          "rural_access_dependents": "int64",
+          "rural_access_working": "int64",
+          "rural_access_elderly": "int64",
+          "rural_access_female_pop": "int64",
+          "rural_access_female_u15": "int64",
+          "rural_access_female_u5": "int64",
+          "rural_access_pop_u15": "int64",
+          "rural_access_total_pop": "int64",
+          "rural_access_wra_pop": "int64",
+          "rural_access_dependency_ratio": "float64",
+          "RAI_total_pop": "float64",
+          "RAI_female_pop": "float64",
+          "RAI_children_u5": "float64",
+          "RAI_female_u5": "float64",
+          "RAI_elderly": "float64",
+          "RAI_pop_u15": "float64",
+          "RAI_female_u15": "float64",
+          "RAI_wra_pop": "float64"
+        },
+        "missing_null": {
+          "ADM2_PCODE": 0,
+          "rural_access_children_u5": 0,
+          "rural_access_dependents": 0,
+          "rural_access_working": 0,
+          "rural_access_elderly": 0,
+          "rural_access_female_pop": 0,
+          "rural_access_female_u15": 0,
+          "rural_access_female_u5": 0,
+          "rural_access_pop_u15": 0,
+          "rural_access_total_pop": 0,
+          "rural_access_wra_pop": 0,
+          "rural_access_dependency_ratio": 2,
+          "RAI_total_pop": 0,
+          "RAI_female_pop": 0,
+          "RAI_children_u5": 0,
+          "RAI_female_u5": 0,
+          "RAI_elderly": 0,
+          "RAI_pop_u15": 0,
+          "RAI_female_u15": 0,
+          "RAI_wra_pop": 0
+        },
+        "duplicate_rows": 0,
+        "numeric_min_max": {
+          "rural_access_children_u5": {
+            "min": 0.0,
+            "max": 104678.0,
+            "zeros": 2
+          },
+          "rural_access_dependents": {
+            "min": 0.0,
+            "max": 347346.0,
+            "zeros": 2
+          },
+          "rural_access_working": {
+            "min": 0.0,
+            "max": 625092.0,
+            "zeros": 2
+          },
+          "rural_access_elderly": {
+            "min": 0.0,
+            "max": 50164.0,
+            "zeros": 3
+          },
+          "rural_access_female_pop": {
+            "min": 0.0,
+            "max": 482102.0,
+            "zeros": 2
+          },
+          "rural_access_female_u15": {
+            "min": 0.0,
+            "max": 147262.0,
+            "zeros": 2
+          },
+          "rural_access_female_u5": {
+            "min": 0.0,
+            "max": 50290.0,
+            "zeros": 2
+          },
+          "rural_access_pop_u15": {
+            "min": 0.0,
+            "max": 297182.0,
+            "zeros": 2
+          },
+          "rural_access_total_pop": {
+            "min": 0.0,
+            "max": 972438.0,
+            "zeros": 2
+          },
+          "rural_access_wra_pop": {
+            "min": 0.0,
+            "max": 257711.0,
+            "zeros": 2
+          },
+          "rural_access_dependency_ratio": {
+            "min": 49.0,
+            "max": 128.1,
+            "zeros": 0
+          },
+          "RAI_total_pop": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 3
+          },
+          "RAI_female_pop": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 3
+          },
+          "RAI_children_u5": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 3
+          },
+          "RAI_female_u5": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 2
+          },
+          "RAI_elderly": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 3
+          },
+          "RAI_pop_u15": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 3
+          },
+          "RAI_female_u15": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 2
+          },
+          "RAI_wra_pop": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 3
+          }
+        },
+        "geographic_coverage": {
+          "grain": "ADM2_PCODE district",
+          "n_codes": 160,
+          "prefixes": [
+            "PK1",
+            "PK2",
+            "PK3",
+            "PK4",
+            "PK5",
+            "PK6",
+            "PK7"
+          ]
+        },
+        "date_coverage": "snapshot; no date column"
+      }
+    },
+    {
+      "relative_path": "02_openstreetmap_geofabrik/populated_places.geojson",
+      "filename": "populated_places.geojson",
+      "folder": "02_openstreetmap_geofabrik",
+      "bytes": 54316291,
+      "sha256": "1b770058066d0b7c71c41d17baae8ceb99d771fac08333636265c48f55eee5bb",
+      "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
+      "licence": "ODbL-1.0",
+      "source_url": "https://www.openstreetmap.org/",
+      "profile": {
+        "format": "geojson",
+        "rows": 67781,
+        "columns": [
+          "adm0_name",
+          "adm0_pcode",
+          "adm1_name",
+          "adm1_pcode",
+          "adm2_name",
+          "adm2_pcode",
+          "adm3_name",
+          "adm3_pcode",
+          "adm4_name",
+          "adm4_pcode",
+          "id",
+          "is_in",
+          "landuse",
+          "name",
+          "name_en",
+          "name_latin",
+          "name_ur",
+          "place",
+          "population",
+          "source"
+        ],
+        "geometry_types": {
+          "Point": 30647,
+          "Polygon": 37113,
+          "MultiPolygon": 17,
+          "LineString": 2,
+          "GeometryCollection": 2
+        },
+        "unnamed_features": 35237,
+        "missing_null": {
+          "name_en": 54409,
+          "name_ur": 64269,
+          "landuse": 29136,
+          "population": 66679,
+          "source": 67781,
+          "adm4_pcode": 67781,
+          "adm4_name": 67781,
+          "place": 38107,
+          "is_in": 66936,
+          "name": 35265,
+          "name_latin": 35237,
+          "adm1_pcode": 1885,
+          "adm1_name": 1885,
+          "adm2_pcode": 1885,
+          "adm2_name": 1885,
+          "adm3_pcode": 1885,
+          "adm3_name": 1885
+        },
+        "geographic_coverage": {
+          "grain": "OSM feature",
+          "adm1": {
+            "Khyber Pakhtunkhwa": 10447,
+            "Punjab": 25074,
+            "Balochistan": 5316,
+            "Sindh": 24622,
+            "Islamabad": 437
+          },
+          "crs": {
+            "type": "name",
+            "properties": {
+              "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+            }
+          }
+        },
+        "date_coverage": "OSM snapshot 2026-10-12 (see folder README/metadata)"
+      }
+    },
+    {
+      "relative_path": "03_ndma_pmd_hazards_warnings/ndma_anticipatory_action_strategy_2026_2030.pdf",
+      "filename": "ndma_anticipatory_action_strategy_2026_2030.pdf",
+      "folder": "03_ndma_pmd_hazards_warnings",
+      "bytes": 9621766,
+      "sha256": "e65d8dfc177dd5fa29ba18e2f40b35650aa282d0472f84488464a605d0bb6b4b",
+      "source": "NDMA and Pakistan Meteorological Department",
+      "licence": "licence_unspecified_official_publication",
+      "source_url": "https://ndma.gov.pk/ ; https://www.pmd.gov.pk/",
+      "profile": {
+        "format": "pdf",
+        "rows": null,
+        "columns": [],
+        "note": "Official document. Not a tabular dataset. Numbers are not extracted in the inventory pass."
+      }
+    },
+    {
+      "relative_path": "03_ndma_pmd_hazards_warnings/ndma_weather_advisory_2026_09_11.pdf",
+      "filename": "ndma_weather_advisory_2026_09_11.pdf",
+      "folder": "03_ndma_pmd_hazards_warnings",
+      "bytes": 420879,
+      "sha256": "6c5feff6f2fe31e42cda69b7c1b7752c41ddcaa0a6c2cdab0c0390a11cd301c7",
+      "source": "NDMA and Pakistan Meteorological Department",
+      "licence": "licence_unspecified_official_publication",
+      "source_url": "https://ndma.gov.pk/ ; https://www.pmd.gov.pk/",
+      "profile": {
+        "format": "pdf",
+        "rows": null,
+        "columns": [],
+        "note": "Official document. Not a tabular dataset. Numbers are not extracted in the inventory pass."
+      }
+    },
+    {
+      "relative_path": "03_ndma_pmd_hazards_warnings/ndma_weather_advisory_2026_10_05.pdf",
+      "filename": "ndma_weather_advisory_2026_10_05.pdf",
+      "folder": "03_ndma_pmd_hazards_warnings",
+      "bytes": 484878,
+      "sha256": "3f999855459499c63f10a8ffb1897ace4ebe6b342fab7282e4daefd957f0845a",
+      "source": "NDMA and Pakistan Meteorological Department",
+      "licence": "licence_unspecified_official_publication",
+      "source_url": "https://ndma.gov.pk/ ; https://www.pmd.gov.pk/",
+      "profile": {
+        "format": "pdf",
+        "rows": null,
+        "columns": [],
+        "note": "Official document. Not a tabular dataset. Numbers are not extracted in the inventory pass."
+      }
+    },
+    {
+      "relative_path": "03_ndma_pmd_hazards_warnings/ndma_weather_advisory_2026_10_09.pdf",
+      "filename": "ndma_weather_advisory_2026_10_09.pdf",
+      "folder": "03_ndma_pmd_hazards_warnings",
+      "bytes": 546888,
+      "sha256": "1506c64e8c1d54c344142e3b0181d7103cc4dc46b97f592832cf02217b946e3d",
+      "source": "NDMA and Pakistan Meteorological Department",
+      "licence": "licence_unspecified_official_publication",
+      "source_url": "https://ndma.gov.pk/ ; https://www.pmd.gov.pk/",
+      "profile": {
+        "format": "pdf",
+        "rows": null,
+        "columns": [],
+        "note": "Official document. Not a tabular dataset. Numbers are not extracted in the inventory pass."
+      }
+    },
+    {
+      "relative_path": "03_ndma_pmd_hazards_warnings/pmd_flood_advisory_river_chenab.pdf",
+      "filename": "pmd_flood_advisory_river_chenab.pdf",
+      "folder": "03_ndma_pmd_hazards_warnings",
+      "bytes": 836219,
+      "sha256": "279ec946cc5bfab5ed26f6b7dbdd99b7ab9b7f330196f00b6d935c94ce5a7995",
+      "source": "NDMA and Pakistan Meteorological Department",
+      "licence": "licence_unspecified_official_publication",
+      "source_url": "https://ndma.gov.pk/ ; https://www.pmd.gov.pk/",
+      "profile": {
+        "format": "pdf",
+        "rows": null,
+        "columns": [],
+        "note": "Official document. Not a tabular dataset. Numbers are not extracted in the inventory pass."
+      }
+    },
+    {
+      "relative_path": "03_ndma_pmd_hazards_warnings/pmd_flood_bulletin_2026_10_15.pdf",
+      "filename": "pmd_flood_bulletin_2026_10_15.pdf",
+      "folder": "03_ndma_pmd_hazards_warnings",
+      "bytes": 4152676,
+      "sha256": "10a08cb1d1176ace79019abe927e93c842921776839a09e25daa02ef3ba46158",
+      "source": "NDMA and Pakistan Meteorological Department",
+      "licence": "licence_unspecified_official_publication",
+      "source_url": "https://ndma.gov.pk/ ; https://www.pmd.gov.pk/",
+      "profile": {
+        "format": "pdf",
+        "rows": null,
+        "columns": [],
+        "note": "Official document. Not a tabular dataset. Numbers are not extracted in the inventory pass."
+      }
+    },
+    {
+      "relative_path": "03_ndma_pmd_hazards_warnings/pmd_river_danger_levels_thresholds.csv",
+      "filename": "pmd_river_danger_levels_thresholds.csv",
+      "folder": "03_ndma_pmd_hazards_warnings",
+      "bytes": 1187,
+      "sha256": "751d1ffa98509caf38caf176860302018eb5e732c8f0f14fc6a350776d480d79",
+      "source": "NDMA and Pakistan Meteorological Department",
+      "licence": "licence_unspecified_official_publication",
+      "source_url": "https://ndma.gov.pk/ ; https://www.pmd.gov.pk/",
+      "profile": {
+        "format": "csv",
+        "rows": 19,
+        "columns": [
+          "river_basin",
+          "station_name",
+          "province",
+          "low_flood_cusecs",
+          "medium_flood_cusecs",
+          "high_flood_cusecs",
+          "very_high_flood_cusecs",
+          "exceptionally_high_cusecs"
+        ],
+        "dtypes": {
+          "river_basin": "str",
+          "station_name": "str",
+          "province": "str",
+          "low_flood_cusecs": "int64",
+          "medium_flood_cusecs": "int64",
+          "high_flood_cusecs": "int64",
+          "very_high_flood_cusecs": "int64",
+          "exceptionally_high_cusecs": "int64"
+        },
+        "missing_null": {
+          "river_basin": 0,
+          "station_name": 0,
+          "province": 0,
+          "low_flood_cusecs": 0,
+          "medium_flood_cusecs": 0,
+          "high_flood_cusecs": 0,
+          "very_high_flood_cusecs": 0,
+          "exceptionally_high_cusecs": 0
+        },
+        "duplicate_rows": 0,
+        "numeric_min_max": {
+          "low_flood_cusecs": {
+            "min": 25000.0,
+            "max": 350000.0,
+            "zeros": 0
+          },
+          "medium_flood_cusecs": {
+            "min": 40000.0,
+            "max": 500000.0,
+            "zeros": 0
+          },
+          "high_flood_cusecs": {
+            "min": 60000.0,
+            "max": 700000.0,
+            "zeros": 0
+          },
+          "very_high_flood_cusecs": {
+            "min": 90000.0,
+            "max": 900000.0,
+            "zeros": 0
+          },
+          "exceptionally_high_cusecs": {
+            "min": 130000.0,
+            "max": 1100000.0,
+            "zeros": 0
+          }
+        },
+        "geographic_coverage": {
+          "grain": "river gauging station",
+          "basins": [
+            "Chenab",
+            "Indus",
+            "Jhelum",
+            "Kabul",
+            "Ravi"
+          ],
+          "stations": [
+            "Tarbela Dam",
+            "Kalabagh",
+            "Chashma",
+            "Taunsa",
+            "Guddu",
+            "Sukkur",
+            "Kotri",
+            "Nowshera",
+            "Mangla Dam",
+            "Rasul",
+            "Marala",
+            "Khanki",
+            "Qadirabad",
+            "Trimmu",
+            "Panjnad",
+            "Jassar",
+            "Shahdara (Lahore)",
+            "Balloki",
+            "Sidhnai"
+          ],
+          "provinces": [
+            "AJK",
+            "KPK",
+            "Punjab",
+            "Sindh"
+          ]
+        },
+        "date_coverage": "threshold table; not a time series"
+      }
+    },
+    {
+      "relative_path": "04_pakistan_bureau_of_statistics/pbs_census_2023_punjab_population_flashcard.pdf",
+      "filename": "pbs_census_2023_punjab_population_flashcard.pdf",
+      "folder": "04_pakistan_bureau_of_statistics",
+      "bytes": 7527081,
+      "sha256": "645f216fa5b5a3334e75666f875a840b7501de87ab8511d533a3cd1b04b8224e",
+      "source": "Pakistan Bureau of Statistics",
+      "licence": "licence_unspecified_official_statistics",
+      "source_url": "https://www.pbs.gov.pk/",
+      "profile": {
+        "format": "pdf",
+        "rows": null,
+        "columns": [],
+        "note": "Official document. Not a tabular dataset. Numbers are not extracted in the inventory pass."
+      }
+    },
+    {
+      "relative_path": "04_pakistan_bureau_of_statistics/pbs_census_2023_sindh_population_flashcard.pdf",
+      "filename": "pbs_census_2023_sindh_population_flashcard.pdf",
+      "folder": "04_pakistan_bureau_of_statistics",
+      "bytes": 7065065,
+      "sha256": "3451f868dd3555b1964a33ca4307dced37f7a878b230d0d1e5302a69b316de57",
+      "source": "Pakistan Bureau of Statistics",
+      "licence": "licence_unspecified_official_statistics",
+      "source_url": "https://www.pbs.gov.pk/",
+      "profile": {
+        "format": "pdf",
+        "rows": null,
+        "columns": [],
+        "note": "Official document. Not a tabular dataset. Numbers are not extracted in the inventory pass."
+      }
+    },
+    {
+      "relative_path": "04_pakistan_bureau_of_statistics/pbs_cpi_price_statistics_methodology.pdf",
+      "filename": "pbs_cpi_price_statistics_methodology.pdf",
+      "folder": "04_pakistan_bureau_of_statistics",
+      "bytes": 2245063,
+      "sha256": "4df27a3ec6fe46189c55d42a0ea3c8a41f1edd13ee992263347e70f5e89079dc",
+      "source": "Pakistan Bureau of Statistics",
+      "licence": "licence_unspecified_official_statistics",
+      "source_url": "https://www.pbs.gov.pk/",
+      "profile": {
+        "format": "pdf",
+        "rows": null,
+        "columns": [],
+        "note": "Official document. Not a tabular dataset. Numbers are not extracted in the inventory pass."
+      }
+    },
+    {
+      "relative_path": "04_pakistan_bureau_of_statistics/pbs_district_population_demographics_160_districts.csv",
+      "filename": "pbs_district_population_demographics_160_districts.csv",
+      "folder": "04_pakistan_bureau_of_statistics",
+      "bytes": 11643,
+      "sha256": "4a087684f4c817efa98802506afbdd2047f56b742a1262e314036eeb51c5f5f2",
+      "source": "Pakistan Bureau of Statistics",
+      "licence": "licence_unspecified_official_statistics",
+      "source_url": "https://www.pbs.gov.pk/",
+      "profile": {
+        "format": "csv",
+        "rows": 160,
+        "columns": [
+          "ADM2_PCODE",
+          "ADM_PCODE",
+          "total_pop",
+          "female_pop",
+          "children_u5",
+          "female_u5",
+          "elderly",
+          "pop_u15",
+          "female_u15",
+          "wra_pop",
+          "dependency_ratio"
+        ],
+        "dtypes": {
+          "ADM2_PCODE": "str",
+          "ADM_PCODE": "str",
+          "total_pop": "int64",
+          "female_pop": "int64",
+          "children_u5": "int64",
+          "female_u5": "int64",
+          "elderly": "int64",
+          "pop_u15": "int64",
+          "female_u15": "int64",
+          "wra_pop": "int64",
+          "dependency_ratio": "float64"
+        },
+        "missing_null": {
+          "ADM2_PCODE": 0,
+          "ADM_PCODE": 0,
+          "total_pop": 0,
+          "female_pop": 0,
+          "children_u5": 0,
+          "female_u5": 0,
+          "elderly": 0,
+          "pop_u15": 0,
+          "female_u15": 0,
+          "wra_pop": 0,
+          "dependency_ratio": 0
+        },
+        "duplicate_rows": 0,
+        "numeric_min_max": {
+          "total_pop": {
+            "min": 43987.0,
+            "max": 14247571.0,
+            "zeros": 0
+          },
+          "female_pop": {
+            "min": 21761.0,
+            "max": 6858562.0,
+            "zeros": 0
+          },
+          "children_u5": {
+            "min": 5291.0,
+            "max": 1402700.0,
+            "zeros": 0
+          },
+          "female_u5": {
+            "min": 2590.0,
+            "max": 686204.0,
+            "zeros": 0
+          },
+          "elderly": {
+            "min": 1955.0,
+            "max": 624592.0,
+            "zeros": 0
+          },
+          "pop_u15": {
+            "min": 15142.0,
+            "max": 4059340.0,
+            "zeros": 0
+          },
+          "female_u15": {
+            "min": 7420.0,
+            "max": 2008752.0,
+            "zeros": 0
+          },
+          "wra_pop": {
+            "min": 11261.0,
+            "max": 3822672.0,
+            "zeros": 0
+          },
+          "dependency_ratio": {
+            "min": 45.87,
+            "max": 128.25,
+            "zeros": 0
+          }
+        },
+        "geographic_coverage": {
+          "grain": "ADM2_PCODE district",
+          "n_codes": 160,
+          "prefixes": [
+            "PK1",
+            "PK2",
+            "PK3",
+            "PK4",
+            "PK5",
+            "PK6",
+            "PK7"
+          ]
+        },
+        "date_coverage": "snapshot; no date column"
+      }
+    },
+    {
+      "relative_path": "04_pakistan_bureau_of_statistics/pbs_district_rural_urban_population.csv",
+      "filename": "pbs_district_rural_urban_population.csv",
+      "folder": "04_pakistan_bureau_of_statistics",
+      "bytes": 11803,
+      "sha256": "7c7b76fd96129857ab5e9a5046da11d13932ecfe73606a9695be2548e13b4838",
+      "source": "Pakistan Bureau of Statistics",
+      "licence": "licence_unspecified_official_statistics",
+      "source_url": "https://www.pbs.gov.pk/",
+      "profile": {
+        "format": "csv",
+        "rows": 160,
+        "columns": [
+          "ADM2_PCODE",
+          "ADM_PCODE",
+          "total_pop_rural",
+          "female_pop_rural",
+          "children_u5_rural",
+          "female_u5_rural",
+          "elderly_rural",
+          "pop_u15_rural",
+          "female_u15_rural",
+          "wra_pop_rural",
+          "dependency_ratio_rural",
+          "rural_pop_perc"
+        ],
+        "dtypes": {
+          "ADM2_PCODE": "str",
+          "ADM_PCODE": "str",
+          "total_pop_rural": "int64",
+          "female_pop_rural": "int64",
+          "children_u5_rural": "int64",
+          "female_u5_rural": "int64",
+          "elderly_rural": "int64",
+          "pop_u15_rural": "int64",
+          "female_u15_rural": "int64",
+          "wra_pop_rural": "int64",
+          "dependency_ratio_rural": "float64",
+          "rural_pop_perc": "float64"
+        },
+        "missing_null": {
+          "ADM2_PCODE": 0,
+          "ADM_PCODE": 0,
+          "total_pop_rural": 0,
+          "female_pop_rural": 0,
+          "children_u5_rural": 0,
+          "female_u5_rural": 0,
+          "elderly_rural": 0,
+          "pop_u15_rural": 0,
+          "female_u15_rural": 0,
+          "wra_pop_rural": 0,
+          "dependency_ratio_rural": 0,
+          "rural_pop_perc": 0
+        },
+        "duplicate_rows": 0,
+        "numeric_min_max": {
+          "total_pop_rural": {
+            "min": 0.0,
+            "max": 1702621.0,
+            "zeros": 2
+          },
+          "female_pop_rural": {
+            "min": 0.0,
+            "max": 807968.0,
+            "zeros": 2
+          },
+          "children_u5_rural": {
+            "min": 0.0,
+            "max": 296206.0,
+            "zeros": 2
+          },
+          "female_u5_rural": {
+            "min": 0.0,
+            "max": 128962.0,
+            "zeros": 2
+          },
+          "elderly_rural": {
+            "min": 0.0,
+            "max": 83866.0,
+            "zeros": 2
+          },
+          "pop_u15_rural": {
+            "min": 0.0,
+            "max": 773978.0,
+            "zeros": 2
+          },
+          "female_u15_rural": {
+            "min": 0.0,
+            "max": 349990.0,
+            "zeros": 2
+          },
+          "wra_pop_rural": {
+            "min": 0.0,
+            "max": 427785.0,
+            "zeros": 2
+          },
+          "dependency_ratio_rural": {
+            "min": 0.0,
+            "max": 128.2,
+            "zeros": 2
+          },
+          "rural_pop_perc": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 2
+          }
+        },
+        "geographic_coverage": {
+          "grain": "ADM2_PCODE district",
+          "n_codes": 160,
+          "prefixes": [
+            "PK1",
+            "PK2",
+            "PK3",
+            "PK4",
+            "PK5",
+            "PK6",
+            "PK7"
+          ]
+        },
+        "date_coverage": "snapshot; no date column"
+      }
+    },
+    {
+      "relative_path": "04_pakistan_bureau_of_statistics/pbs_district_vulnerability_dependency_ratios.csv",
+      "filename": "pbs_district_vulnerability_dependency_ratios.csv",
+      "folder": "04_pakistan_bureau_of_statistics",
+      "bytes": 21509,
+      "sha256": "60f6cf746134a999073e5f38b75cb9a82fc415b0dc34388feda89c492b155bd6",
+      "source": "Pakistan Bureau of Statistics",
+      "licence": "licence_unspecified_official_statistics",
+      "source_url": "https://www.pbs.gov.pk/",
+      "profile": {
+        "format": "csv",
+        "rows": 160,
+        "columns": [
+          "ADM2_PCODE",
+          "total_pop",
+          "female_pop",
+          "children_u5",
+          "female_u5",
+          "elderly",
+          "pop_u15",
+          "female_u15",
+          "wra_pop",
+          "dependency_ratio",
+          "total_pop_rural",
+          "female_pop_rural",
+          "children_u5_rural",
+          "female_u5_rural",
+          "elderly_rural",
+          "pop_u15_rural",
+          "female_u15_rural",
+          "wra_pop_rural",
+          "dependency_ratio_rural",
+          "rural_pop_perc",
+          "ADM_PCODE"
+        ],
+        "dtypes": {
+          "ADM2_PCODE": "str",
+          "total_pop": "int64",
+          "female_pop": "int64",
+          "children_u5": "int64",
+          "female_u5": "int64",
+          "elderly": "int64",
+          "pop_u15": "int64",
+          "female_u15": "int64",
+          "wra_pop": "int64",
+          "dependency_ratio": "float64",
+          "total_pop_rural": "int64",
+          "female_pop_rural": "int64",
+          "children_u5_rural": "int64",
+          "female_u5_rural": "int64",
+          "elderly_rural": "int64",
+          "pop_u15_rural": "int64",
+          "female_u15_rural": "int64",
+          "wra_pop_rural": "int64",
+          "dependency_ratio_rural": "float64",
+          "rural_pop_perc": "float64",
+          "ADM_PCODE": "str"
+        },
+        "missing_null": {
+          "ADM2_PCODE": 0,
+          "total_pop": 0,
+          "female_pop": 0,
+          "children_u5": 0,
+          "female_u5": 0,
+          "elderly": 0,
+          "pop_u15": 0,
+          "female_u15": 0,
+          "wra_pop": 0,
+          "dependency_ratio": 0,
+          "total_pop_rural": 0,
+          "female_pop_rural": 0,
+          "children_u5_rural": 0,
+          "female_u5_rural": 0,
+          "elderly_rural": 0,
+          "pop_u15_rural": 0,
+          "female_u15_rural": 0,
+          "wra_pop_rural": 0,
+          "dependency_ratio_rural": 0,
+          "rural_pop_perc": 0,
+          "ADM_PCODE": 0
+        },
+        "duplicate_rows": 0,
+        "numeric_min_max": {
+          "total_pop": {
+            "min": 43987.0,
+            "max": 14247571.0,
+            "zeros": 0
+          },
+          "female_pop": {
+            "min": 21761.0,
+            "max": 6858562.0,
+            "zeros": 0
+          },
+          "children_u5": {
+            "min": 5291.0,
+            "max": 1402700.0,
+            "zeros": 0
+          },
+          "female_u5": {
+            "min": 2590.0,
+            "max": 686204.0,
+            "zeros": 0
+          },
+          "elderly": {
+            "min": 1955.0,
+            "max": 624592.0,
+            "zeros": 0
+          },
+          "pop_u15": {
+            "min": 15142.0,
+            "max": 4059340.0,
+            "zeros": 0
+          },
+          "female_u15": {
+            "min": 7420.0,
+            "max": 2008752.0,
+            "zeros": 0
+          },
+          "wra_pop": {
+            "min": 11261.0,
+            "max": 3822672.0,
+            "zeros": 0
+          },
+          "dependency_ratio": {
+            "min": 45.87,
+            "max": 128.25,
+            "zeros": 0
+          },
+          "total_pop_rural": {
+            "min": 0.0,
+            "max": 1702621.0,
+            "zeros": 2
+          },
+          "female_pop_rural": {
+            "min": 0.0,
+            "max": 807968.0,
+            "zeros": 2
+          },
+          "children_u5_rural": {
+            "min": 0.0,
+            "max": 296206.0,
+            "zeros": 2
+          },
+          "female_u5_rural": {
+            "min": 0.0,
+            "max": 128962.0,
+            "zeros": 2
+          },
+          "elderly_rural": {
+            "min": 0.0,
+            "max": 83866.0,
+            "zeros": 2
+          },
+          "pop_u15_rural": {
+            "min": 0.0,
+            "max": 773978.0,
+            "zeros": 2
+          },
+          "female_u15_rural": {
+            "min": 0.0,
+            "max": 349990.0,
+            "zeros": 2
+          },
+          "wra_pop_rural": {
+            "min": 0.0,
+            "max": 427785.0,
+            "zeros": 2
+          },
+          "dependency_ratio_rural": {
+            "min": 0.0,
+            "max": 128.2,
+            "zeros": 2
+          },
+          "rural_pop_perc": {
+            "min": 0.0,
+            "max": 100.0,
+            "zeros": 2
+          }
+        },
+        "geographic_coverage": {
+          "grain": "ADM2_PCODE district",
+          "n_codes": 160,
+          "prefixes": [
+            "PK1",
+            "PK2",
+            "PK3",
+            "PK4",
+            "PK5",
+            "PK6",
+            "PK7"
+          ]
+        },
+        "date_coverage": "snapshot; no date column"
+      }
+    },
+    {
+      "relative_path": "04_pakistan_bureau_of_statistics/pbs_integrated_agricultural_census_report.pdf",
+      "filename": "pbs_integrated_agricultural_census_report.pdf",
+      "folder": "04_pakistan_bureau_of_statistics",
+      "bytes": 6344155,
+      "sha256": "4cf1c3a23cb11acde4bb7bc20d05435d193500bee384576e17742e3cc686c902",
+      "source": "Pakistan Bureau of Statistics",
+      "licence": "licence_unspecified_official_statistics",
+      "source_url": "https://www.pbs.gov.pk/",
+      "profile": {
+        "format": "pdf",
+        "rows": null,
+        "columns": [],
+        "note": "Official document. Not a tabular dataset. Numbers are not extracted in the inventory pass."
+      }
+    },
+    {
+      "relative_path": "04_pakistan_bureau_of_statistics/pbs_quarterly_national_accounts_economic_table1.pdf",
+      "filename": "pbs_quarterly_national_accounts_economic_table1.pdf",
+      "folder": "04_pakistan_bureau_of_statistics",
+      "bytes": 344520,
+      "sha256": "299e2143aa4fe63e68b7222d6e3f775abf6c93cca9c29391648bd654aec1e26e",
+      "source": "Pakistan Bureau of Statistics",
+      "licence": "licence_unspecified_official_statistics",
+      "source_url": "https://www.pbs.gov.pk/",
+      "profile": {
+        "format": "pdf",
+        "rows": null,
+        "columns": [],
+        "note": "Official document. Not a tabular dataset. Numbers are not extracted in the inventory pass."
+      }
+    },
+    {
+      "relative_path": "README_DATASETS_CATALOG.md",
+      "filename": "README_DATASETS_CATALOG.md",
+      "folder": ".",
+      "bytes": 2378,
+      "sha256": "b06ef7d4334c18db32f857058fe13a435605b97ac04905ff0700a376bf067c82",
+      "source": "collection",
+      "licence": "see_readme",
+      "source_url": "",
+      "profile": {
+        "format": "md",
+        "rows": null,
+        "columns": []
+      }
+    }
+  ],
+  "byte_identical_duplicates": {},
+  "adm2_compatibility": [
+    {
+      "left": "osm_pak_emergency_facilities_infrastructure.csv",
+      "right": "osm_pak_hospital_travel_access_times.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "osm_pak_emergency_facilities_infrastructure.csv",
+      "right": "osm_pak_road_network_flood_exposure.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "osm_pak_emergency_facilities_infrastructure.csv",
+      "right": "osm_pak_rural_access_index_roads.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "osm_pak_emergency_facilities_infrastructure.csv",
+      "right": "pbs_district_population_demographics_160_districts.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "osm_pak_emergency_facilities_infrastructure.csv",
+      "right": "pbs_district_rural_urban_population.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "osm_pak_emergency_facilities_infrastructure.csv",
+      "right": "pbs_district_vulnerability_dependency_ratios.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "osm_pak_hospital_travel_access_times.csv",
+      "right": "osm_pak_road_network_flood_exposure.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "osm_pak_hospital_travel_access_times.csv",
+      "right": "osm_pak_rural_access_index_roads.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "osm_pak_hospital_travel_access_times.csv",
+      "right": "pbs_district_population_demographics_160_districts.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "osm_pak_hospital_travel_access_times.csv",
+      "right": "pbs_district_rural_urban_population.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "osm_pak_hospital_travel_access_times.csv",
+      "right": "pbs_district_vulnerability_dependency_ratios.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "osm_pak_road_network_flood_exposure.csv",
+      "right": "osm_pak_rural_access_index_roads.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "osm_pak_road_network_flood_exposure.csv",
+      "right": "pbs_district_population_demographics_160_districts.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "osm_pak_road_network_flood_exposure.csv",
+      "right": "pbs_district_rural_urban_population.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "osm_pak_road_network_flood_exposure.csv",
+      "right": "pbs_district_vulnerability_dependency_ratios.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "osm_pak_rural_access_index_roads.csv",
+      "right": "pbs_district_population_demographics_160_districts.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "osm_pak_rural_access_index_roads.csv",
+      "right": "pbs_district_rural_urban_population.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "osm_pak_rural_access_index_roads.csv",
+      "right": "pbs_district_vulnerability_dependency_ratios.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "pbs_district_population_demographics_160_districts.csv",
+      "right": "pbs_district_rural_urban_population.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "pbs_district_population_demographics_160_districts.csv",
+      "right": "pbs_district_vulnerability_dependency_ratios.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    },
+    {
+      "left": "pbs_district_rural_urban_population.csv",
+      "right": "pbs_district_vulnerability_dependency_ratios.csv",
+      "shared_adm2": 160,
+      "compatible_on_adm2": true
+    }
+  ]
+}

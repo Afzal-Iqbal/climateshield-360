@@ -1,0 +1,98 @@
+{
+  "generated_at_utc": "2026-10-19T16:30:34.034707+00:00",
+  "n_files": 40,
+  "byte_identical_duplicates": {},
+  "logical_duplicates": [
+    {
+      "files": [
+        "04_pakistan_bureau_of_statistics/pbs_district_vulnerability_dependency_ratios.csv",
+        "join(pbs_district_population_demographics_160_districts.csv, pbs_district_rural_urban_population.csv)"
+      ],
+      "note": "Not byte-identical, but shared columns are equal for all 160 rows."
+    }
+  ],
+  "issues": [
+    {
+      "dataset": "01_open_meteo_heat_rainfall",
+      "severity": "high",
+      "issue": "Peshawar hourly series starts 2023-01-01 (33288 hours) while 11 cities start 2021-01-01 (50808 hours).",
+      "action_proposed": "flag"
+    },
+    {
+      "dataset": "01_open_meteo_heat_rainfall",
+      "severity": "medium",
+      "issue": "pakistan_cities_hourly_heat_rainfall_sample.csv is 6-hourly (hours 0/6/12/18), not hourly. Peak temperature 49.0 C vs JSON 50.1 C.",
+      "action_proposed": "fix label; flag undersampled peaks"
+    },
+    {
+      "dataset": "01_open_meteo_heat_rainfall",
+      "severity": "info",
+      "issue": "Quetta extreme_heat_hours_ge_40c = 0 because max temperature is 39.7 C. This is a real climate value, not missing data.",
+      "action_proposed": "keep"
+    },
+    {
+      "dataset": "02_openstreetmap_geofabrik",
+      "severity": "high",
+      "issue": "All RP*_crops_* flood-exposure columns are 0.0 for every district.",
+      "action_proposed": "flag as source-unavailable; exclude from gold join"
+    },
+    {
+      "dataset": "02_openstreetmap_geofabrik",
+      "severity": "high",
+      "issue": "OSM facility zeros mean 'none mapped'. Health facilities GeoJSON covers 115 of 160 ADM2 codes and is sparse in Balochistan (79 features).",
+      "action_proposed": "flag"
+    },
+    {
+      "dataset": "02_openstreetmap_geofabrik",
+      "severity": "medium",
+      "issue": "populated_places: 35,237 unnamed of 67,781; population tag null on 66,679; 1,885 features lack ADM codes. Geometry includes 2 LineString and 2 GeometryCollection features.",
+      "action_proposed": "flag; keep features"
+    },
+    {
+      "dataset": "02_openstreetmap_geofabrik",
+      "severity": "medium",
+      "issue": "rural_access_dependency_ratio missing for PK702 and PK712 (0 rural population).",
+      "action_proposed": "flag; do not fill"
+    },
+    {
+      "dataset": "04_pakistan_bureau_of_statistics",
+      "severity": "medium",
+      "issue": "pbs_district_vulnerability_dependency_ratios.csv is an exact column-wise join of the demographics and rural/urban CSVs (160/160).",
+      "action_proposed": "keep raw copies; one canonical processed table"
+    },
+    {
+      "dataset": "04_pakistan_bureau_of_statistics",
+      "severity": "info",
+      "issue": "PBS tables have ADM2 codes but no district names. ADM_PCODE duplicates ADM2_PCODE.",
+      "action_proposed": "fix redundant column; attach names from OSM where codes match"
+    },
+    {
+      "dataset": "03_ndma_pmd_hazards_warnings",
+      "severity": "info",
+      "issue": "River thresholds are in cusecs, 19 stations, no time series. PDFs are not tabular.",
+      "action_proposed": "keep thresholds; add cms conversion; catalog PDFs"
+    },
+    {
+      "dataset": "integration",
+      "severity": "high",
+      "issue": "District OSM CSVs and PBS CSVs share the same 160 ADM2_PCODE values and can be joined. City weather and river stations cannot be joined to districts without a reviewed spatial assignment.",
+      "action_proposed": "join district snapshots only; keep weather and rivers separate"
+    }
+  ],
+  "volume": {
+    "open_meteo_hourly_rows_expected": 592176,
+    "open_meteo_6h_sample_rows": 98696,
+    "osm_populated_places": 67781,
+    "osm_health_facilities": 5144,
+    "district_tables": 160
+  },
+  "do_not": [
+    "Overwrite raw files",
+    "Fill Peshawar 2021-2022",
+    "Treat OSM zeros as confirmed absence",
+    "Treat crop-flood zeros as no crop exposure",
+    "Discard temperatures >= 40 C",
+    "Merge rainfall mm with river cusecs",
+    "Train an ML model in this step"
+  ]
+}
