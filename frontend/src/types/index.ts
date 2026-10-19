@@ -118,6 +118,32 @@ export interface QualityLog {
   explanation: string;
 }
 
+export interface QualitySummaryResponseData {
+  total_checks: number;
+  fixed: number;
+  filled: number;
+  flagged: number;
+  total_anomalies: number;
+  pass_rate_pct: number;
+  sources_audited: number;
+}
+
+export interface QualityDecisionsResponseData {
+  items: QualityLog[];
+  total: number;
+  limit: number;
+  offset: number;
+  sources: string[];
+}
+
+export interface DailyQualityCount {
+  date: string;
+  fix: number;
+  fill: number;
+  flag: number;
+  total: number;
+}
+
 export interface Prediction {
   zone_id: string;
   forecast_time: string;

@@ -9,12 +9,15 @@
 
 import {
   APIResponse,
+  DailyQualityCount,
   ErrorResponse,
   FreshnessResponseData,
   HealthData,
   MetaData,
   ModelEvalResponseData,
   PipelineStatusData,
+  QualityDecisionsResponseData,
+  QualitySummaryResponseData,
   RunStatusExtended,
 } from '../types';
 
@@ -78,6 +81,24 @@ export const api = {
   getRuns: (hours: number = 24) =>
     apiFetch<RunStatusExtended[]>(`/runs?hours=${hours}`),
   getModelEval: () => apiFetch<ModelEvalResponseData>('/model-eval'),
+  getQualitySummary: () =>
+    apiFetch<QualitySummaryResponseData>('/quality/summary'),
+  getQualityDecisions: (params: {
+    source?: string;
+    action?: string;
+    limit?: number;
+    offset?: number;
+  } = {}) => {
+    const q = new URLSearchParams();
+    if (params.source) q.set('source', params.source);
+    if (params.action && params.action !== 'all') q.set('action', params.action);
+    if (params.limit !== undefined) q.set('limit', String(params.limit));
+    if (params.offset !== undefined) q.set('offset', String(params.offset));
+    const qs = q.toString();
+    return apiFetch<QualityDecisionsResponseData>(`/quality/decisions${qs ? `?${qs}` : ''}`);
+  },
+  getQualityDaily: () =>
+    apiFetch<DailyQualityCount[]>('/quality/daily'),
 };
 
 /**

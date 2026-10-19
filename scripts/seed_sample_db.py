@@ -148,17 +148,51 @@ def seed_database(db_path: Path = SAMPLE_DB_PATH):
         """
     )
 
-    batch_time = now_utc - timedelta(minutes=18)
-    conn.execute(
-        """
-        INSERT INTO quality_log VALUES
-        (?, 'Regional Doppler Weather Radar', 'Temperature Physical Bounds [-5C, 55C]', 'fix', 1, 'Sensor spike of 68.2C clamped to previous 15-min rolling mean of 42.1C'),
-        (?, 'Sindh PDMA Water Gauges', 'Missing Sensor Timestamp Imputation', 'fill', 3, 'Linear interpolation on Malir River gauge depth during 10-minute packet loss'),
-        (?, 'K-Electric Distribution Feeder SCADA', 'Rapid Voltage Drop Outlier Detection', 'flag', 4, 'Flagged 4 distribution feeders in Lyari showing atypical high variance load'),
-        (?, 'NOAA GFS 0.25 Gridded Atmosphere', 'Geographic Bounding Box Karachi [24-26N, 66-68E]', 'fix', 0, 'Bounding box validation passed with zero out-of-boundary records');
-        """,
-        [batch_time, batch_time, batch_time, batch_time],
-    )
+    # Seed rich multi-day audit records across the last 7 days (naive UTC)
+    quality_records = [
+        # Today (Day 0) - Latest micro-batch (18 mins ago)
+        (now_utc - timedelta(minutes=18), 'PMD AWS #04 Kemari Port', 'RULE-QC-08: Stale Temperature Plateau', 'flag', 12, 'Thermistor stuck at 36.4°C during rapid barometric drop. Flagged as suspected hardware freeze; decoupled from live ensemble.'),
+        (now_utc - timedelta(minutes=18), 'K-Electric Feeder Telemetry', 'RULE-QC-03: Null Packet Imputation', 'fill', 4, 'Upstream transmission jitter caused 3 null packet intervals. Replaced with forward-fill from 15m moving median.'),
+        (now_utc - timedelta(minutes=18), 'Karachi Urban Drainage Sluices', 'RULE-QC-14: Acoustic Water Level Spike', 'fix', 1, 'Ultrasonic echo artifact on Gujjar Nullah gauge jumped to 14.8m. Clamped to channel brim limit of 5.2m.'),
+        (now_utc - timedelta(minutes=18), 'Regional Doppler Weather Radar', 'RULE-QC-01: Temperature Physical Bounds [-5C, 55C]', 'fix', 1, 'Sensor spike of 68.2C clamped to previous 15-min rolling mean of 42.1C.'),
+        (now_utc - timedelta(minutes=18), 'K-Electric Distribution Feeder SCADA', 'RULE-QC-05: Rapid Voltage Drop Outlier Detection', 'flag', 4, 'Flagged 4 distribution feeders in Lyari showing atypical high variance load.'),
+        (now_utc - timedelta(minutes=18), 'Sindh PDMA Water Gauges', 'RULE-QC-09: Missing Sensor Timestamp Imputation', 'fill', 3, 'Linear interpolation on Malir River gauge depth during 10-minute packet loss.'),
+        (now_utc - timedelta(hours=3), 'NOAA GFS 0.25 Gridded Atmosphere', 'RULE-QC-02: Bounding Box Coordinate Validation', 'fix', 6, 'Bounding box validation passed; clamped 6 border grid cells to Karachi municipal limits.'),
+
+        # Yesterday (Day 1)
+        (now_utc - timedelta(days=1, hours=2), 'KPT Manora Tide Gauge', 'RULE-QC-21: Astronomical Tide Variance Check', 'flag', 3, 'Observed surge gauge at +3.28m CD exceeded 3-sigma statistical envelope vs astronomical tide.'),
+        (now_utc - timedelta(days=1, hours=5), 'PMD Karachi Met Station', 'RULE-QC-11: Relative Humidity Ceiling Check', 'fix', 2, 'Super-saturation reading of 104% RH clamped to physical limit of 100%.'),
+        (now_utc - timedelta(days=1, hours=9), 'Sindh PDMA Water Gauges', 'RULE-QC-07: Sluice Flow Rate Imputation', 'fill', 6, 'Downstream sluice gate telemetry gap filled using upstream weir differential.'),
+        (now_utc - timedelta(days=1, hours=14), 'Regional Doppler Weather Radar', 'RULE-QC-04: Ground Clutter Radar Reflection Filter', 'fix', 15, 'Ground clutter echoes over Karachi Ridge filtered out via dual-polarization correlation.'),
+
+        # Day 2
+        (now_utc - timedelta(days=2, hours=3), 'K-Electric Distribution Feeder SCADA', 'RULE-QC-03: Substation Telemetry Imputation', 'fill', 12, 'Fiber optic link drop at Korangi grid filled from secondary radio RTU.'),
+        (now_utc - timedelta(days=2, hours=7), 'SBCA Active Excavation Permits', 'RULE-QC-18: Expired Permit Invalidation', 'flag', 5, 'Trench permits in District East flagged due to missing municipal clearance stamp.'),
+        (now_utc - timedelta(days=2, hours=11), 'Regional Doppler Weather Radar', 'RULE-QC-01: Noise Spike Suppression', 'fix', 22, 'Suppressed 22 transient noise spikes in radial velocity gates.'),
+
+        # Day 3
+        (now_utc - timedelta(days=3, hours=4), 'Civil Hospital Karachi AWS', 'RULE-QC-01: Timestamp Offset Normalization', 'fix', 86, 'Clock drift of +4 minutes on local data logger synchronized with NTP time server.'),
+        (now_utc - timedelta(days=3, hours=8), 'Sindh PDMA Water Gauges', 'RULE-QC-09: Missing Depth Data Interpolation', 'fill', 8, 'Interpolated 8 depth intervals on Hub Dam feeder canal.'),
+        (now_utc - timedelta(days=3, hours=13), 'KPT Manora Tide Gauge', 'RULE-QC-22: Wave Buoy Communication Timeout', 'flag', 2, 'Offshore wave buoy telemetry timeout flagged for coastal patrol check.'),
+
+        # Day 4
+        (now_utc - timedelta(days=4, hours=2), 'Regional Doppler Weather Radar', 'RULE-QC-06: Beam Blockage Attenuation Correction', 'fix', 19, 'Partial beam blockage over high-rise clusters in Clifton normalized using azimuthal interpolation.'),
+        (now_utc - timedelta(days=4, hours=6), 'K-Electric Distribution Feeder SCADA', 'RULE-QC-03: Grid 11-A Imputation', 'fill', 15, 'Synthetic forward-fill for 15 feeder telemetry intervals.'),
+        (now_utc - timedelta(days=4, hours=10), 'Karachi Urban Drainage Sluices', 'RULE-QC-14: Sensor Drift Flag', 'flag', 4, 'Malir Causeway pressure transducer drifted by 0.8m over 12 hours; flagged for recalibration.'),
+
+        # Day 5
+        (now_utc - timedelta(days=5, hours=3), 'PMD Karachi Met Station', 'RULE-QC-10: Barometric Pressure Discontinuity', 'fix', 5, 'Sudden pressure jump of 12 hPa in 10 minutes smoothed via spline filter.'),
+        (now_utc - timedelta(days=5, hours=7), 'Sindh PDMA Water Gauges', 'RULE-QC-09: Null Packet Imputation', 'fill', 11, 'Filled missing river discharge intervals using hydrological recession curve.'),
+        (now_utc - timedelta(days=5, hours=12), 'SBCA Active Excavation Permits', 'RULE-QC-19: Duplicate Geo-Coordinates Flag', 'flag', 3, 'Identical excavation coordinates submitted for two separate municipal works.'),
+
+        # Day 6
+        (now_utc - timedelta(days=6, hours=4), 'Regional Doppler Weather Radar', 'RULE-QC-01: Velocity Dealiasing Correction', 'fix', 42, 'Doppler radial velocity folds exceeding Nyquist velocity corrected using 4DVar dealiasing.'),
+        (now_utc - timedelta(days=6, hours=8), 'K-Electric Feeder Telemetry', 'RULE-QC-03: SCADA Backup Imputation', 'fill', 9, 'Primary SCADA packet drop synthesized using secondary substation RTU.'),
+        (now_utc - timedelta(days=6, hours=15), 'KPT Manora Tide Gauge', 'RULE-QC-20: Marine Sensor Noise Flag', 'flag', 7, 'High frequency boat wash noise flagged and isolated from tidal surge envelope.'),
+    ]
+
+    for rec in quality_records:
+        conn.execute("INSERT INTO quality_log VALUES (?, ?, ?, ?, ?, ?);", list(rec))
 
     # 5. zones(zone_id, name, geometry_geojson)
     conn.execute(

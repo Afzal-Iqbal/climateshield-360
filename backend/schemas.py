@@ -106,6 +106,32 @@ class QualitySummaryCounts(BaseModel):
     rules_audited: int = 0
 
 
+class QualitySummaryResponseData(BaseModel):
+    total_checks: int
+    fixed: int
+    filled: int
+    flagged: int
+    total_anomalies: int
+    pass_rate_pct: float
+    sources_audited: int
+
+
+class QualityDecisionsResponseData(BaseModel):
+    items: List[QualityLog]
+    total: int
+    limit: int
+    offset: int
+    sources: List[str]
+
+
+class DailyQualityCount(BaseModel):
+    date: str
+    fix: int = 0
+    fill: int = 0
+    flag: int = 0
+    total: int = 0
+
+
 class Prediction(BaseModel):
     """Contract: predictions(zone_id, forecast_time, hazard_type, probability, interval_low, interval_high, baseline_value)"""
     zone_id: str
