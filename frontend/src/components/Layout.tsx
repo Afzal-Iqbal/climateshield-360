@@ -200,13 +200,13 @@ export const Layout: React.FC<LayoutProps> = ({ meta, isLoadingMeta = false }) =
         {/* ============================================================ */}
         {/* MAIN WORKSPACE CONTENT CONTAINER (Requirement 3 & 4)        */}
         {/* ============================================================ */}
-        <main className="w-full flex-1 flex flex-col pb-20 sm:pb-8">
+        <main className="w-full flex-1 flex flex-col pb-12 sm:pb-16">
           <AnimatePresence mode="wait">
             <motion.div
               key={location.pathname}
               initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 6 }}
               animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, y: 0 }}
-              exit={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: -6 }}
+              exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
               transition={{ duration: 0.2 }}
               className="w-full flex-1 flex flex-col"
             >
@@ -216,10 +216,10 @@ export const Layout: React.FC<LayoutProps> = ({ meta, isLoadingMeta = false }) =
         </main>
 
         {/* ============================================================ */}
-        {/* NON-OVERLAPPING STATIC FOOTER (Requirement 4 & Rule 6)       */}
+        {/* NON-OVERLAPPING OPAQUE STATIC FOOTER (Requirement 5 & Rule 6)*/}
         {/* Placed in standard content flow so nothing is hidden behind  */}
         {/* ============================================================ */}
-        <footer className="w-full bg-surface-container-high/60 dark:bg-primary-container/80 border-t border-outline-variant/30 py-3 px-4 sm:px-6 lg:px-8 mt-auto z-20">
+        <footer className="w-full bg-surface-container-high dark:bg-primary-container border-t border-outline-variant/30 py-3.5 px-4 sm:px-6 lg:px-8 mt-auto mb-14 sm:mb-0 relative z-20 shadow-xs">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-on-surface-variant">
             <div className="flex items-center gap-2 text-center sm:text-left">
               <span className="material-symbols-outlined text-error text-[18px] shrink-0" aria-hidden="true">

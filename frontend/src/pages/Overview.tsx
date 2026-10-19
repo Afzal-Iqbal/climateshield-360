@@ -32,6 +32,7 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
   const [timeRange, setTimeRange] = useState<'24h' | '48h' | '7d'>('24h');
   const [activeHazardView, setActiveHazardView] = useState<'heat' | 'heavy_rain' | 'both'>('both');
   const [priorityHazardFilter, setPriorityHazardFilter] = useState<'all' | 'heat' | 'heavy_rain'>('all');
+  const [showAllPriorities, setShowAllPriorities] = useState(false);
   const [hoveredZone, setHoveredZone] = useState<string | null>(null);
 
   // Fetch Overview summary and prediction curves
@@ -62,8 +63,17 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
     refetchInterval: 60000,
   });
 
+  // Fetch total count of all priority actions
+  const { data: allPrioritiesResponse } = useQuery({
+    queryKey: ['priorities', timeRange, 'all-total'],
+    queryFn: () => api.getPriorities({ range: timeRange }),
+    staleTime: 60000,
+  });
+
   const overview = overviewResponse?.data;
   const priorities = prioritiesResponse?.data || [];
+  const allPrioritiesCount = allPrioritiesResponse?.data?.length || 14;
+  const visiblePriorities = showAllPriorities ? priorities : priorities.slice(0, 5);
 
   // Build combined chart dataset from prediction points
   const heatPoints = overview?.predictions_series?.heat || [];
@@ -80,7 +90,9 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
 
     return {
       forecast_time: hp.forecast_time,
-      display_time: `+${hp.hours_ahead}h (${pktTime.split(',')[1]?.trim() || pktTime})`,
+      short_time: `+${hp.hours_ahead}h`,
+      full_time: `+${hp.hours_ahead}h (${pktTime.split(',')[1]?.trim() || pktTime})`,
+      display_time: `+${hp.hours_ahead}h`,
       hours_ahead: hp.hours_ahead,
       // Heat hazard metrics
       heat_prob: Math.round(hp.probability * 100),
@@ -703,7 +715,7 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
             </div>
 
             {/* Recharts Area + Line Chart */}
-            <div className="w-full h-72 bg-surface-container-low rounded-lg p-2 select-none">
+            <div className="w-full h-80 sm:h-72 bg-surface-container-low rounded-lg p-2 select-none">
               {isOverviewLoading ? (
                 <div className="h-full flex items-center justify-center font-label-mono-sm text-on-surface-variant">
                   Loading ensemble projection series...
@@ -714,13 +726,15 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartData} margin={{ top: 15, right: 25, left: 0, bottom: 5 }}>
+                  <ComposedChart data={chartData} margin={{ top: 20, right: 25, left: 0, bottom: 5 }}>
                     <XAxis
-                      dataKey="display_time"
+                      dataKey="short_time"
                       stroke="#74777e"
                       fontSize={11}
                       tickLine={false}
                       fontFamily="JetBrains Mono"
+                      interval="preserveStartEnd"
+                      minTickGap={25}
                     />
                     <YAxis
                       stroke="#74777e"
@@ -736,7 +750,12 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                         const d = payload[0]?.payload;
                         return (
                           <div className="bg-primary-container text-on-primary p-space-sm rounded-lg shadow-xl text-xs font-mono space-y-1 border border-white/10">
-                            <div className="font-bold text-secondary-container">{d.display_time}</div>
+                            <div className="font-bold text-secondary-container">
+                              {d.full_time || d.display_time}
+                            </div>
+                            <div className="text-[11px] text-on-primary-container">
+                              Forecast: {formatPKT(d.forecast_time, { dateStyle: 'medium', timeStyle: 'short' })}
+                            </div>
                             {activeHazardView !== 'heavy_rain' && (
                               <div className="border-t border-white/10 pt-1">
                                 <div className="text-[#ffb77d] font-bold">Heat Hazard Probability: {d.heat_prob}%</div>
@@ -765,19 +784,76 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                     />
                     <Legend
                       verticalAlign="top"
-                      height={32}
-                      formatter={(val) => <span className="font-label-mono-sm text-xs text-on-surface">{val}</span>}
+                      content={({ payload }) => {
+                        if (!payload || !payload.length) return null;
+                        return (
+                          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pb-2.5 px-1 text-xs select-none">
+                            {payload.map((entry, index) => {
+                              const isBaseline = entry.value?.toString().toLowerCase().includes('baseline');
+                              const isBand = entry.value?.toString().toLowerCase().includes('ci');
+                              return (
+                                <div key={`legend-${index}`} className="flex items-center gap-1.5 whitespace-nowrap">
+                                  {isBand ? (
+                                    <span
+                                      className="w-3 h-2 rounded-xs opacity-75 inline-block shrink-0"
+                                      style={{ backgroundColor: entry.color }}
+                                    />
+                                  ) : isBaseline ? (
+                                    <span className="w-3.5 h-0 border-t-2 border-dashed border-[#74777e] inline-block shrink-0" />
+                                  ) : (
+                                    <span
+                                      className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+                                      style={{ backgroundColor: entry.color }}
+                                    />
+                                  )}
+                                  <span className="font-label-mono-sm text-[11px] text-on-surface">
+                                    {entry.value}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      }}
                     />
-                    {/* Critical Alert Threshold line at 75% */}
+                    {/* Critical Alert Threshold line at 75% with collision-free pill label */}
                     <ReferenceLine
                       y={75}
                       stroke="#ba1a1a"
                       strokeDasharray="4 4"
-                      label={{
-                        value: 'Critical Risk Threshold (75%)',
-                        fill: '#ba1a1a',
-                        fontSize: 10,
-                        position: 'insideTopRight',
+                      label={(props: any): React.ReactElement => {
+                        const viewBox = props?.viewBox;
+                        if (!viewBox) return <g />;
+                        const { x = 0, y = 0 } = viewBox;
+                        const badgeWidth = 175;
+                        const badgeHeight = 18;
+                        const posX = x + 8;
+                        const posY = y - badgeHeight - 2;
+                        return (
+                          <g className="select-none pointer-events-none">
+                            <rect
+                              x={posX}
+                              y={posY}
+                              width={badgeWidth}
+                              height={badgeHeight}
+                              rx={4}
+                              fill="#111c26"
+                              fillOpacity={0.92}
+                              stroke="#ba1a1a"
+                              strokeWidth={1}
+                            />
+                            <text
+                              x={posX + 8}
+                              y={posY + 12}
+                              fill="#f87171"
+                              fontSize={10}
+                              fontWeight="700"
+                              fontFamily="JetBrains Mono, monospace"
+                            >
+                              Critical Risk Threshold (75%)
+                            </text>
+                          </g>
+                        );
                       }}
                     />
 
@@ -801,7 +877,7 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                           fill="#d97706"
                           fillOpacity={0.16}
                           stroke="none"
-                          name="Heat 90% CI Band"
+                          name="Heat 90% CI"
                           isAnimationActive={!shouldReduceMotion}
                           animationDuration={800}
                         />
@@ -812,7 +888,7 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                           strokeWidth={2.5}
                           dot={{ r: 3.5 }}
                           activeDot={{ r: 5 }}
-                          name="Heat Model Probability"
+                          name="Heat Forecast"
                           isAnimationActive={!shouldReduceMotion}
                           animationDuration={800}
                         />
@@ -823,7 +899,7 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                           strokeDasharray="4 4"
                           strokeWidth={1.5}
                           dot={false}
-                          name="Heat Climatology Baseline"
+                          name="Heat Baseline"
                           isAnimationActive={!shouldReduceMotion}
                           animationDuration={800}
                         />
@@ -850,7 +926,7 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                           fill="#006398"
                           fillOpacity={0.18}
                           stroke="none"
-                          name="Rain 90% CI Band"
+                          name="Rain 90% CI"
                           isAnimationActive={!shouldReduceMotion}
                           animationDuration={800}
                         />
@@ -861,7 +937,7 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                           strokeWidth={2.5}
                           dot={{ r: 3.5 }}
                           activeDot={{ r: 5 }}
-                          name="Rain Model Probability"
+                          name="Rain Forecast"
                           isAnimationActive={!shouldReduceMotion}
                           animationDuration={800}
                         />
@@ -872,7 +948,7 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                           strokeDasharray="6 6"
                           strokeWidth={1.5}
                           dot={false}
-                          name="Rain Climatology Baseline"
+                          name="Rain Baseline"
                           isAnimationActive={!shouldReduceMotion}
                           animationDuration={800}
                         />
@@ -896,132 +972,143 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
 
         {/* Right Column (4 of 12 cols = ~33%): Ranked Priority Actions Panel */}
         <div className="lg:col-span-4 flex flex-col gap-space-md">
-          <div className="bg-surface-container-lowest rounded-xl shadow-sm p-space-md flex flex-col gap-space-md border border-outline-variant/20">
-            <div className="flex flex-col gap-space-xs">
-              <div className="flex items-center justify-between">
-                <span className="font-label-mono-sm text-label-mono-sm uppercase text-secondary font-semibold tracking-wider">
-                  Decision Support System
-                </span>
-                <span className="px-2.5 py-0.5 rounded-full bg-error text-on-error font-label-mono-sm text-label-mono-sm font-semibold">
-                  {priorities.length} Actions Pinned
-                </span>
+          <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/20 flex flex-col lg:max-h-[500px] overflow-visible lg:overflow-hidden">
+            {/* Sticky Panel Header */}
+            <div className="sticky top-0 z-10 bg-surface-container-lowest border-b border-outline-variant/20 p-space-md shrink-0 rounded-t-xl">
+              <div className="flex flex-col gap-space-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-label-mono-sm text-label-mono-sm uppercase text-secondary font-semibold tracking-wider">
+                    Decision Support System
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-error text-on-error font-label-mono-sm text-label-mono-sm font-semibold">
+                    {priorities.length} Actions Pinned
+                  </span>
+                </div>
+                <h2 className="font-headline-md text-headline-md text-on-surface font-bold">
+                  Ranked Priority Actions
+                </h2>
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  Algorithmic risk ranking by severity level then exposed population from <code className="text-secondary font-mono">exposure_index</code>.
+                </p>
+
+                {/* Filter Pills for Priorities */}
+                <div className="flex items-center gap-1.5 bg-surface-container p-1 rounded-lg mt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPriorityHazardFilter('all');
+                      setShowAllPriorities(false);
+                    }}
+                    className={`flex-1 py-1 px-2 rounded font-label-mono-sm text-xs transition-colors ${
+                      priorityHazardFilter === 'all'
+                        ? 'bg-primary text-on-primary font-bold shadow-sm'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    All ({allPrioritiesCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPriorityHazardFilter('heat');
+                      setShowAllPriorities(false);
+                    }}
+                    className={`flex-1 py-1 px-2 rounded font-label-mono-sm text-xs transition-colors ${
+                      priorityHazardFilter === 'heat'
+                        ? 'bg-primary text-on-primary font-bold shadow-sm'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    Heat
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPriorityHazardFilter('heavy_rain');
+                      setShowAllPriorities(false);
+                    }}
+                    className={`flex-1 py-1 px-2 rounded font-label-mono-sm text-xs transition-colors ${
+                      priorityHazardFilter === 'heavy_rain'
+                        ? 'bg-primary text-on-primary font-bold shadow-sm'
+                        : 'text-on-surface-variant hover:text-on-surface'
+                    }`}
+                  >
+                    Rain
+                  </button>
+                </div>
               </div>
-              <h2 className="font-headline-md text-headline-md text-on-surface font-bold">
-                Ranked Priority Actions
-              </h2>
-              <p className="font-body-sm text-body-sm text-on-surface-variant">
-                Algorithmic risk ranking by severity level then exposed population from <code className="text-secondary font-mono">exposure_index</code>.
-              </p>
             </div>
 
-            {/* Filter Pills for Priorities */}
-            <div className="flex items-center gap-1.5 bg-surface-container p-1 rounded-lg">
-              <button
-                type="button"
-                onClick={() => setPriorityHazardFilter('all')}
-                className={`flex-1 py-1 px-2 rounded font-label-mono-sm text-xs transition-colors ${
-                  priorityHazardFilter === 'all'
-                    ? 'bg-primary text-on-primary font-bold shadow-sm'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                All ({priorities.length})
-              </button>
-              <button
-                type="button"
-                onClick={() => setPriorityHazardFilter('heat')}
-                className={`flex-1 py-1 px-2 rounded font-label-mono-sm text-xs transition-colors ${
-                  priorityHazardFilter === 'heat'
-                    ? 'bg-primary text-on-primary font-bold shadow-sm'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                Heat
-              </button>
-              <button
-                type="button"
-                onClick={() => setPriorityHazardFilter('heavy_rain')}
-                className={`flex-1 py-1 px-2 rounded font-label-mono-sm text-xs transition-colors ${
-                  priorityHazardFilter === 'heavy_rain'
-                    ? 'bg-primary text-on-primary font-bold shadow-sm'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                Rain
-              </button>
-            </div>
-
-            {/* Action Items List */}
-            <div className="flex flex-col gap-space-sm max-h-[700px] overflow-y-auto pr-1">
+            {/* Scrollable Items List on Desktop / Natural Flow on Mobile */}
+            <div className="p-space-md flex flex-col gap-2 flex-1 lg:overflow-y-auto">
               {isPrioritiesLoading ? (
                 <div className="py-8 text-center font-label-mono-sm text-on-surface-variant">
                   Computing priority directives...
                 </div>
-              ) : priorities.length === 0 ? (
+              ) : visiblePriorities.length === 0 ? (
                 <div className="py-8 text-center font-label-mono-sm text-on-surface-variant">
                   No priority interventions match active filters.
                 </div>
               ) : (
-                priorities.map((item) => (
-                  <div
-                    key={`${item.zone_id}-${item.hazard_type}-${item.rank}`}
-                    className="bg-surface-container-low rounded-xl p-space-md flex flex-col gap-space-xs relative overflow-hidden transition-all hover:bg-surface-container border border-outline-variant/15"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-label-mono-sm text-label-mono-sm font-bold uppercase tracking-wider text-secondary">
-                        #{item.rank} Priority Intervention
+                <>
+                  {visiblePriorities.map((item) => (
+                    <Link
+                      to={`/risk-map?zone=${item.zone_id}`}
+                      key={`${item.zone_id}-${item.hazard_type}-${item.rank}`}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container border border-outline-variant/15 transition-all min-h-[56px] group text-left focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    >
+                      {/* Rank number on the left */}
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center font-label-mono-sm text-xs font-bold text-secondary">
+                        #{item.rank}
+                      </div>
+
+                      {/* Zone name (bold) with one-line reason below it */}
+                      <div className="flex-1 min-w-0 flex flex-col justify-center">
+                        <div className="font-bold text-sm text-on-surface truncate group-hover:text-primary transition-colors">
+                          {item.zone_name || item.zone_id}
+                        </div>
+                        <div
+                          className="text-xs text-on-surface-variant truncate"
+                          title={item.reason}
+                        >
+                          {item.reason}
+                        </div>
+                      </div>
+
+                      {/* Risk badge on the right that never shrinks */}
+                      <div className="flex-shrink-0 whitespace-nowrap">
+                        <RiskBadge level={item.risk_level} />
+                      </div>
+                    </Link>
+                  ))}
+
+                  {/* Toggle Button for Top 5 / Show all */}
+                  {priorities.length > 5 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllPriorities(!showAllPriorities)}
+                      className="mt-1 w-full py-2 px-3 rounded-lg border border-outline-variant/30 bg-surface-container/60 hover:bg-surface-container text-xs font-semibold text-secondary flex items-center justify-center gap-1.5 transition-colors shrink-0"
+                    >
+                      <span>{showAllPriorities ? 'Show top 5' : `Show all ${priorities.length}`}</span>
+                      <span className="material-symbols-outlined text-[16px]">
+                        {showAllPriorities ? 'expand_less' : 'expand_more'}
                       </span>
-                      <RiskBadge level={item.risk_level} />
-                    </div>
-
-                    <div className="font-title-md text-title-md text-on-surface font-semibold mt-1">
-                      {item.action_title}
-                    </div>
-
-                    <div className="flex items-center gap-1 font-label-mono-sm text-label-mono-sm text-secondary font-medium">
-                      <span className="material-symbols-outlined text-[16px]">location_on</span>
-                      <span>{item.zone_name}</span>
-                    </div>
-
-                    {/* Rule-Based Reason String Built Exclusively from Table Fields */}
-                    <p className="font-body-sm text-body-sm text-on-surface-variant mt-1 leading-relaxed bg-surface-container-lowest/60 p-2 rounded border border-outline-variant/20">
-                      {item.reason}
-                    </p>
-
-                    <div className="mt-space-xs pt-space-xs flex items-center justify-between font-label-mono-sm text-label-mono-sm border-t border-outline-variant/20">
-                      {/* View Evidence Link Opening Risk Map with Zone Selected */}
-                      <Link
-                        to={`/risk-map?zone=${item.zone_id}`}
-                        className="text-secondary font-semibold hover:underline flex items-center gap-1 group"
-                      >
-                        <span>View Evidence in Risk Map</span>
-                        <span className="material-symbols-outlined text-[16px] group-hover:translate-x-0.5 transition-transform">
-                          arrow_forward
-                        </span>
-                      </Link>
-                      <span className="px-1.5 py-0.5 rounded bg-surface-container-highest text-on-surface-variant text-[10px] uppercase font-mono">
-                        Score: {item.score}
-                      </span>
-                    </div>
-                  </div>
-                ))
+                    </button>
+                  )}
+                </>
               )}
             </div>
 
             {/* Quick Dispatch Actions Footer Bar */}
-            <div className="mt-space-xs p-space-sm bg-surface-container rounded-lg flex flex-col gap-space-sm border border-outline-variant/20">
+            <div className="p-space-sm bg-surface-container border-t border-outline-variant/20 shrink-0">
               <button
                 type="button"
                 onClick={() => alert(`Directives dispatched to KMC Command Cell for ${priorities.length} priority zones.`)}
-                className="w-full py-2.5 px-4 bg-primary text-on-primary rounded-lg font-title-md text-title-md hover:bg-primary-container transition-colors shadow-sm flex items-center justify-center gap-2"
+                className="w-full py-2 px-4 bg-primary text-on-primary rounded-lg font-title-md text-sm hover:bg-primary-container transition-colors shadow-sm flex items-center justify-center gap-2"
               >
-                <span className="material-symbols-outlined text-[20px]">send_time_extension</span>
+                <span className="material-symbols-outlined text-[18px]">send_time_extension</span>
                 <span>Broadcast Directives to KMC Cell</span>
               </button>
-              <div className="flex items-center justify-between text-on-surface-variant font-label-mono-sm text-label-mono-sm">
-                <span>Automated SMS/Tetra Relay</span>
-                <span className="text-secondary font-bold">18 Towns Subscribed</span>
-              </div>
             </div>
           </div>
         </div>
