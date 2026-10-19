@@ -62,7 +62,7 @@ def get_connection() -> duckdb.DuckDBPyConnection:
                 conn.execute("CREATE TEMPORARY VIEW IF NOT EXISTS exposure_index AS SELECT * FROM sample_db.exposure_index;")
                 conn.execute("CREATE TEMPORARY VIEW IF NOT EXISTS facilities AS SELECT * FROM sample_db.facilities;")
                 conn.execute("CREATE TEMPORARY VIEW IF NOT EXISTS impact_indicators AS SELECT * FROM sample_db.impact_indicators;")
-                conn.execute("CREATE TEMPORARY VIEW IF NOT EXISTS quality_log AS SELECT timestamp_utc as logged_at, dataset as source_name, rule_id as rule, action, n_rows as rows_affected, reason as explanation FROM quality_logs;")
+                conn.execute('CREATE TEMPORARY VIEW IF NOT EXISTS quality_log AS SELECT timestamp_utc as logged_at, dataset as source_name, rule_id as rule, action, "column", n_rows as rows_affected, reason as explanation, details FROM quality_logs;')
         else:
             if REAL_DB_PATH.exists():
                 conn.execute(f"ATTACH '{REAL_DB_PATH}' AS processed_db (READ_ONLY);")
@@ -146,6 +146,8 @@ def is_sample_database() -> bool:
     db_name = get_db_path().name.lower()
     if "sample" in db_name:
         return True
+    if "climateshield" in db_name:
+        return False
     rows = safe_query("SELECT is_sample FROM _is_sample LIMIT 1;")
     if rows and "is_sample" in rows[0]:
         return bool(rows[0]["is_sample"])

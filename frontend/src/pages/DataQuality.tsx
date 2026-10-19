@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   ResponsiveContainer,
@@ -13,6 +13,7 @@ import {
 import { api, formatPKT } from '../api/client';
 import { SampleBanner } from '../components/SampleBanner';
 import { EmptyState } from '../components/EmptyState';
+import { QualityLog } from '../types';
 
 interface DataQualityProps {
   isSample?: boolean;
@@ -27,20 +28,31 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
   const [selectedSource, setSelectedSource] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [page, setPage] = useState<number>(0);
-  const pageSize = 8;
+  const pageSize = 10;
 
   // Sorting state
   const [sortField, setSortField] = useState<SortField>('logged_at');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
 
-  // Expanded row tracking
-  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set([0])); // row 0 expanded by default
+  // Issue Detail Drawer State (Read-only)
+  const [activeDrawerItem, setActiveDrawerItem] = useState<QualityLog | null>(null);
+
+  // Close drawer on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setActiveDrawerItem(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // 1. Fetch Quality Summary
-  const { data: summaryResponse } = useQuery({
+  const { data: summaryResponse, refetch: refetchSummary } = useQuery({
     queryKey: ['quality-summary'],
     queryFn: api.getQualitySummary,
-    refetchInterval: 60000,
+    refetchInterval: 30000,
   });
 
   // 2. Fetch Paginated Decisions
@@ -57,7 +69,7 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
         limit: pageSize,
         offset: page * pageSize,
       }),
-    refetchInterval: 60000,
+    refetchInterval: 30000,
   });
 
   // 3. Fetch Daily Counts for Stacked Bar Chart
@@ -84,7 +96,8 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
         (item) =>
           item.source_name.toLowerCase().includes(q) ||
           item.rule.toLowerCase().includes(q) ||
-          item.explanation.toLowerCase().includes(q)
+          item.explanation.toLowerCase().includes(q) ||
+          (item.column && item.column.toLowerCase().includes(q))
       );
     }
 
@@ -105,16 +118,6 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
     return list;
   }, [rawItems, searchQuery, sortField, sortOrder]);
 
-  const toggleRow = (index: number) => {
-    const next = new Set(expandedRows);
-    if (next.has(index)) {
-      next.delete(index);
-    } else {
-      next.add(index);
-    }
-    setExpandedRows(next);
-  };
-
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -122,6 +125,11 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
       setSortField(field);
       setSortOrder('asc');
     }
+  };
+
+  const handleRefreshAll = () => {
+    refetchSummary();
+    refetchDecisions();
   };
 
   const totalPages = Math.ceil(totalItems / pageSize) || 1;
@@ -138,21 +146,21 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
         <div className="flex flex-col max-w-4xl min-w-0">
           <div className="flex items-center gap-space-sm mb-space-xs flex-wrap">
             <span className="px-2.5 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-mono text-[11px] uppercase tracking-wider font-semibold">
-              System Telemetry Audit
+              Quality Assurance Center
             </span>
             <span className="font-mono text-[11px] text-on-surface-variant flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-secondary inline-block"></span>
               {summary ? `${summary.sources_audited} Telemetry Sources Audited` : 'Active Auditing'}
             </span>
-            <span className="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-mono text-[11px]">
-              ISO-19157 COMPLIANT
+            <span className="px-2 py-0.5 rounded bg-surface-container-high text-on-surface-variant font-mono text-[11px] border border-outline-variant/30">
+              Read-Only Audit Trail (Rule 11)
             </span>
           </div>
           <h1 className="font-headline-lg text-headline-lg font-bold text-on-surface tracking-tight">
-            Automated Data Quality &amp; Ingestion Auditing
+            Data Quality Center &amp; Decision Ledger
           </h1>
           <p className="font-body-md text-body-md text-on-surface-variant mt-0.5">
-            Rule-based integrity evaluation, synthetic gap reconciliation, and anomalous telemetry detection across all Karachi meteorological &amp; hydrological sensors.
+            Automated integrity auditing, synthetic fill tracking, physical range clamps, and logical exclusion governance across all meteorological &amp; geospatial layers.
           </p>
         </div>
 
@@ -160,227 +168,286 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
         <div className="flex items-center gap-space-sm shrink-0">
           <div className="flex items-center gap-space-xs px-3 py-1.5 rounded-lg bg-surface-container-high text-on-surface border border-outline-variant/30 font-mono text-xs">
             <span className="material-symbols-outlined text-[18px] text-secondary">verified_user</span>
-            <span className="font-semibold">Ledger Hash: <span className="text-on-surface-variant">#90E2-SINDH-QC</span></span>
+            <span className="font-semibold">DuckDB View: <span className="text-on-surface-variant">quality_log</span></span>
           </div>
           <button
-            onClick={() => refetchDecisions()}
+            onClick={handleRefreshAll}
             className="flex items-center gap-space-xs px-3 py-2 rounded-lg bg-primary text-on-primary hover:bg-primary-container transition-all shadow-sm font-mono text-xs font-semibold uppercase tracking-wider"
             type="button"
           >
             <span className="material-symbols-outlined text-[18px]">sync</span>
-            <span>Run Sweep</span>
+            <span>Refresh Ledger</span>
           </button>
         </div>
       </div>
 
       {/* ============================================================ */}
-      {/* SECTION 2: SUMMARY METRIC TILES                             */}
+      {/* SECTION 2: METRICS COCKPIT: TOTAL RECORDS, MISSING, DUP, EXCL */}
       {/* ============================================================ */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-space-md">
-        {/* Tile 1: Total Integrity Checks */}
-        <div className="bg-surface-container-lowest rounded-xl p-space-md sm:p-space-lg shadow-sm border border-outline-variant/30 flex flex-col justify-between">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-space-md">
+        {/* Metric 1: Total Records Inspected */}
+        <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/30 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-space-sm">
+            <div className="flex items-center justify-between mb-1">
               <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider font-semibold">
-                Total Integrity Checks (Last 24h)
+                Total Records Inspected
               </span>
-              <span className="px-2 py-0.5 rounded-full bg-surface-container-high font-mono text-[10px] text-on-surface-variant">
-                [SAMPLE DATA]
-              </span>
+              <span className="material-symbols-outlined text-secondary text-[18px]">fact_check</span>
             </div>
-            <div className="flex items-baseline gap-space-sm">
+            <div className="flex items-baseline gap-2 mt-1">
               <span className="font-metric-display text-metric-display text-on-surface tabular-nums">
-                {summary ? summary.total_checks.toLocaleString() : '248,190'}
+                {summary ? summary.total_records_inspected.toLocaleString() : '665,888'}
               </span>
-              <span className="font-body-sm text-body-sm text-on-surface-variant font-medium">
-                packets
+              <span className="font-body-sm text-body-sm text-on-surface-variant">
+                records
               </span>
             </div>
-            <p className="font-body-sm text-body-sm text-on-surface-variant mt-1">
-              Telemetry payloads streamed via LoRaWAN, cellular APN &amp; optical fiber across municipal cells.
+            <p className="font-body-sm text-xs text-on-surface-variant mt-1">
+              Evaluated across weather hourly observations, district tables, and GIS points.
             </p>
           </div>
-          <div className="mt-space-md pt-space-sm bg-surface-container-low rounded-lg p-space-sm flex items-center justify-between border border-outline-variant/20">
-            <div className="flex items-center gap-space-xs">
-              <span className="material-symbols-outlined text-[#059669] text-[20px]">check_circle</span>
-              <span className="font-title-md text-title-md text-on-surface font-bold">
-                {summary ? `${summary.pass_rate_pct}%` : '99.8%'}
-              </span>
-              <span className="font-body-sm text-body-sm text-on-surface-variant">Pass Rate</span>
-            </div>
-            <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-semibold">
-              Optimal
+          <div className="mt-3 pt-2 border-t border-outline-variant/20 flex items-center justify-between font-mono text-[11px]">
+            <span className="text-on-surface-variant">Integrity Pass Rate</span>
+            <span className="font-bold text-[#059669]">
+              {summary ? `${summary.pass_rate_pct}%` : '99.8%'}
             </span>
           </div>
         </div>
 
-        {/* Tile 2: Triage Breakdown */}
-        <div className="bg-surface-container-lowest rounded-xl p-space-md sm:p-space-lg shadow-sm border border-outline-variant/30 flex flex-col justify-between">
+        {/* Metric 2: Missing Count */}
+        <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/30 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-space-xs">
-              <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider font-semibold">
-                Telemetry Triage Breakdown
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-mono text-[11px] text-[#B45309] uppercase tracking-wider font-semibold">
+                Missing Values Detected
               </span>
-              <span className="font-mono text-[11px] text-[#B45309] font-semibold">
-                {summary ? `${summary.total_anomalies} Total Logged` : 'Anomalies'}
+              <span className="material-symbols-outlined text-[#B45309] text-[18px]">find_in_page</span>
+            </div>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="font-metric-display text-metric-display text-on-surface tabular-nums">
+                {summary ? summary.missing_count.toLocaleString() : '655,485'}
+              </span>
+              <span className="font-body-sm text-body-sm text-on-surface-variant">
+                rows / cells
               </span>
             </div>
-            {/* Breakdown Stack Bar */}
-            <div className="w-full h-3 rounded-full bg-surface-container flex overflow-hidden my-space-sm border border-outline-variant/30">
-              <div
-                className="bg-secondary h-full"
-                style={{
-                  width: `${
-                    summary && summary.total_anomalies > 0
-                      ? (summary.fixed / summary.total_anomalies) * 100
-                      : 45
-                  }%`,
-                }}
-                title={`Fixed: ${summary?.fixed || 0}`}
-              ></div>
-              <div
-                className="bg-secondary-container h-full"
-                style={{
-                  width: `${
-                    summary && summary.total_anomalies > 0
-                      ? (summary.filled / summary.total_anomalies) * 100
-                      : 35
-                  }%`,
-                }}
-                title={`Filled: ${summary?.filled || 0}`}
-              ></div>
-              <div
-                className="bg-error h-full"
-                style={{
-                  width: `${
-                    summary && summary.total_anomalies > 0
-                      ? (summary.flagged / summary.total_anomalies) * 100
-                      : 20
-                  }%`,
-                }}
-                title={`Flagged: ${summary?.flagged || 0}`}
-              ></div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-space-xs mt-space-sm">
-              {/* Fixed */}
-              <div className="bg-surface-container-low p-2 rounded-lg flex flex-col border border-outline-variant/20">
-                <div className="flex items-center gap-1 mb-1">
-                  <span className="w-2 h-2 rounded-full bg-secondary"></span>
-                  <span className="font-mono text-[10px] text-on-surface-variant">Auto-Fixed</span>
-                </div>
-                <span className="font-title-md text-title-md text-on-surface font-bold tabular-nums">
-                  {summary ? summary.fixed : '—'}
-                </span>
-                <span className="font-mono text-[9px] text-on-surface-variant">Clamped/Norm</span>
-              </div>
-
-              {/* Filled */}
-              <div className="bg-surface-container-low p-2 rounded-lg flex flex-col border border-outline-variant/20">
-                <div className="flex items-center gap-1 mb-1">
-                  <span className="w-2 h-2 rounded-full bg-secondary-container"></span>
-                  <span className="font-mono text-[10px] text-on-surface-variant">Imputed</span>
-                </div>
-                <span className="font-title-md text-title-md text-on-surface font-bold tabular-nums">
-                  {summary ? summary.filled : '—'}
-                </span>
-                <span className="font-mono text-[9px] text-on-surface-variant">Forward-Fill</span>
-              </div>
-
-              {/* Flagged */}
-              <div className="bg-error-container/30 p-2 rounded-lg flex flex-col border border-error/20">
-                <div className="flex items-center gap-1 mb-1">
-                  <span className="w-2 h-2 rounded-full bg-error"></span>
-                  <span className="font-mono text-[10px] text-error font-semibold">Flagged</span>
-                </div>
-                <span className="font-title-md text-title-md text-error font-bold tabular-nums">
-                  {summary ? summary.flagged : '—'}
-                </span>
-                <span className="font-mono text-[9px] text-on-error-container">Quarantined</span>
-              </div>
-            </div>
+            <p className="font-body-sm text-xs text-on-surface-variant mt-1">
+              Null sensor packets, dry-hour zeros, and temporal coverage truncations logged.
+            </p>
           </div>
-          <div className="mt-space-sm text-right">
-            <span className="font-mono text-[10px] text-on-surface-variant">QC Protocol: PDMA-SINDH-MET-08 Rev 4</span>
+          <div className="mt-3 pt-2 border-t border-outline-variant/20 flex items-center justify-between font-mono text-[11px]">
+            <span className="text-on-surface-variant">Rule Audit</span>
+            <span className="text-[#B45309] font-bold">Never Invent Heat/Rain</span>
           </div>
         </div>
 
-        {/* Tile 3: Daily Ingestion Trend Chart Preview */}
-        <div className="bg-surface-container-lowest rounded-xl p-space-md sm:p-space-lg shadow-sm border border-outline-variant/30 flex flex-col justify-between">
+        {/* Metric 3: Duplicate Count */}
+        <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/30 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-space-xs">
-              <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider font-semibold">
-                7-Day Quality Index
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-mono text-[11px] text-secondary uppercase tracking-wider font-semibold">
+                Duplicate Counts
               </span>
-              <span className="font-mono text-[11px] text-[#059669] font-bold">&gt; 99.2% Min</span>
+              <span className="material-symbols-outlined text-secondary text-[18px]">content_copy</span>
             </div>
-            <p className="font-body-sm text-body-sm text-on-surface-variant mb-space-xs">
-              Daily verification volume across storm &amp; dry cycles.
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="font-metric-display text-metric-display text-on-surface tabular-nums">
+                {summary ? summary.duplicate_count.toLocaleString() : '960'}
+              </span>
+              <span className="font-body-sm text-body-sm text-on-surface-variant">
+                rows
+              </span>
+            </div>
+            <p className="font-body-sm text-xs text-on-surface-variant mt-1">
+              Redundant ADM_PCODE key copies and duplicate coordinates de-duplicated.
             </p>
           </div>
-          <div className="w-full h-24 relative flex items-center justify-center">
-            {loadingDaily ? (
-              <span className="font-mono text-xs text-on-surface-variant">Loading daily trends...</span>
-            ) : dailyData.length === 0 ? (
-              <span className="font-mono text-xs text-on-surface-variant">No daily logs recorded</span>
-            ) : (
-              <ResponsiveContainer width="100%" height={90}>
-                <BarChart data={dailyData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
-                  <Bar dataKey="fix" stackId="a" fill="#006398" />
-                  <Bar dataKey="fill" stackId="a" fill="#5bb8fe" />
-                  <Bar dataKey="flag" stackId="a" fill="#ba1a1a" />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
+          <div className="mt-3 pt-2 border-t border-outline-variant/20 flex items-center justify-between font-mono text-[11px]">
+            <span className="text-on-surface-variant">Resolution</span>
+            <span className="font-bold text-secondary">Canonical Joins</span>
           </div>
-          <div className="flex items-center justify-between pt-space-xs text-on-surface-variant font-mono text-[10px] border-t border-outline-variant/20">
-            <span>7d History</span>
-            <span className="text-secondary font-bold">Auditing Active</span>
+        </div>
+
+        {/* Metric 4: Excluded Count */}
+        <div className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/30 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-mono text-[11px] text-error uppercase tracking-wider font-semibold">
+                Excluded Records / Columns
+              </span>
+              <span className="material-symbols-outlined text-error text-[18px]">block</span>
+            </div>
+            <div className="flex items-baseline gap-2 mt-1">
+              <span className="font-metric-display text-metric-display text-on-surface tabular-nums">
+                {summary ? summary.excluded_count.toLocaleString() : '320'}
+              </span>
+              <span className="font-body-sm text-body-sm text-on-surface-variant">
+                rows / 12 cols
+              </span>
+            </div>
+            <p className="font-body-sm text-xs text-on-surface-variant mt-1">
+              Unmapped crop-flood columns and isolated anomaly features excluded from gold.
+            </p>
+          </div>
+          <div className="mt-3 pt-2 border-t border-outline-variant/20 flex items-center justify-between font-mono text-[11px]">
+            <span className="text-on-surface-variant">Action</span>
+            <span className="font-bold text-error">Source Unavailable</span>
           </div>
         </div>
       </div>
 
       {/* ============================================================ */}
-      {/* SECTION 3: STACKED BAR CHART OF DAILY COUNTS PER ACTION     */}
+      {/* SECTION 3: TRIAGE ACTION COUNTERS: FIX / FILL / FLAG / EXCLUDE */}
+      {/* ============================================================ */}
+      <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm border border-outline-variant/30 flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <span className="font-mono text-xs uppercase tracking-wider font-bold text-on-surface flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-secondary text-[18px]">checklist</span>
+            Audit Action Breakdown: Fix · Fill · Flag · Exclude
+          </span>
+          <span className="font-mono text-[11px] text-on-surface-variant">
+            ISO-19157 Spatial Data Quality Standard
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-space-sm">
+          {/* Action: Fix */}
+          <div
+            onClick={() => { setSelectedAction('fix'); setPage(0); }}
+            className={`p-3 rounded-lg border cursor-pointer transition-all flex items-center gap-3 ${
+              selectedAction === 'fix'
+                ? 'bg-secondary-fixed/30 border-secondary ring-2 ring-secondary/30'
+                : 'bg-surface-container-low hover:bg-surface-container border-outline-variant/30'
+            }`}
+          >
+            <div className="w-9 h-9 rounded-lg bg-secondary-fixed text-on-secondary-fixed flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[20px]">build</span>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-1">
+                <span className="font-mono text-[11px] text-secondary font-bold uppercase">Fix Count</span>
+                <span className="text-[10px] text-on-surface-variant">(Certain)</span>
+              </div>
+              <span className="font-title-md text-title-md font-bold text-on-surface">
+                {summary ? summary.fix_count : 15}
+              </span>
+              <span className="text-[10px] text-on-surface-variant truncate">Clamps, UTC, Units</span>
+            </div>
+          </div>
+
+          {/* Action: Fill */}
+          <div
+            onClick={() => { setSelectedAction('fill'); setPage(0); }}
+            className={`p-3 rounded-lg border cursor-pointer transition-all flex items-center gap-3 ${
+              selectedAction === 'fill'
+                ? 'bg-secondary-container/40 border-secondary-container ring-2 ring-secondary/30'
+                : 'bg-surface-container-low hover:bg-surface-container border-outline-variant/30'
+            }`}
+          >
+            <div className="w-9 h-9 rounded-lg bg-secondary-container text-on-secondary-container flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[20px]">tune</span>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-1">
+                <span className="font-mono text-[11px] text-on-secondary-container font-bold uppercase">Fill Count</span>
+                <span className="text-[10px] text-on-surface-variant">(Imputed)</span>
+              </div>
+              <span className="font-title-md text-title-md font-bold text-on-surface">
+                {summary ? summary.fill_count : 1}
+              </span>
+              <span className="text-[10px] text-on-surface-variant truncate">Short gaps &le;6h only</span>
+            </div>
+          </div>
+
+          {/* Action: Flag */}
+          <div
+            onClick={() => { setSelectedAction('flag'); setPage(0); }}
+            className={`p-3 rounded-lg border cursor-pointer transition-all flex items-center gap-3 ${
+              selectedAction === 'flag'
+                ? 'bg-error-container/50 border-error ring-2 ring-error/30'
+                : 'bg-surface-container-low hover:bg-surface-container border-outline-variant/30'
+            }`}
+          >
+            <div className="w-9 h-9 rounded-lg bg-error text-on-error flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[20px]">flag</span>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-1">
+                <span className="font-mono text-[11px] text-error font-bold uppercase">Flag Count</span>
+                <span className="text-[10px] text-on-surface-variant">(Warning)</span>
+              </div>
+              <span className="font-title-md text-title-md font-bold text-on-surface">
+                {summary ? summary.flag_count : 31}
+              </span>
+              <span className="text-[10px] text-on-surface-variant truncate">Quarantined records</span>
+            </div>
+          </div>
+
+          {/* Action: Exclude / Keep */}
+          <div
+            onClick={() => { setSelectedAction('exclude'); setPage(0); }}
+            className={`p-3 rounded-lg border cursor-pointer transition-all flex items-center gap-3 ${
+              selectedAction === 'exclude'
+                ? 'bg-surface-container-high border-outline ring-2 ring-outline/30'
+                : 'bg-surface-container-low hover:bg-surface-container border-outline-variant/30'
+            }`}
+          >
+            <div className="w-9 h-9 rounded-lg bg-surface-container-highest text-on-surface flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-[20px]">block</span>
+            </div>
+            <div className="flex flex-col min-w-0">
+              <div className="flex items-center gap-1">
+                <span className="font-mono text-[11px] text-on-surface font-bold uppercase">Exclude Count</span>
+                <span className="text-[10px] text-on-surface-variant">(Filtered)</span>
+              </div>
+              <span className="font-title-md text-title-md font-bold text-on-surface">
+                {summary ? summary.exclude_count : 13}
+              </span>
+              <span className="text-[10px] text-on-surface-variant truncate">Excluded from joins</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ============================================================ */}
+      {/* SECTION 4: STACKED DAILY AGGREGATION CHART                   */}
       {/* ============================================================ */}
       <div className="bg-surface-container-lowest p-space-md sm:p-space-lg rounded-xl shadow-sm border border-outline-variant/30 flex flex-col gap-space-md">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm">
           <div>
             <h2 className="font-title-md text-title-md text-on-surface font-semibold">
-              Daily Triage Actions by Category (Last 7 Days)
+              Daily Triage Actions by Category (Timeline Verification)
             </h2>
             <p className="font-body-sm text-body-sm text-on-surface-variant">
-              Chronological daily breakdown of automated corrections, forward-fill synthetic interpolations, and quarantined flags.
+              Chronological daily stacked volume of deterministic fixes, synthetic interpolations, and quarantine flags.
             </p>
           </div>
           <div className="flex items-center gap-space-sm font-mono text-[11px]">
             <div className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded bg-[#006398]"></span>
-              <span>Auto-Fixed</span>
+              <span>Fixed</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded bg-[#5bb8fe]"></span>
-              <span>Imputed / Filled</span>
+              <span>Filled</span>
             </div>
             <div className="flex items-center gap-1.5">
               <span className="w-3 h-3 rounded bg-[#ba1a1a]"></span>
-              <span>Flagged for Review</span>
+              <span>Flagged</span>
             </div>
           </div>
         </div>
 
         {loadingDaily ? (
-          <div className="h-64 flex items-center justify-center font-mono text-xs text-on-surface-variant">
-            Loading 7-day daily telemetry data...
+          <div className="h-48 flex items-center justify-center font-mono text-xs text-on-surface-variant">
+            Loading daily quality telemetry...
           </div>
         ) : dailyData.length === 0 ? (
-          <EmptyState
-            icon="bar_chart"
-            title="No Daily Aggregations Available"
-            description="No quality log events recorded in DuckDB for the daily aggregation chart."
-          />
+          <div className="h-48 flex items-center justify-center font-mono text-xs text-on-surface-variant">
+            No daily logs recorded in warehouse
+          </div>
         ) : (
-          <div className="h-64 w-full">
+          <div className="h-48 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dailyData} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e0e3e5" />
@@ -401,13 +468,12 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
                     fontFamily: 'JetBrains Mono',
                     fontSize: '12px',
                   }}
-                  formatter={(value: any, name: any) => [value, name]}
-                  labelFormatter={(label) => `Date: ${label} (UTC)`}
                 />
                 <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'JetBrains Mono' }} />
-                <Bar dataKey="fix" name="Auto-Fixed (Fix)" stackId="a" fill="#006398" />
+                <Bar dataKey="fix" name="Auto-Fixed" stackId="a" fill="#006398" />
                 <Bar dataKey="fill" name="Imputed (Fill)" stackId="a" fill="#5bb8fe" />
-                <Bar dataKey="flag" name="Quarantined (Flag)" stackId="a" fill="#ba1a1a" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="flag" name="Quarantined (Flag)" stackId="a" fill="#ba1a1a" />
+                <Bar dataKey="exclude" name="Excluded" stackId="a" fill="#605d64" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -415,71 +481,11 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
       </div>
 
       {/* ============================================================ */}
-      {/* SECTION 4: EXPLAINER BOX (Fix / Fill / Flag Definition)       */}
+      {/* SECTION 5: DECISION TABLE FROM quality_log (READ-ONLY)       */}
       {/* ============================================================ */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-space-md">
-        {/* Fix Explainer */}
-        <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm border border-outline-variant/30 flex items-start gap-space-sm">
-          <div className="w-10 h-10 rounded-lg bg-secondary-fixed flex items-center justify-center shrink-0 text-on-secondary-fixed">
-            <span className="material-symbols-outlined text-[20px]">build</span>
-          </div>
-          <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="font-mono text-xs font-bold text-secondary uppercase tracking-wider">
-                Action: FIX
-              </span>
-              <span className="font-mono text-[10px] text-on-surface-variant font-medium">(Certain Correction)</span>
-            </div>
-            <p className="font-body-sm text-body-sm text-on-surface-variant mt-1 leading-relaxed">
-              Automated, deterministic correction applied with full confidence. Used for physical limit clamps (e.g. 68°C to 42°C), unit conversions, and NTP clock drift syncs.
-            </p>
-          </div>
-        </div>
-
-        {/* Fill Explainer */}
-        <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm border border-outline-variant/30 flex items-start gap-space-sm">
-          <div className="w-10 h-10 rounded-lg bg-secondary-container flex items-center justify-center shrink-0 text-on-secondary-container">
-            <span className="material-symbols-outlined text-[20px]">tune</span>
-          </div>
-          <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="font-mono text-xs font-bold text-on-secondary-container uppercase tracking-wider">
-                Action: FILL
-              </span>
-              <span className="font-mono text-[10px] text-on-surface-variant font-medium">(Synthetic Estimate)</span>
-            </div>
-            <p className="font-body-sm text-body-sm text-on-surface-variant mt-1 leading-relaxed">
-              Missing values synthesized via linear interpolation, nearby sensor correlation, or rolling medians. Every filled record strictly retains its synthetic provenance marker.
-            </p>
-          </div>
-        </div>
-
-        {/* Flag Explainer */}
-        <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-sm border border-outline-variant/30 flex items-start gap-space-sm">
-          <div className="w-10 h-10 rounded-lg bg-error text-on-error flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-[20px]">flag</span>
-          </div>
-          <div className="flex flex-col min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="font-mono text-xs font-bold text-error uppercase tracking-wider">
-                Action: FLAG
-              </span>
-              <span className="font-mono text-[10px] text-on-surface-variant font-medium">(Quarantined Warning)</span>
-            </div>
-            <p className="font-body-sm text-body-sm text-on-surface-variant mt-1 leading-relaxed">
-              Telemetry left unchanged with a warning attached. Quarantined from downstream NWP models and risk engines. Queued for human analyst inspection or field repair.
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* ============================================================ */}
-      {/* SECTION 5: AUDIT DECISION TABLE WITH FILTERS & EXPANSIONS    */}
-      {/* ============================================================ */}
-      <div className="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden border border-outline-variant/30">
+      <div className="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden border border-outline-variant/30 flex flex-col">
         {/* Table Filter Toolbar */}
         <div className="p-space-md bg-surface-container-low flex flex-col md:flex-row items-stretch md:items-center justify-between gap-space-md border-b border-outline-variant/30">
-          {/* Search and Action Filter Pills */}
           <div className="flex flex-wrap items-center gap-space-sm flex-1 min-w-0">
             {/* Search Input */}
             <div className="relative w-full sm:w-72">
@@ -490,7 +496,7 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Filter by source, rule, or explanation..."
+                placeholder="Search rule, column, source, explanation..."
                 className="w-full pl-9 pr-3 py-1.5 rounded-lg bg-surface-container-lowest text-on-surface placeholder:text-outline font-body-sm text-xs border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-secondary"
               />
             </div>
@@ -498,10 +504,11 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
             {/* Action Pills */}
             <div className="flex items-center gap-1 flex-wrap">
               {[
-                { key: 'all', label: 'All Actions' },
+                { key: 'all', label: 'All Decisions' },
                 { key: 'fix', label: 'Fixed' },
                 { key: 'fill', label: 'Filled' },
                 { key: 'flag', label: 'Flagged' },
+                { key: 'exclude', label: 'Excluded' },
               ].map((tab) => (
                 <button
                   key={tab.key}
@@ -568,7 +575,7 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
           <EmptyState
             icon="verified_user"
             title="No Quality Decisions Match Criteria"
-            description="No audit logs found for the selected action and source filter."
+            description="No audit logs found for the selected action and source filter in quality_log."
             actionText="Clear Filters"
             onAction={() => {
               setSelectedAction('all');
@@ -588,7 +595,7 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
                     scope="col"
                   >
                     <div className="flex items-center gap-1">
-                      <span>Timestamp (PKT)</span>
+                      <span>Logged (PKT)</span>
                       {sortField === 'logged_at' && (
                         <span className="material-symbols-outlined text-[14px]">
                           {sortOrder === 'asc' ? 'arrow_upward' : 'arrow_downward'}
@@ -598,7 +605,7 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
                   </th>
                   <th
                     onClick={() => handleSort('source_name')}
-                    className="py-3 px-space-md w-56 cursor-pointer hover:text-on-surface select-none"
+                    className="py-3 px-space-md w-52 cursor-pointer hover:text-on-surface select-none"
                     scope="col"
                   >
                     <div className="flex items-center gap-1">
@@ -615,7 +622,7 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
                   </th>
                   <th
                     onClick={() => handleSort('action')}
-                    className="py-3 px-space-md w-32 cursor-pointer hover:text-on-surface select-none"
+                    className="py-3 px-space-md w-28 cursor-pointer hover:text-on-surface select-none"
                     scope="col"
                   >
                     <div className="flex items-center gap-1">
@@ -629,7 +636,7 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
                   </th>
                   <th
                     onClick={() => handleSort('rows_affected')}
-                    className="py-3 px-space-md w-28 cursor-pointer hover:text-on-surface select-none"
+                    className="py-3 px-space-md w-24 cursor-pointer hover:text-on-surface select-none"
                     scope="col"
                   >
                     <div className="flex items-center gap-1">
@@ -644,129 +651,110 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
                   <th className="py-3 px-space-md" scope="col">
                     Triage Explanation
                   </th>
-                  <th className="py-3 px-space-md w-12 text-center" scope="col">
-                    Detail
+                  <th className="py-3 px-space-md w-24 text-center" scope="col">
+                    Inspection
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-outline-variant/20 font-body-sm text-body-sm text-on-surface">
                 {filteredAndSortedItems.map((item, index) => {
-                  const isExpanded = expandedRows.has(index);
-                  const isFlag = item.action === 'flag';
-                  const isFill = item.action === 'fill';
+                  const act = item.action.toLowerCase();
+                  const isFlag = act === 'flag';
+                  const isFill = act === 'fill';
+                  const isExclude = act === 'exclude' || act === 'keep';
+                  const isFix = act === 'fix';
 
                   return (
-                    <React.Fragment key={`${item.source_name}-${item.logged_at}-${index}`}>
-                      <tr
-                        onClick={() => toggleRow(index)}
-                        className={`group hover:bg-surface-container-low/60 transition-colors cursor-pointer ${
-                          isExpanded ? 'bg-surface-container-low/40' : ''
-                        }`}
-                      >
-                        {/* Timestamp in PKT (Rule 3) */}
-                        <td className="py-3.5 px-space-md font-mono text-xs whitespace-nowrap">
-                          <span className="font-semibold text-on-surface">
-                            {formatPKT(item.logged_at, { second: '2-digit' })}
+                    <tr
+                      key={`${item.source_name}-${item.logged_at}-${index}`}
+                      onClick={() => setActiveDrawerItem(item)}
+                      className="group hover:bg-surface-container-low/70 transition-colors cursor-pointer"
+                    >
+                      {/* Timestamp in PKT (Rule 3) */}
+                      <td className="py-3.5 px-space-md font-mono text-xs whitespace-nowrap">
+                        <span className="font-semibold text-on-surface">
+                          {formatPKT(item.logged_at, { second: '2-digit' })}
+                        </span>
+                      </td>
+
+                      {/* Source Stream */}
+                      <td className="py-3.5 px-space-md font-mono text-xs">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-on-surface truncate max-w-[200px]" title={item.source_name}>
+                            {item.source_name}
                           </span>
-                        </td>
-
-                        {/* Source Stream */}
-                        <td className="py-3.5 px-space-md">
-                          <div className="flex flex-col">
-                            <span className="font-semibold text-on-surface">{item.source_name}</span>
-                          </div>
-                        </td>
-
-                        {/* Rule */}
-                        <td className="py-3.5 px-space-md">
-                          <span className="font-mono text-xs text-primary font-medium">{item.rule}</span>
-                        </td>
-
-                        {/* Action Badge */}
-                        <td className="py-3.5 px-space-md">
-                          {isFlag && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-error-container text-on-error-container font-mono text-[11px] font-bold border border-error/30">
-                              <span className="material-symbols-outlined text-[13px]">flag</span>
-                              FLAG
+                          {item.column && (
+                            <span className="text-[10px] text-on-surface-variant truncate">
+                              col: {item.column}
                             </span>
                           )}
-                          {isFill && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-secondary-container/40 text-on-secondary-container font-mono text-[11px] font-bold border border-secondary/30">
-                              <span className="material-symbols-outlined text-[13px]">tune</span>
-                              FILL
-                            </span>
-                          )}
-                          {!isFlag && !isFill && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-mono text-[11px] font-bold border border-secondary/20">
-                              <span className="material-symbols-outlined text-[13px]">build</span>
-                              FIX
-                            </span>
-                          )}
-                        </td>
+                        </div>
+                      </td>
 
-                        {/* Rows Affected */}
-                        <td className="py-3.5 px-space-md font-mono text-xs">
-                          <span className="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-medium">
-                            {item.rows_affected} rows
+                      {/* Rule Triggered */}
+                      <td className="py-3.5 px-space-md">
+                        <span className="font-mono text-xs text-primary font-bold">
+                          {item.rule}
+                        </span>
+                      </td>
+
+                      {/* Action Badge */}
+                      <td className="py-3.5 px-space-md">
+                        {isFlag && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-error-container text-on-error-container font-mono text-[11px] font-bold border border-error/30">
+                            <span className="material-symbols-outlined text-[13px]">flag</span>
+                            FLAG
                           </span>
-                        </td>
+                        )}
+                        {isFill && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-secondary-container/40 text-on-secondary-container font-mono text-[11px] font-bold border border-secondary/30">
+                            <span className="material-symbols-outlined text-[13px]">tune</span>
+                            FILL
+                          </span>
+                        )}
+                        {isFix && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-mono text-[11px] font-bold border border-secondary/20">
+                            <span className="material-symbols-outlined text-[13px]">build</span>
+                            FIX
+                          </span>
+                        )}
+                        {isExclude && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-surface-container-high text-on-surface font-mono text-[11px] font-bold border border-outline-variant/30">
+                            <span className="material-symbols-outlined text-[13px]">block</span>
+                            EXCLUDE
+                          </span>
+                        )}
+                      </td>
 
-                        {/* Explanation preview */}
-                        <td className="py-3.5 px-space-md max-w-md">
-                          <p className="text-on-surface-variant text-xs truncate">{item.explanation}</p>
-                        </td>
+                      {/* Rows Affected */}
+                      <td className="py-3.5 px-space-md font-mono text-xs">
+                        <span className="px-2 py-0.5 rounded bg-surface-container text-on-surface-variant font-medium">
+                          {item.rows_affected}
+                        </span>
+                      </td>
 
-                        {/* Chevron */}
-                        <td className="py-3.5 px-space-md text-center">
-                          <button
-                            type="button"
-                            className="w-7 h-7 rounded-full flex items-center justify-center hover:bg-surface-container transition-colors text-secondary"
-                            aria-label={isExpanded ? 'Collapse row' : 'Expand row'}
-                          >
-                            <span className="material-symbols-outlined text-[20px]">
-                              {isExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down'}
-                            </span>
-                          </button>
-                        </td>
-                      </tr>
+                      {/* Explanation preview */}
+                      <td className="py-3.5 px-space-md max-w-md">
+                        <p className="text-on-surface-variant text-xs truncate" title={item.explanation}>
+                          {item.explanation}
+                        </p>
+                      </td>
 
-                      {/* Expandable Drawer Row */}
-                      {isExpanded && (
-                        <tr className="bg-surface-container-lowest border-b border-outline-variant/30">
-                          <td colSpan={7} className="p-space-md sm:p-space-lg">
-                            <div className="bg-surface-container-low rounded-xl p-space-md border border-outline-variant/30 flex flex-col gap-space-sm">
-                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-outline-variant/20 pb-2">
-                                <div className="flex items-center gap-2">
-                                  <span className="material-symbols-outlined text-secondary text-[20px]">
-                                    terminal
-                                  </span>
-                                  <span className="font-title-md text-body-md text-on-surface font-bold">
-                                    Quality Audit Detail: {item.rule}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2 font-mono text-[11px] text-on-surface-variant">
-                                  <span>Source: <strong>{item.source_name}</strong></span>
-                                  <span>·</span>
-                                  <span>Rows: <strong>{item.rows_affected}</strong></span>
-                                </div>
-                              </div>
-
-                              <div className="p-3 bg-surface-container-lowest rounded-lg border border-outline-variant/20 font-body-sm text-on-surface leading-relaxed">
-                                <span className="font-semibold text-primary block mb-0.5 font-mono text-xs uppercase tracking-wide">
-                                  Audit Action &amp; Remediation Rationale:
-                                </span>
-                                {item.explanation}
-                              </div>
-
-                              <div className="flex items-center justify-between pt-1 font-mono text-[10px] text-on-surface-variant">
-                                <span>UTC Timestamp: {item.logged_at}</span>
-                                <span className="text-secondary font-semibold">ISO-19157 Verified Audit Trail</span>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </React.Fragment>
+                      {/* Inspect Button / Drawer Trigger */}
+                      <td className="py-3.5 px-space-md text-center">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveDrawerItem(item);
+                          }}
+                          className="px-2.5 py-1 rounded bg-surface-container hover:bg-surface-container-high text-secondary hover:text-on-surface transition-colors font-mono text-[11px] font-semibold flex items-center justify-center gap-1 border border-outline-variant/30"
+                        >
+                          <span>View</span>
+                          <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+                        </button>
+                      </td>
+                    </tr>
                   );
                 })}
               </tbody>
@@ -774,34 +762,24 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
           </div>
         )}
 
-        {/* Table Pagination */}
-        <div className="p-space-md bg-surface-container flex flex-col sm:flex-row items-center justify-between gap-space-sm font-body-sm text-body-sm text-on-surface-variant border-t border-outline-variant/30">
-          <div className="flex items-center gap-space-xs font-mono text-xs">
-            <span>
-              Showing <strong>{filteredAndSortedItems.length}</strong> of{' '}
-              <strong>{totalItems}</strong> audit decisions
-            </span>
-            <span className="px-2 py-0.5 rounded bg-surface-container-high font-mono text-[10px]">
-              Ledger Sync: REALTIME
-            </span>
-          </div>
-
-          <div className="flex items-center gap-space-xs">
+        {/* Pagination Bar */}
+        <div className="p-space-sm bg-surface-container-low flex items-center justify-between border-t border-outline-variant/30 font-mono text-xs">
+          <span className="text-on-surface-variant">
+            Showing Page <strong>{page + 1}</strong> of <strong>{totalPages}</strong> ({totalItems} total decision events)
+          </span>
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setPage(Math.max(0, page - 1))}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="px-3 py-1 rounded bg-surface-container-high text-on-surface font-mono text-xs hover:bg-surface-container-highest disabled:opacity-40 transition-colors font-medium"
+              className="px-3 py-1 rounded bg-surface-container text-on-surface disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-container-high font-semibold transition-colors"
               type="button"
             >
               Previous
             </button>
-            <span className="px-3 py-1 rounded bg-surface-container-lowest text-on-surface font-mono text-xs font-bold border border-outline-variant/30">
-              Page {page + 1} of {totalPages}
-            </span>
             <button
-              onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="px-3 py-1 rounded bg-surface-container-high text-on-surface font-mono text-xs hover:bg-surface-container-highest disabled:opacity-40 transition-colors font-medium"
+              className="px-3 py-1 rounded bg-surface-container text-on-surface disabled:opacity-40 disabled:cursor-not-allowed hover:bg-surface-container-high font-semibold transition-colors"
               type="button"
             >
               Next
@@ -809,6 +787,183 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
           </div>
         </div>
       </div>
+
+      {/* ============================================================ */}
+      {/* SECTION 6: ISSUE DETAIL DRAWER (BEFORE & AFTER VALUES)       */}
+      {/* ============================================================ */}
+      {activeDrawerItem && (
+        <div className="fixed inset-0 z-50 overflow-hidden flex justify-end">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-xs transition-opacity"
+            onClick={() => setActiveDrawerItem(null)}
+            aria-hidden="true"
+          />
+
+          {/* Slide-over Drawer Container */}
+          <div className="relative w-full max-w-xl bg-surface-container-lowest h-full shadow-2xl border-l border-outline-variant/40 flex flex-col justify-between overflow-y-auto z-10 animate-in slide-in-from-right duration-200">
+            {/* Drawer Header */}
+            <div className="p-space-md sm:p-space-lg border-b border-outline-variant/30 flex items-start justify-between bg-surface-container-low">
+              <div className="flex flex-col gap-1 pr-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-2 py-0.5 rounded bg-surface-container-high font-mono text-[10px] font-bold text-on-surface uppercase border border-outline-variant/30">
+                    Audit Decision Detail
+                  </span>
+                  <span className="px-2 py-0.5 rounded bg-secondary-fixed text-on-secondary-fixed font-mono text-[10px] font-bold">
+                    Read-Only (Rule 11)
+                  </span>
+                </div>
+                <h3 className="font-title-lg text-title-md font-bold text-on-surface mt-1 break-words">
+                  {activeDrawerItem.rule}
+                </h3>
+                <span className="font-mono text-xs text-on-surface-variant">
+                  Source: <strong>{activeDrawerItem.source_name}</strong>
+                </span>
+              </div>
+              <button
+                onClick={() => setActiveDrawerItem(null)}
+                className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-surface-container-high text-on-surface-variant hover:text-on-surface transition-colors shrink-0"
+                aria-label="Close detail drawer"
+                type="button"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+
+            {/* Drawer Body Content */}
+            <div className="p-space-md sm:p-space-lg flex flex-col gap-space-md flex-1">
+              {/* Status & Scope Pill Matrix */}
+              <div className="grid grid-cols-2 gap-2 font-mono text-xs">
+                <div className="bg-surface-container-low p-2.5 rounded-lg border border-outline-variant/20 flex flex-col">
+                  <span className="text-[10px] text-on-surface-variant uppercase">Triage Action</span>
+                  <span className="font-bold text-on-surface uppercase mt-0.5 flex items-center gap-1">
+                    {activeDrawerItem.action === 'flag' && <span className="w-2 h-2 rounded-full bg-error inline-block"></span>}
+                    {activeDrawerItem.action === 'fix' && <span className="w-2 h-2 rounded-full bg-secondary inline-block"></span>}
+                    {activeDrawerItem.action === 'fill' && <span className="w-2 h-2 rounded-full bg-secondary-container inline-block"></span>}
+                    {activeDrawerItem.action}
+                  </span>
+                </div>
+                <div className="bg-surface-container-low p-2.5 rounded-lg border border-outline-variant/20 flex flex-col">
+                  <span className="text-[10px] text-on-surface-variant uppercase">Rows Affected</span>
+                  <span className="font-bold text-on-surface mt-0.5">
+                    {activeDrawerItem.rows_affected} rows
+                  </span>
+                </div>
+                <div className="bg-surface-container-low p-2.5 rounded-lg border border-outline-variant/20 flex flex-col">
+                  <span className="text-[10px] text-on-surface-variant uppercase">Logged Time (PKT)</span>
+                  <span className="font-semibold text-on-surface mt-0.5">
+                    {formatPKT(activeDrawerItem.logged_at)}
+                  </span>
+                </div>
+                <div className="bg-surface-container-low p-2.5 rounded-lg border border-outline-variant/20 flex flex-col">
+                  <span className="text-[10px] text-on-surface-variant uppercase">Target Column</span>
+                  <span className="font-semibold text-on-surface truncate mt-0.5" title={activeDrawerItem.column || 'All table columns'}>
+                    {activeDrawerItem.column || 'Whole Record / Table'}
+                  </span>
+                </div>
+              </div>
+
+              {/* BEFORE AND AFTER VALUES VISUAL DIFF CARD */}
+              <div className="rounded-xl border border-outline-variant/40 bg-surface-container-lowest p-space-md shadow-xs flex flex-col gap-3">
+                <div className="flex items-center justify-between border-b border-outline-variant/20 pb-2">
+                  <span className="font-mono text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-secondary text-[16px]">compare_arrows</span>
+                    Telemetry State Comparison: Before vs After
+                  </span>
+                  <span className="text-[10px] font-mono text-on-surface-variant">
+                    {activeDrawerItem.before_value ? 'Value Transformed' : 'Audit Marker'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch">
+                  {/* Before Value Box */}
+                  <div className="bg-error-container/20 rounded-lg p-3 border border-error/20 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-1.5 text-error font-mono text-[11px] font-bold uppercase mb-1">
+                        <span className="material-symbols-outlined text-[14px]">history</span>
+                        <span>Before Value / Anomaly</span>
+                      </div>
+                      <div className="font-mono text-xs font-bold text-on-surface break-words bg-surface-container-lowest p-2 rounded border border-outline-variant/20">
+                        {activeDrawerItem.before_value || 'Raw un-normalized sensor payload'}
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-on-surface-variant font-mono mt-2">
+                      Original state prior to automated rule execution.
+                    </span>
+                  </div>
+
+                  {/* After Value Box */}
+                  <div className="bg-[#ECFDF5]/50 rounded-lg p-3 border border-[#A7F3D0] flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center gap-1.5 text-[#059669] font-mono text-[11px] font-bold uppercase mb-1">
+                        <span className="material-symbols-outlined text-[14px]">done_all</span>
+                        <span>After Value / Corrected</span>
+                      </div>
+                      <div className="font-mono text-xs font-bold text-on-surface break-words bg-surface-container-lowest p-2 rounded border border-outline-variant/20">
+                        {activeDrawerItem.after_value || 'Normalized, verified, or quarantined state'}
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-on-surface-variant font-mono mt-2">
+                      Sanitized state stored in downstream warehouse tables.
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Triage Explanation Card */}
+              <div className="rounded-xl border border-outline-variant/30 bg-surface-container-low p-space-md flex flex-col gap-2">
+                <span className="font-mono text-xs font-bold text-on-surface uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-secondary text-[16px]">description</span>
+                  Triage Explanation &amp; Scientific Rationale
+                </span>
+                <p className="font-body-md text-sm text-on-surface leading-relaxed">
+                  {activeDrawerItem.explanation}
+                </p>
+                {activeDrawerItem.details && (
+                  <div className="mt-2 pt-2 border-t border-outline-variant/20 font-mono text-xs text-on-surface-variant bg-surface-container p-2.5 rounded border border-outline-variant/20">
+                    <span className="text-[10px] text-on-surface uppercase font-bold block mb-1">
+                      Engine Execution Output:
+                    </span>
+                    {activeDrawerItem.details}
+                  </div>
+                )}
+              </div>
+
+              {/* Rule & Governance Policy */}
+              <div className="p-space-sm rounded-lg bg-surface-container-low border border-outline-variant/20 flex items-start gap-2 text-on-surface-variant font-body-sm text-xs">
+                <span className="material-symbols-outlined text-secondary text-[18px] shrink-0 mt-0.5">
+                  verified
+                </span>
+                <div>
+                  <strong className="text-on-surface">Data Quality Policy:</strong>{' '}
+                  This record is immutable evidence generated during warehouse transformation. In accordance with Rule 11, this interface is strictly read-only.
+                </div>
+              </div>
+            </div>
+
+            {/* Drawer Footer Actions */}
+            <div className="p-space-md border-t border-outline-variant/30 bg-surface-container-low flex items-center justify-between">
+              <span className="font-mono text-[11px] text-on-surface-variant">
+                Record Hash: #{activeDrawerItem.rule.slice(0, 12)}
+              </span>
+              <button
+                onClick={() => setActiveDrawerItem(null)}
+                className="px-4 py-2 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-mono text-xs font-semibold transition-colors"
+                type="button"
+              >
+                Close Drawer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* SECTION 7: MANDATORY FOOTER (RULE 6)                         */}
+      {/* ============================================================ */}
+      <footer className="w-full py-4 px-space-md rounded-xl bg-surface-container-low text-center border border-outline-variant/30 text-on-surface-variant font-body-sm text-xs">
+        <p>Information only, not professional advice. In an emergency contact official services.</p>
+      </footer>
     </div>
   );
 };

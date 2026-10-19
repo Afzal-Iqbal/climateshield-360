@@ -89,28 +89,42 @@ class FreshnessResponseData(BaseModel):
 
 
 class QualityLog(BaseModel):
-    """Contract: quality_log(logged_at, source_name, rule, action[fix|fill|flag], rows_affected, explanation)"""
+    """Contract: quality_log(logged_at, source_name, rule, action[fix|fill|flag|exclude], rows_affected, explanation)"""
     logged_at: datetime
     source_name: str
     rule: str
-    action: Literal["fix", "fill", "flag"]
+    action: str  # fix, fill, flag, exclude, keep
     rows_affected: int
     explanation: str
+    column: Optional[str] = None
+    details: Optional[str] = None
+    before_value: Optional[str] = None
+    after_value: Optional[str] = None
 
 
 class QualitySummaryCounts(BaseModel):
     fix: int = 0
     fill: int = 0
     flag: int = 0
+    exclude: int = 0
     total_actions: int = 0
     rules_audited: int = 0
 
 
 class QualitySummaryResponseData(BaseModel):
     total_checks: int
-    fixed: int
-    filled: int
-    flagged: int
+    total_records_inspected: int = 0
+    missing_count: int = 0
+    duplicate_count: int = 0
+    excluded_count: int = 0
+    fixed: int = 0
+    filled: int = 0
+    flagged: int = 0
+    excluded: int = 0
+    fix_count: int = 0
+    fill_count: int = 0
+    flag_count: int = 0
+    exclude_count: int = 0
     total_anomalies: int
     pass_rate_pct: float
     sources_audited: int
@@ -129,6 +143,8 @@ class DailyQualityCount(BaseModel):
     fix: int = 0
     fill: int = 0
     flag: int = 0
+    exclude: int = 0
+    keep: int = 0
     total: int = 0
 
 
@@ -207,6 +223,31 @@ class Zone(BaseModel):
 
 # --- Pipeline Status Schemas ---
 
+class NextScheduledRunInfo(BaseModel):
+    source: str
+    cron: Optional[str] = None
+    next_run_utc: Optional[datetime] = None
+    next_run_pkt: Optional[str] = None
+    display_text: str
+
+
+class HourlyEvidenceInfo(BaseModel):
+    runs_last_24h: int
+    success_count: int
+    failed_count: int
+    success_rate_pct: float
+    avg_duration_seconds: Optional[float] = None
+    has_runs: bool
+
+
+class ErrorLogEntry(BaseModel):
+    run_id: str
+    started_at: datetime
+    status: str
+    error_message: str
+    duration_seconds: Optional[float] = None
+
+
 class PipelineStatusData(BaseModel):
     latest_successful_run: Optional[RunStatusExtended] = None
     latest_run: Optional[RunStatusExtended] = None
@@ -214,6 +255,11 @@ class PipelineStatusData(BaseModel):
     minutes_since_last_success: Optional[float] = None
     status_indicator: Literal["ok", "late", "failed"]
     quality_summary: QualitySummaryCounts
+    next_scheduled_run: Optional[NextScheduledRunInfo] = None
+    hourly_evidence: Optional[HourlyEvidenceInfo] = None
+    error_logs: List[ErrorLogEntry] = []
+    model_version: Optional[str] = None
+    evaluation_status: Optional[str] = None
 
 
 # --- Health & Metadata Models ---

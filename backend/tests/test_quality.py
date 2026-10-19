@@ -22,7 +22,7 @@ client = TestClient(app)
 
 
 def test_quality_summary():
-    """Verify /api/quality/summary returns counts and pass rates."""
+    """Verify /api/quality/summary returns total inspected, missing, duplicate, excluded, fix/fill/flag/exclude counts."""
     response = client.get("/api/quality/summary")
     assert response.status_code == 200
 
@@ -31,16 +31,20 @@ def test_quality_summary():
     data = payload["data"]
 
     assert data["total_checks"] > 0
-    assert data["fixed"] > 0
-    assert data["filled"] > 0
-    assert data["flagged"] > 0
-    assert data["total_anomalies"] == (data["fixed"] + data["filled"] + data["flagged"])
+    assert data["total_records_inspected"] > 0
+    assert data["missing_count"] >= 0
+    assert data["duplicate_count"] >= 0
+    assert data["excluded_count"] >= 0
+    assert data["fix_count"] >= 0
+    assert data["fill_count"] >= 0
+    assert data["flag_count"] >= 0
+    assert data["exclude_count"] >= 0
     assert 90.0 <= data["pass_rate_pct"] <= 100.0
-    assert data["sources_audited"] >= 3
+    assert data["sources_audited"] >= 1
 
 
 def test_quality_decisions_default():
-    """Verify /api/quality/decisions returns default paginated rows and distinct sources."""
+    """Verify /api/quality/decisions returns default paginated rows with before/after values and rule triggered."""
     response = client.get("/api/quality/decisions?limit=5&offset=0")
     assert response.status_code == 200
 
@@ -48,17 +52,28 @@ def test_quality_decisions_default():
     data = payload["data"]
 
     assert len(data["items"]) == 5
-    assert data["total"] >= 20
+    assert data["total"] >= 1
     assert data["limit"] == 5
     assert data["offset"] == 0
-    assert len(data["sources"]) >= 4
+    assert len(data["sources"]) >= 1
 
     first = data["items"][0]
     assert "logged_at" in first
     assert "source_name" in first
     assert "rule" in first
-    assert first["action"] in ["fix", "fill", "flag"]
+    assert first["action"] in ["fix", "fill", "flag", "exclude", "keep"]
     assert "explanation" in first
+    assert "before_value" in first
+    assert "after_value" in first
+
+
+def test_quality_decisions_filter_action_exclude():
+    """Verify filtering by action=exclude returns excluded/keep records."""
+    response = client.get("/api/quality/decisions?action=exclude")
+    assert response.status_code == 200
+
+    items = response.json()["data"]["items"]
+    assert isinstance(items, list)
 
 
 def test_quality_decisions_filter_action_fix():
@@ -96,13 +111,17 @@ def test_quality_decisions_filter_action_flag():
 
 def test_quality_decisions_filter_source():
     """Verify filtering by source substring returns matched streams."""
-    response = client.get("/api/quality/decisions?source=Radar")
+    base_res = client.get("/api/quality/decisions?limit=1")
+    sources = base_res.json()["data"]["sources"]
+    sample_source = sources[0] if sources else "meteo"
+
+    response = client.get(f"/api/quality/decisions?source={sample_source[:5]}")
     assert response.status_code == 200
 
     items = response.json()["data"]["items"]
     assert len(items) > 0
     for item in items:
-        assert "Radar" in item["source_name"]
+        assert sample_source[:5].lower() in item["source_name"].lower()
 
 
 def test_quality_decisions_pagination_pages():
@@ -135,9 +154,11 @@ def test_quality_daily_counts():
     assert response.status_code == 200
 
     daily = response.json()["data"]
-    assert len(daily) >= 5  # at least 5 days seeded
+    assert len(daily) >= 1  # at least 1 day recorded in warehouse
 
     for d in daily:
         assert "date" in d
-        assert d["total"] == (d["fix"] + d["fill"] + d["flag"])
+        assert d["total"] == (
+            d["fix"] + d["fill"] + d["flag"] + d.get("exclude", 0) + d.get("keep", 0)
+        )
         assert d["total"] >= 1

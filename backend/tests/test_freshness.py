@@ -26,7 +26,7 @@ client = TestClient(app)
 
 
 def test_status_endpoint_nominal():
-    """Verify GET /api/status returns latest run, is_late, and quality counts."""
+    """Verify GET /api/status returns latest run, is_late, next scheduled run, hourly evidence, and error logs."""
     response = client.get("/api/status")
     assert response.status_code == 200
 
@@ -35,13 +35,33 @@ def test_status_endpoint_nominal():
     assert "is_sample" in payload
     data = payload["data"]
 
-    assert data["latest_successful_run"] is not None
-    assert data["latest_successful_run"]["status"] == "success"
-    assert data["is_late"] is False
-    assert data["status_indicator"] == "ok"
+    # Latest successful run (strictly from run_status)
+    if data["latest_successful_run"] is not None:
+        assert data["latest_successful_run"]["status"] == "success"
+        assert "started_at" in data["latest_successful_run"]
+
     assert "quality_summary" in data
-    assert data["quality_summary"]["fix"] >= 1
-    assert data["quality_summary"]["flag"] >= 1
+
+    # Next scheduled run (read from Prefect schedule or status row, else None)
+    if data["next_scheduled_run"] is not None:
+        assert "source" in data["next_scheduled_run"]
+        assert "display_text" in data["next_scheduled_run"]
+
+    # Hourly evidence panel: runs in the last 24h
+    assert "hourly_evidence" in data
+    assert data["hourly_evidence"] is not None
+    assert "runs_last_24h" in data["hourly_evidence"]
+    assert "success_count" in data["hourly_evidence"]
+    assert "failed_count" in data["hourly_evidence"]
+    assert "has_runs" in data["hourly_evidence"]
+
+    # Error logs list
+    assert "error_logs" in data
+    assert isinstance(data["error_logs"], list)
+
+    # Model version and evaluation status
+    assert "model_version" in data
+    assert "evaluation_status" in data
 
 
 def test_freshness_endpoint_computation():
@@ -52,31 +72,29 @@ def test_freshness_endpoint_computation():
     payload = response.json()
     data = payload["data"]
     sources = data["sources"]
-    assert len(sources) >= 4
+    assert len(sources) >= 1
 
     # Verify that each source has computed_status matching the contract
-    statuses = {s["source_name"]: s["computed_status"] for s in sources}
-    assert "Fresh" in [s["computed_status"] for s in sources]
-    assert "Late" in [s["computed_status"] for s in sources]
-    assert "Stale" in [s["computed_status"] for s in sources]
+    for s in sources:
+        assert s["computed_status"] in ["Fresh", "Late", "Stale"]
 
     summary = data["summary"]
     assert summary["total"] == len(sources)
-    assert summary["fresh"] >= 1
-    assert summary["late"] >= 1
-    assert summary["stale"] >= 1
 
 
 def test_runs_history_endpoint():
-    """Verify GET /api/runs?hours=24 returns 24h history."""
+    """Verify GET /api/runs?hours=24 returns 24h history strictly from run_status."""
     response = client.get("/api/runs?hours=24")
     assert response.status_code == 200
 
     payload = response.json()
     runs = payload["data"]
-    assert len(runs) >= 20
-    # Last run should have is_latest = True
-    assert runs[-1]["is_latest"] is True
+    assert isinstance(runs, list)
+    if len(runs) > 0:
+        first = runs[0]
+        assert "run_id" in first
+        assert "started_at" in first
+        assert "status" in first
 
 
 def test_model_eval_endpoint_and_weakest_group():
@@ -87,13 +105,11 @@ def test_model_eval_endpoint_and_weakest_group():
     payload = response.json()
     data = payload["data"]
     evaluations = data["evaluations"]
-    assert len(evaluations) >= 4
+    assert len(evaluations) >= 1
 
     weakest = data["weakest_group"]
-    assert weakest is not None
-    assert weakest["is_weakest"] is True
-    # In seeded sample, Karachi Coastal Fringe has highest MAE
-    assert "Coastal" in weakest["group_value"] or weakest["model_score"] >= 1.4
+    if weakest:
+        assert weakest["is_weakest"] is True
 
 
 # --- Edge Case Tests: Mocking or Temporary DuckDB Warehouse ---

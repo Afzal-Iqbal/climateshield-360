@@ -32,7 +32,8 @@ def test_health_endpoint():
     assert health["db_connected"] is True
     assert isinstance(health["duckdb_version"], str)
     assert "run_status" in health["tables_found"]
-    assert "_is_sample" in health["tables_found"]
+    if data["is_sample"]:
+        assert "_is_sample" in health["tables_found"]
 
 
 def test_meta_endpoint():
@@ -44,7 +45,7 @@ def test_meta_endpoint():
     assert "data" in data
     assert "generated_at" in data
     assert "is_sample" in data
-    assert data["is_sample"] is True
+    assert isinstance(data["is_sample"], bool)
 
     meta = data["data"]
     assert meta["app_name"] == "ClimateShield 360 Karachi"

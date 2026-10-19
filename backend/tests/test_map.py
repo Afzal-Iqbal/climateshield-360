@@ -29,7 +29,7 @@ def test_get_map_zones_default_combined():
     assert "data" in payload
     assert "generated_at" in payload
     assert "is_sample" in payload
-    assert payload["is_sample"] is True
+    assert isinstance(payload["is_sample"], bool)
 
     fc = payload["data"]
     assert fc["type"] == "FeatureCollection"
@@ -95,7 +95,7 @@ def test_get_facilities_all():
     assert response.status_code == 200
 
     payload = response.json()
-    assert payload["is_sample"] is True
+    assert isinstance(payload["is_sample"], bool)
     fc = payload["data"]
     assert fc["type"] == "FeatureCollection"
     assert len(fc["features"]) >= 15
@@ -151,7 +151,7 @@ def test_get_zone_detail_success():
     assert response.status_code == 200
 
     payload = response.json()
-    assert payload["is_sample"] is True
+    assert isinstance(payload["is_sample"], bool)
     data = payload["data"]
 
     assert data["zone_id"] == "KHI-SOUTH"

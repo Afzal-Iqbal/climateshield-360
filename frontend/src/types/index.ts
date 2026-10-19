@@ -92,10 +92,36 @@ export interface FreshnessResponseData {
   summary: FreshnessSummary;
 }
 
+export interface NextScheduledRunInfo {
+  source: string;
+  cron?: string | null;
+  next_run_utc?: string | null;
+  next_run_pkt?: string | null;
+  display_text: string;
+}
+
+export interface HourlyEvidenceInfo {
+  runs_last_24h: number;
+  success_count: number;
+  failed_count: number;
+  success_rate_pct: number;
+  avg_duration_seconds?: number | null;
+  has_runs: boolean;
+}
+
+export interface ErrorLogEntry {
+  run_id: string;
+  started_at: string;
+  status: string;
+  error_message: string;
+  duration_seconds?: number | null;
+}
+
 export interface QualitySummaryCounts {
   fix: number;
   fill: number;
   flag: number;
+  exclude?: number;
   total_actions: number;
   rules_audited: number;
 }
@@ -107,22 +133,40 @@ export interface PipelineStatusData {
   minutes_since_last_success?: number | null;
   status_indicator: 'ok' | 'late' | 'failed';
   quality_summary: QualitySummaryCounts;
+  next_scheduled_run?: NextScheduledRunInfo | null;
+  hourly_evidence?: HourlyEvidenceInfo | null;
+  error_logs?: ErrorLogEntry[];
+  model_version?: string | null;
+  evaluation_status?: string | null;
 }
 
 export interface QualityLog {
   logged_at: string;
   source_name: string;
   rule: string;
-  action: 'fix' | 'fill' | 'flag';
+  action: 'fix' | 'fill' | 'flag' | 'exclude' | 'keep' | string;
   rows_affected: number;
   explanation: string;
+  column?: string | null;
+  details?: string | null;
+  before_value?: string | null;
+  after_value?: string | null;
 }
 
 export interface QualitySummaryResponseData {
   total_checks: number;
+  total_records_inspected: number;
+  missing_count: number;
+  duplicate_count: number;
+  excluded_count: number;
   fixed: number;
   filled: number;
   flagged: number;
+  excluded?: number;
+  fix_count: number;
+  fill_count: number;
+  flag_count: number;
+  exclude_count: number;
   total_anomalies: number;
   pass_rate_pct: number;
   sources_audited: number;
@@ -141,6 +185,7 @@ export interface DailyQualityCount {
   fix: number;
   fill: number;
   flag: number;
+  exclude?: number;
   total: number;
 }
 
