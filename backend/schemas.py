@@ -4,7 +4,7 @@ Defined in AGENT_RULES.md.
 """
 
 from datetime import datetime
-from typing import Generic, List, Literal, Optional, TypeVar
+from typing import Any, Dict, Generic, List, Literal, Optional, TypeVar
 from pydantic import BaseModel, Field
 
 T = TypeVar("T")
@@ -309,3 +309,124 @@ class PriorityItem(BaseModel):
     score: float
     action_title: str
     reason: str
+
+
+# --- Map & GeoJSON Schemas ---
+
+class GeoJSONGeometry(BaseModel):
+    type: str
+    coordinates: Any
+
+
+class ZoneFeatureProperties(BaseModel):
+    zone_id: str
+    name: str
+    hazard_type: str
+    risk_level: Literal["Low", "Moderate", "High", "Severe"]
+    probability: float
+    interval_low: float
+    interval_high: float
+    interval: List[float] = Field(description="[interval_low, interval_high]")
+    exposed_population: int
+    facilities_count: int
+    vulnerability_score: float
+    evidence_strength: str
+    baseline_value: float
+
+
+class ZoneGeoJSONFeature(BaseModel):
+    type: Literal["Feature"] = "Feature"
+    id: str
+    geometry: GeoJSONGeometry
+    properties: ZoneFeatureProperties
+
+
+class ZoneGeoJSONFeatureCollection(BaseModel):
+    type: Literal["FeatureCollection"] = "FeatureCollection"
+    features: List[ZoneGeoJSONFeature]
+
+
+class FacilityFeatureProperties(BaseModel):
+    facility_id: str
+    type: str
+    name: str
+    zone_id: str
+    lat: float
+    lon: float
+
+
+class FacilityGeoJSONFeature(BaseModel):
+    type: Literal["Feature"] = "Feature"
+    id: str
+    geometry: GeoJSONGeometry
+    properties: FacilityFeatureProperties
+
+
+class FacilityGeoJSONFeatureCollection(BaseModel):
+    type: Literal["FeatureCollection"] = "FeatureCollection"
+    features: List[FacilityGeoJSONFeature]
+
+
+class ZoneHazardDetail(BaseModel):
+    hazard_type: str
+    probability: float
+    interval_low: float
+    interval_high: float
+    interval: List[float]
+    baseline_value: float
+    heat_probability: Optional[float] = None
+    heat_interval: Optional[List[float]] = None
+    rain_probability: Optional[float] = None
+    rain_interval: Optional[List[float]] = None
+    wbgt_celsius: Optional[float] = None
+    rainfall_6h_mm: Optional[float] = None
+    warning_label: str
+
+
+class DemographicBreakdown(BaseModel):
+    children_under_5: int
+    elderly_65_plus: int
+    informal_settlements_pct: float
+
+
+class ZoneExposureDetail(BaseModel):
+    exposed_population: int
+    facilities_count: int
+    demographics: Optional[DemographicBreakdown] = None
+    critical_facilities: List[Facility] = []
+
+
+class ZoneVulnerabilityDetail(BaseModel):
+    vulnerability_score: float
+    risk_level: Literal["Low", "Moderate", "High", "Severe"]
+    heat_risk_level: str
+    rain_risk_level: str
+    chokepoint_notes: Optional[str] = None
+    indicators: List[ImpactIndicator] = []
+
+
+class EvidenceSourceItem(BaseModel):
+    source: str
+    row_ids: str
+    indicator: str
+    impact_area: str
+    evidence_strength: str
+
+
+class ZoneEvidenceDetail(BaseModel):
+    evidence_strength: str
+    sources_count: int
+    sources: List[EvidenceSourceItem]
+    model_provenance: str = "ClimateShield 360 Urban Ensemble v1.0"
+    last_calibrated: Optional[str] = None
+
+
+class ZoneDetailResponseData(BaseModel):
+    zone_id: str
+    name: str
+    geometry: Optional[GeoJSONGeometry] = None
+    hazard: ZoneHazardDetail
+    exposure: ZoneExposureDetail
+    vulnerability: ZoneVulnerabilityDetail
+    evidence: ZoneEvidenceDetail
+

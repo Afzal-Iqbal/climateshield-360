@@ -277,3 +277,124 @@ export interface PriorityItem {
   action_title: string;
   reason: string;
 }
+
+// --- Map & Geospatial Types ---
+
+export interface GeoJSONGeometry {
+  type: string;
+  coordinates: any;
+}
+
+export interface ZoneFeatureProperties {
+  zone_id: string;
+  name: string;
+  hazard_type: string;
+  risk_level: RiskLevel;
+  probability: number;
+  interval_low: number;
+  interval_high: number;
+  interval: [number, number];
+  exposed_population: number;
+  facilities_count: number;
+  vulnerability_score: number;
+  evidence_strength: EvidenceStrength;
+  baseline_value: number;
+}
+
+export interface ZoneGeoJSONFeature {
+  type: 'Feature';
+  id: string;
+  geometry: GeoJSONGeometry;
+  properties: ZoneFeatureProperties;
+}
+
+export interface ZoneGeoJSONFeatureCollection {
+  type: 'FeatureCollection';
+  features: ZoneGeoJSONFeature[];
+}
+
+export interface FacilityFeatureProperties {
+  facility_id: string;
+  type: string;
+  name: string;
+  zone_id: string;
+  lat: number;
+  lon: number;
+}
+
+export interface FacilityGeoJSONFeature {
+  type: 'Feature';
+  id: string;
+  geometry: GeoJSONGeometry;
+  properties: FacilityFeatureProperties;
+}
+
+export interface FacilityGeoJSONFeatureCollection {
+  type: 'FeatureCollection';
+  features: FacilityGeoJSONFeature[];
+}
+
+export interface DemographicBreakdown {
+  children_under_5: number;
+  elderly_65_plus: number;
+  informal_settlements_pct: number;
+}
+
+export interface ZoneHazardDetail {
+  hazard_type: string;
+  probability: number;
+  interval_low: number;
+  interval_high: number;
+  interval: [number, number];
+  baseline_value: number;
+  heat_probability?: number | null;
+  heat_interval?: [number, number] | null;
+  rain_probability?: number | null;
+  rain_interval?: [number, number] | null;
+  wbgt_celsius?: number | null;
+  rainfall_6h_mm?: number | null;
+  warning_label: string;
+}
+
+export interface ZoneExposureDetail {
+  exposed_population: number;
+  facilities_count: number;
+  demographics?: DemographicBreakdown | null;
+  critical_facilities: Facility[];
+}
+
+export interface ZoneVulnerabilityDetail {
+  vulnerability_score: number;
+  risk_level: RiskLevel;
+  heat_risk_level: string;
+  rain_risk_level: string;
+  chokepoint_notes?: string | null;
+  indicators: ImpactIndicator[];
+}
+
+export interface EvidenceSourceItem {
+  source: string;
+  row_ids: string;
+  indicator: string;
+  impact_area: string;
+  evidence_strength: string;
+}
+
+export interface ZoneEvidenceDetail {
+  evidence_strength: EvidenceStrength;
+  sources_count: number;
+  sources: EvidenceSourceItem[];
+  model_provenance: string;
+  last_calibrated?: string | null;
+}
+
+export interface ZoneDetailData {
+  zone_id: string;
+  name: string;
+  geometry?: GeoJSONGeometry | null;
+  hazard: ZoneHazardDetail;
+  exposure: ZoneExposureDetail;
+  vulnerability: ZoneVulnerabilityDetail;
+  evidence: ZoneEvidenceDetail;
+}
+

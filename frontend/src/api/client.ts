@@ -21,6 +21,9 @@ import {
   QualityDecisionsResponseData,
   QualitySummaryResponseData,
   RunStatusExtended,
+  FacilityGeoJSONFeatureCollection,
+  ZoneDetailData,
+  ZoneGeoJSONFeatureCollection,
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -111,6 +114,20 @@ export const api = {
     const qs = q.toString();
     return apiFetch<PriorityItem[]>(`/priorities${qs ? `?${qs}` : ''}`);
   },
+  getMapZones: (hazard?: string) => {
+    const q = new URLSearchParams();
+    if (hazard) q.set('hazard', hazard);
+    const qs = q.toString();
+    return apiFetch<ZoneGeoJSONFeatureCollection>(`/map/zones${qs ? `?${qs}` : ''}`);
+  },
+  getMapFacilities: (types?: string[]) => {
+    const q = new URLSearchParams();
+    if (types && types.length > 0) q.set('types', types.join(','));
+    const qs = q.toString();
+    return apiFetch<FacilityGeoJSONFeatureCollection>(`/map/facilities${qs ? `?${qs}` : ''}`);
+  },
+  getZoneDetail: (zoneId: string) =>
+    apiFetch<ZoneDetailData>(`/map/zone/${encodeURIComponent(zoneId)}`),
 };
 
 /**
