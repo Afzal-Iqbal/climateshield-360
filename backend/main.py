@@ -38,6 +38,7 @@ from routers.impacts import router as impacts_router
 from routers.insight import router as insight_router
 from routers.forecast import router as forecast_router
 from routers.model import router as model_router
+from routers.planner import router as planner_router
 
 app = FastAPI(
     title="ClimateShield 360 API",
@@ -163,3 +164,4 @@ app.include_router(impacts_router, prefix="/api")
 app.include_router(insight_router, prefix="/api")
 app.include_router(forecast_router, prefix="/api")
 app.include_router(model_router, prefix="/api")
+app.include_router(planner_router, prefix="/api")

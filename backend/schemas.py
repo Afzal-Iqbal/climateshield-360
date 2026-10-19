@@ -628,3 +628,80 @@ class ImpactDomainData(BaseModel):
     limitations: str
     indicators: List[ImpactIndicatorMetric] = []
     time_series: Optional[ImpactTimeSeries] = None
+
+
+# --- Emergency Action Planner Models ---
+
+class PlannerMeasureItem(BaseModel):
+    measure_id: str
+    title: str
+    category: str
+    action: str
+    target: str
+    priority: Literal["Immediate", "Urgent", "Standard"]
+
+
+class ResourceGapDetail(BaseModel):
+    is_gap: bool
+    population_per_facility: int
+    severity: Literal["Severe", "Elevated", "Normal"]
+    explanation: str
+    mitigation_action: str
+
+
+class PlannerDistrictItem(BaseModel):
+    rank: int
+    district_id: str
+    district_name: str
+    hazard_type: Literal["heat", "heavy_rain"]
+    risk_level: Literal["Low", "Moderate", "High", "Severe"]
+    vulnerability_score: float
+    exposed_population: int
+    facilities_count: int
+    evidence_strength: str
+    # Reason fields
+    forecast_probability: float
+    forecast_interval_low: float
+    forecast_interval_high: float
+    baseline_value: float
+    reason_summary: str
+    # Suggested measures from fixed mapping in code
+    suggested_measures: List[PlannerMeasureItem]
+    # Row IDs used
+    row_ids: List[str]
+    # Resource gap flag
+    resource_gap: bool
+    resource_gap_details: ResourceGapDetail
+
+
+class CityForecastSummary(BaseModel):
+    hazard_type: str
+    time_range: str
+    avg_probability: float
+    interval_low: float
+    interval_high: float
+    baseline_value: float
+    cutoff_time_utc: datetime
+    cutoff_time_pkt: str
+
+
+class ResourceGapSummary(BaseModel):
+    total_districts_evaluated: int
+    flagged_gap_districts_count: int
+    total_exposed_population: int
+    total_facilities_registered: int
+    citywide_ratio: int
+    flagged_district_names: List[str]
+    facilities_by_type: Dict[str, int]
+    policy_notice: str
+
+
+class PlannerResponseData(BaseModel):
+    hazard: Literal["heat", "heavy_rain"]
+    range: Literal["24h", "48h", "7d"]
+    city: str
+    city_forecast: CityForecastSummary
+    districts: List[PlannerDistrictItem]
+    resource_summary: ResourceGapSummary
+    operational_note: str = "Decision support only, not emergency dispatch instructions."
+

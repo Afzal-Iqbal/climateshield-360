@@ -591,3 +591,80 @@ export interface ImpactDomainData {
   indicators: ImpactIndicatorMetric[];
   time_series?: ImpactTimeSeries | null;
 }
+
+// --- Emergency Action Planner Types ---
+
+export interface PlannerMeasureItem {
+  measure_id: string;
+  title: string;
+  category: string;
+  action: string;
+  target: string;
+  priority: 'Immediate' | 'Urgent' | 'Standard';
+}
+
+export interface ResourceGapDetail {
+  is_gap: boolean;
+  population_per_facility: number;
+  severity: 'Severe' | 'Elevated' | 'Normal';
+  explanation: string;
+  mitigation_action: string;
+}
+
+export interface PlannerDistrictItem {
+  rank: number;
+  district_id: string;
+  district_name: string;
+  hazard_type: 'heat' | 'heavy_rain';
+  risk_level: RiskLevel;
+  vulnerability_score: number;
+  exposed_population: number;
+  facilities_count: number;
+  evidence_strength: string;
+  // Reason fields
+  forecast_probability: number;
+  forecast_interval_low: number;
+  forecast_interval_high: number;
+  baseline_value: number;
+  reason_summary: string;
+  // Suggested measures
+  suggested_measures: PlannerMeasureItem[];
+  // Row IDs used
+  row_ids: string[];
+  // Resource gap
+  resource_gap: boolean;
+  resource_gap_details: ResourceGapDetail;
+}
+
+export interface CityForecastSummary {
+  hazard_type: string;
+  time_range: string;
+  avg_probability: number;
+  interval_low: number;
+  interval_high: number;
+  baseline_value: number;
+  cutoff_time_utc: string;
+  cutoff_time_pkt: string;
+}
+
+export interface ResourceGapSummary {
+  total_districts_evaluated: number;
+  flagged_gap_districts_count: number;
+  total_exposed_population: number;
+  total_facilities_registered: number;
+  citywide_ratio: number;
+  flagged_district_names: string[];
+  facilities_by_type: Record<string, number>;
+  policy_notice: string;
+}
+
+export interface PlannerResponseData {
+  hazard: 'heat' | 'heavy_rain';
+  range: '24h' | '48h' | '7d';
+  city: string;
+  city_forecast: CityForecastSummary;
+  districts: PlannerDistrictItem[];
+  resource_summary: ResourceGapSummary;
+  operational_note: string;
+}
+

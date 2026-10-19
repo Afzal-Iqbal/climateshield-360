@@ -27,6 +27,7 @@ import {
   ZoneDetailData,
   ZoneGeoJSONFeatureCollection,
   ImpactDomainData,
+  PlannerResponseData,
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -154,6 +155,13 @@ export const api = {
     if (params.district_id) q.set('district_id', params.district_id);
     const qs = q.toString();
     return apiFetch<ImpactDomainData[]>(`/impacts${qs ? `?${qs}` : ''}`);
+  },
+  getPlanner: (params: { hazard?: string; range?: string } = {}) => {
+    const q = new URLSearchParams();
+    if (params.hazard) q.set('hazard', params.hazard);
+    if (params.range) q.set('range', params.range);
+    const qs = q.toString();
+    return apiFetch<PlannerResponseData>(`/planner${qs ? `?${qs}` : ''}`);
   },
 };
 
