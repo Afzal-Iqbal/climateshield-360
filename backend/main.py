@@ -28,7 +28,8 @@ from schemas import (
     MetaData,
 )
 
-# Import placeholder routers
+# Import routers
+from routers.overview import router as overview_router
 from routers.freshness import router as freshness_router
 from routers.quality import router as quality_router
 from routers.predictions import router as predictions_router
@@ -151,6 +152,7 @@ def get_meta() -> APIResponse[MetaData]:
 
 
 # Mount feature routers under /api
+app.include_router(overview_router, prefix="/api")
 app.include_router(freshness_router, prefix="/api")
 app.include_router(quality_router, prefix="/api")
 app.include_router(predictions_router, prefix="/api")

@@ -15,7 +15,9 @@ import {
   HealthData,
   MetaData,
   ModelEvalResponseData,
+  OverviewData,
   PipelineStatusData,
+  PriorityItem,
   QualityDecisionsResponseData,
   QualitySummaryResponseData,
   RunStatusExtended,
@@ -99,6 +101,16 @@ export const api = {
   },
   getQualityDaily: () =>
     apiFetch<DailyQualityCount[]>('/quality/daily'),
+  getOverview: (range: '24h' | '48h' | '7d' = '24h') =>
+    apiFetch<OverviewData>(`/overview?range=${range}`),
+  getPriorities: (params: { range?: string; hazard?: string; limit?: number } = {}) => {
+    const q = new URLSearchParams();
+    if (params.range) q.set('range', params.range);
+    if (params.hazard && params.hazard !== 'all') q.set('hazard', params.hazard);
+    if (params.limit) q.set('limit', String(params.limit));
+    const qs = q.toString();
+    return apiFetch<PriorityItem[]>(`/priorities${qs ? `?${qs}` : ''}`);
+  },
 };
 
 /**

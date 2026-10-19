@@ -241,3 +241,71 @@ class MetaData(BaseModel):
     timezone_display: str = "PKT (UTC+5)"
     db_path: str
     last_run: Optional[LastRunSummary] = None
+
+
+# --- Overview & Priorities Schemas ---
+
+class PredictionPoint(BaseModel):
+    forecast_time: datetime
+    hours_ahead: int
+    probability: float
+    interval_low: float
+    interval_high: float
+    baseline_value: float
+    hazard_type: str
+
+
+class HazardMetricSummary(BaseModel):
+    hazard_type: str
+    hazard_level: str  # Severe, High, Moderate, Low
+    headline_value: float
+    unit: str
+    interval_low: float
+    interval_high: float
+    source: str
+    label: str
+
+
+class FreshnessMetricSummary(BaseModel):
+    status: str  # Nominal, Degraded, Stale
+    fresh_sources: int
+    total_sources: int
+    lagging_source: Optional[str] = None
+    integrity_pct: float
+
+
+class SevereZonesMetricSummary(BaseModel):
+    severe_count: int
+    total_count: int
+    hotspots: List[str]
+    risk_level: str = "Severe"
+
+
+class OverviewData(BaseModel):
+    time_range: str
+    heat_hazard_level: str
+    rain_hazard_level: str
+    severe_zones_count: int
+    total_zones_count: int
+    severe_zone_names: List[str]
+    data_freshness_status: str
+    heat_summary: HazardMetricSummary
+    rain_summary: HazardMetricSummary
+    freshness_summary: FreshnessMetricSummary
+    severe_summary: SevereZonesMetricSummary
+    predictions_series: dict[str, List[PredictionPoint]]
+
+
+class PriorityItem(BaseModel):
+    rank: int
+    zone_id: str
+    zone_name: str
+    hazard_type: str
+    risk_level: str
+    exposed_population: int
+    facilities_count: int
+    vulnerability_score: float
+    evidence_strength: str
+    score: float
+    action_title: str
+    reason: str

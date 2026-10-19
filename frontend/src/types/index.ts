@@ -209,3 +209,71 @@ export interface Zone {
   name: string;
   geometry_geojson: string;
 }
+
+// --- Overview & Priorities Interfaces ---
+
+export interface PredictionPoint {
+  forecast_time: string;
+  hours_ahead: number;
+  probability: number;
+  interval_low: number;
+  interval_high: number;
+  baseline_value: number;
+  hazard_type: string;
+}
+
+export interface HazardMetricSummary {
+  hazard_type: string;
+  hazard_level: RiskLevel;
+  headline_value: number;
+  unit: string;
+  interval_low: number;
+  interval_high: number;
+  source: string;
+  label: string;
+}
+
+export interface FreshnessMetricSummary {
+  status: string;
+  fresh_sources: number;
+  total_sources: number;
+  lagging_source?: string | null;
+  integrity_pct: number;
+}
+
+export interface SevereZonesMetricSummary {
+  severe_count: number;
+  total_count: number;
+  hotspots: string[];
+  risk_level: RiskLevel;
+}
+
+export interface OverviewData {
+  time_range: '24h' | '48h' | '7d';
+  heat_hazard_level: RiskLevel;
+  rain_hazard_level: RiskLevel;
+  severe_zones_count: number;
+  total_zones_count: number;
+  severe_zone_names: string[];
+  data_freshness_status: string;
+  heat_summary: HazardMetricSummary;
+  rain_summary: HazardMetricSummary;
+  freshness_summary: FreshnessMetricSummary;
+  severe_summary: SevereZonesMetricSummary;
+  predictions_series: Record<string, PredictionPoint[]>;
+}
+
+export interface PriorityItem {
+  rank: number;
+  zone_id: string;
+  zone_name: string;
+  hazard_type: string;
+  risk_level: RiskLevel;
+  exposed_population: number;
+  facilities_count: number;
+  vulnerability_score: number;
+  evidence_strength: string;
+  score: number;
+  action_title: string;
+  reason: string;
+}

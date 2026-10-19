@@ -254,6 +254,7 @@ def seed_database(db_path: Path = SAMPLE_DB_PATH):
         """
     )
 
+
     # 7. predictions(zone_id, forecast_time, hazard_type, probability, interval_low, interval_high, baseline_value)
     conn.execute(
         """
@@ -269,32 +270,77 @@ def seed_database(db_path: Path = SAMPLE_DB_PATH):
         """
     )
 
-    time_horizons = [6, 12, 24, 48]
-    for hours in time_horizons:
-        f_time = now_utc + timedelta(hours=hours)
-        conn.execute(
-            """
-            INSERT INTO predictions VALUES
-            -- Heat hazard (WBGT in °C, baseline normal 35.5C)
-            ('KHI-EAST', ?, 'heat', 0.88, 41.2, 45.8, 35.5),
-            ('KHI-SOUTH', ?, 'heat', 0.76, 38.5, 43.1, 34.8),
-            ('KHI-CENTRAL', ?, 'heat', 0.91, 42.0, 46.4, 35.8),
-            ('KHI-KORANGI', ?, 'heat', 0.84, 40.5, 45.0, 35.2),
-            ('KHI-MALIR', ?, 'heat', 0.94, 43.1, 47.5, 36.0),
-            ('KHI-WEST', ?, 'heat', 0.82, 39.8, 44.5, 35.0),
-            ('KHI-KEAMARI', ?, 'heat', 0.65, 36.2, 40.8, 33.5),
+    # Granular forecast horizons spanning 24h, 48h, and 7 days (168h)
+    horizons_24h = [3, 6, 9, 12, 15, 18, 21, 24]
+    horizons_48h = [27, 30, 33, 36, 39, 42, 45, 48]
+    horizons_7d = [60, 72, 84, 96, 108, 120, 132, 144, 156, 168]
+    all_horizons = horizons_24h + horizons_48h + horizons_7d
 
-            -- Heavy rain hazard (mm, baseline normal 5.0mm)
-            ('KHI-EAST', ?, 'heavy_rain', 0.62, 18.0, 52.0, 5.0),
-            ('KHI-SOUTH', ?, 'heavy_rain', 0.79, 32.0, 78.0, 6.0),
-            ('KHI-CENTRAL', ?, 'heavy_rain', 0.58, 14.0, 46.0, 4.5),
-            ('KHI-KORANGI', ?, 'heavy_rain', 0.85, 40.0, 95.0, 7.5),
-            ('KHI-MALIR', ?, 'heavy_rain', 0.88, 48.0, 110.0, 8.0),
-            ('KHI-WEST', ?, 'heavy_rain', 0.68, 22.0, 60.0, 5.2),
-            ('KHI-KEAMARI', ?, 'heavy_rain', 0.72, 28.0, 70.0, 6.5);
-            """,
-            [f_time] * 14,
-        )
+    zone_heat_multipliers = {
+        "KHI-MALIR": 1.08,
+        "KHI-CENTRAL": 1.05,
+        "KHI-EAST": 1.00,
+        "KHI-KORANGI": 0.98,
+        "KHI-WEST": 0.96,
+        "KHI-SOUTH": 0.88,
+        "KHI-KEAMARI": 0.78,
+    }
+
+    zone_rain_multipliers = {
+        "KHI-KORANGI": 1.10,
+        "KHI-MALIR": 1.08,
+        "KHI-SOUTH": 1.02,
+        "KHI-WEST": 0.94,
+        "KHI-EAST": 0.88,
+        "KHI-CENTRAL": 0.82,
+        "KHI-KEAMARI": 0.75,
+    }
+
+    for h in all_horizons:
+        f_time = now_utc + timedelta(hours=h)
+
+        # Diurnal thermal curve: peaks around 15h-18h (local afternoon heat)
+        # Periodic diurnal wave + slight general escalation
+        phase = ((h + 10) % 24) / 24.0  # 0 to 1 daily cycle
+        import math
+        diurnal_factor = 0.5 + 0.5 * math.sin(phase * 2 * math.pi - math.pi / 2)  # 0 at night, 1 at peak afternoon
+        
+        # Base probability for heat
+        base_heat_prob = 0.52 + 0.38 * diurnal_factor
+        # Monsoon rain system arrives at +12h, peaks +18h to +24h, then gradually dissipates
+        if h <= 9:
+            base_rain_prob = 0.35 + (h / 9.0) * 0.25
+        elif h <= 24:
+            base_rain_prob = 0.60 + 0.28 * math.sin(((h - 9) / 15.0) * math.pi)
+        elif h <= 48:
+            base_rain_prob = 0.70 - ((h - 24) / 24.0) * 0.32
+        else:
+            base_rain_prob = 0.30 + 0.15 * math.sin((h / 48.0) * math.pi)
+
+        # Baseline climatological normal risk in Karachi
+        baseline_heat = 0.22
+        baseline_rain = 0.15
+
+        # Uncertainty widens with lead time
+        spread_factor = 0.08 + (h / 168.0) * 0.12
+
+        for zid, h_mult in zone_heat_multipliers.items():
+            prob = min(0.96, max(0.20, round(base_heat_prob * h_mult, 3)))
+            low = max(0.05, round(prob - spread_factor, 3))
+            high = min(0.99, round(prob + spread_factor * 0.9, 3))
+            conn.execute(
+                "INSERT INTO predictions VALUES (?, ?, 'heat', ?, ?, ?, ?);",
+                [zid, f_time, prob, low, high, baseline_heat]
+            )
+
+        for zid, r_mult in zone_rain_multipliers.items():
+            prob = min(0.95, max(0.15, round(base_rain_prob * r_mult, 3)))
+            low = max(0.04, round(prob - spread_factor * 1.1, 3))
+            high = min(0.99, round(prob + spread_factor * 1.0, 3))
+            conn.execute(
+                "INSERT INTO predictions VALUES (?, ?, 'heavy_rain', ?, ?, ?, ?);",
+                [zid, f_time, prob, low, high, baseline_rain]
+            )
 
     # 8. model_eval(group_type, group_value, metric, baseline_score, model_score)
     # Stratified model evaluation with groups matching DESIGN.md:
