@@ -592,3 +592,39 @@ class ModelSummaryResponseData(BaseModel):
     model_version: str = "lightgbm_quantile_v1.0"
 
 
+class ImpactIndicatorMetric(BaseModel):
+    name: str
+    value: Optional[float] = None
+    unit: Optional[str] = None
+    description: Optional[str] = None
+    evidence_strength: Literal["low", "medium", "high", "limited"] = "medium"
+    source: Optional[str] = None
+    row_ids: List[str] = []
+
+
+class TimeSeriesPoint(BaseModel):
+    timestamp_utc: datetime
+    timestamp_pkt: Optional[str] = None
+    metrics: Dict[str, Optional[float]] = {}
+
+
+class ImpactTimeSeries(BaseModel):
+    variable_name: str
+    unit: str
+    points: List[TimeSeriesPoint] = []
+
+
+class ImpactDomainData(BaseModel):
+    impact_area: str
+    title: str
+    evidence_level: Literal["measured", "indicator-based", "limited"]
+    supported_data: bool
+    risk_level: Optional[Literal["Low", "Moderate", "High", "Severe"]] = None
+    coverage: float  # percent of districts with data (e.g. 100.0 or 0.0)
+    coverage_count: Optional[int] = None
+    coverage_total: Optional[int] = None
+    source_names: List[str] = []
+    row_ids: List[str] = []
+    limitations: str
+    indicators: List[ImpactIndicatorMetric] = []
+    time_series: Optional[ImpactTimeSeries] = None

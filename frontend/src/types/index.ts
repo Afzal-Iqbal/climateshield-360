@@ -554,4 +554,40 @@ export interface ModelSummaryData {
   model_version: string;
 }
 
+export interface ImpactIndicatorMetric {
+  name: string;
+  value?: number | null;
+  unit?: string | null;
+  description?: string | null;
+  evidence_strength: 'low' | 'medium' | 'high' | 'limited';
+  source?: string | null;
+  row_ids: string[];
+}
 
+export interface TimeSeriesPoint {
+  timestamp_utc: string;
+  timestamp_pkt?: string | null;
+  metrics: Record<string, number | null>;
+}
+
+export interface ImpactTimeSeries {
+  variable_name: string;
+  unit: string;
+  points: TimeSeriesPoint[];
+}
+
+export interface ImpactDomainData {
+  impact_area: string;
+  title: string;
+  evidence_level: 'measured' | 'indicator-based' | 'limited';
+  supported_data: boolean;
+  risk_level?: RiskLevel | null;
+  coverage: number;
+  coverage_count?: number | null;
+  coverage_total?: number | null;
+  source_names: string[];
+  row_ids: string[];
+  limitations: string;
+  indicators: ImpactIndicatorMetric[];
+  time_series?: ImpactTimeSeries | null;
+}

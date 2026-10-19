@@ -26,6 +26,7 @@ import {
   ModelSummaryData,
   ZoneDetailData,
   ZoneGeoJSONFeatureCollection,
+  ImpactDomainData,
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -140,6 +141,20 @@ export const api = {
   },
   getModelSummary: () =>
     apiFetch<ModelSummaryData>('/model/summary'),
+  getImpactDomain: (area: string, params: { city?: string; district_id?: string } = {}) => {
+    const q = new URLSearchParams();
+    if (params.city) q.set('city', params.city);
+    if (params.district_id) q.set('district_id', params.district_id);
+    const qs = q.toString();
+    return apiFetch<ImpactDomainData>(`/impacts/${encodeURIComponent(area)}${qs ? `?${qs}` : ''}`);
+  },
+  getAllImpacts: (params: { city?: string; district_id?: string } = {}) => {
+    const q = new URLSearchParams();
+    if (params.city) q.set('city', params.city);
+    if (params.district_id) q.set('district_id', params.district_id);
+    const qs = q.toString();
+    return apiFetch<ImpactDomainData[]>(`/impacts${qs ? `?${qs}` : ''}`);
+  },
 };
 
 /**
