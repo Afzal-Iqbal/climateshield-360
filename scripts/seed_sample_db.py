@@ -31,7 +31,8 @@ def seed_database(db_path: Path = SAMPLE_DB_PATH):
     conn = duckdb.connect(str(db_path))
     print(f"[seed_sample_db] Connected to {db_path}")
 
-    now_utc = datetime.now(timezone.utc)
+    # Rule 3: Store time in UTC. DuckDB TIMESTAMP stores naive datetime in UTC.
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
 
     # 1. _is_sample table (Internal flag)
     conn.execute(
@@ -66,31 +67,39 @@ def seed_database(db_path: Path = SAMPLE_DB_PATH):
         );
         """
     )
-    conn.execute(
-        """
-        INSERT INTO run_status VALUES
-        (
-            'RUN-20261019-01',
-            ?,
-            ?,
-            'success',
-            'Sample scheduled run: Ingested PMD Karachi Met, GFS 0.25, and Sindh PDMA feeder streams. All 18 zones evaluated.'
-        ),
-        (
-            'RUN-20261018-02',
-            ?,
-            ?,
-            'success',
-            'Sample evening validation run completed with zero schema violations.'
-        );
-        """,
-        [
-            now_utc - timedelta(minutes=25),
-            now_utc - timedelta(minutes=20),
-            now_utc - timedelta(hours=14),
-            now_utc - timedelta(hours=13, minutes=55),
-        ],
-    )
+
+    # Seed 24 hourly runs over the last 24 hours
+    # 22 success, 1 failed/retried at -10h, 1 running/lag at -1h, latest at -18m
+    durations = [11.2, 9.8, 10.4, 12.1, 8.9, 11.6, 10.0, 14.2, 9.1, 10.7, 11.0, 8.4, 9.6, 15.2, 9.9, 11.5, 12.3, 13.0, 10.1, 9.5, 10.3, 11.8, 14.5, 8.4]
+    
+    for i in range(24):
+        # hour offset from 23 hours ago down to 0 (current hour)
+        hour_offset = 23 - i
+        run_start = now_utc - timedelta(hours=hour_offset, minutes=18)
+        dur = durations[i]
+        run_finish = run_start + timedelta(seconds=dur)
+        run_id = f"RUN-{run_start.strftime('%Y%m%d-%H%M')}"
+
+        if hour_offset == 10:
+            # Simulated retry / partition failover
+            status = "failed"
+            notes = "Scheduled DB partition failover triggered retries. Auto-recovered on retry."
+        elif hour_offset == 1:
+            status = "success"
+            notes = "Upstream KE Feeder SCADA delayed; used forward fill fallback."
+        elif hour_offset == 0:
+            status = "success"
+            notes = "Nominal scheduled run: Ingested PMD Karachi Met, GFS 0.25, and Sindh PDMA feeder streams. All 18 zones evaluated."
+        else:
+            status = "success"
+            notes = "Nominal micro-batch execution completed cleanly."
+
+        conn.execute(
+            """
+            INSERT INTO run_status VALUES (?, ?, ?, ?, ?);
+            """,
+            [run_id, run_start, run_finish, status, notes],
+        )
 
     # 3. source_freshness(source_name, publisher, licence, last_fetched_at, expected_every_minutes, status)
     conn.execute(
@@ -108,20 +117,20 @@ def seed_database(db_path: Path = SAMPLE_DB_PATH):
     conn.execute(
         """
         INSERT INTO source_freshness VALUES
-        ('PMD Karachi Met Station', 'Pakistan Meteorological Department', 'Government Open Data', ?, 30, 'fresh'),
-        ('NOAA GFS 0.25 Atmosphere', 'NOAA NCEP', 'Public Domain (US Gov)', ?, 360, 'fresh'),
-        ('ECMWF Open Data IFS', 'ECMWF', 'CC-BY-4.0', ?, 360, 'fresh'),
-        ('Sindh PDMA Water Gauges', 'Sindh Disaster Management Authority', 'Institutional MOU', ?, 60, 'delayed'),
-        ('K-Electric Grid Feeder Telemetry', 'K-Electric SCADA Cell', 'Restricted Operational', ?, 15, 'fresh'),
-        ('Karachi Urban Drainage Sluices', 'Karachi Metropolitan Corporation', 'Municipal Public Record', ?, 120, 'stale');
+        ('Regional Doppler Weather Radar', 'Pakistan Meteorological Dept (PMD)', 'Gov MoA / Level-1 Feed', ?, 10, 'fresh'),
+        ('ECMWF Integrated Forecasting System (IFS)', 'European Centre for Medium-Range Weather', 'WMO GTS Exchange', ?, 360, 'fresh'),
+        ('NOAA GFS 0.25 Gridded Atmosphere', 'NOAA NCEP', 'Public Domain (US Gov)', ?, 360, 'fresh'),
+        ('K-Electric Distribution Feeder SCADA', 'K-Electric Grid Operating Centre', 'Critical Infra SLA', ?, 15, 'delayed'),
+        ('SBCA Active Excavation Permits', 'Sindh Building Control Authority', 'Provincial Public Record', ?, 1440, 'stale'),
+        ('Sentinel-2 Surface Reflectance (UHI)', 'ESA Copernicus Open Access Hub', 'CC-BY-SA 3.0 IGO', ?, 7200, 'fresh');
         """,
         [
-            now_utc - timedelta(minutes=14),
-            now_utc - timedelta(hours=2, minutes=10),
-            now_utc - timedelta(hours=3, minutes=45),
-            now_utc - timedelta(minutes=85),
-            now_utc - timedelta(minutes=7),
-            now_utc - timedelta(hours=6, minutes=20),
+            now_utc - timedelta(minutes=4),       # 4m ago (expected 10m -> Fresh: 0.4x)
+            now_utc - timedelta(hours=1, minutes=42), # 102m ago (expected 360m -> Fresh: 0.28x)
+            now_utc - timedelta(hours=2, minutes=10), # 130m ago (expected 360m -> Fresh: 0.36x)
+            now_utc - timedelta(minutes=35),      # 35m ago (expected 15m -> Late: 2.33x)
+            now_utc - timedelta(hours=74),        # 74h ago (expected 24h -> Stale: 3.08x)
+            now_utc - timedelta(hours=28),        # 28h ago (expected 120h -> Fresh: 0.23x)
         ],
     )
 
@@ -138,20 +147,17 @@ def seed_database(db_path: Path = SAMPLE_DB_PATH):
         );
         """
     )
+
+    batch_time = now_utc - timedelta(minutes=18)
     conn.execute(
         """
         INSERT INTO quality_log VALUES
-        (?, 'PMD Karachi Met Station', 'Temperature Physical Bounds [-5C, 55C]', 'fix', 1, 'Sensor spike of 68.2C clamped to previous 15-min rolling mean of 42.1C'),
+        (?, 'Regional Doppler Weather Radar', 'Temperature Physical Bounds [-5C, 55C]', 'fix', 1, 'Sensor spike of 68.2C clamped to previous 15-min rolling mean of 42.1C'),
         (?, 'Sindh PDMA Water Gauges', 'Missing Sensor Timestamp Imputation', 'fill', 3, 'Linear interpolation on Malir River gauge depth during 10-minute packet loss'),
-        (?, 'K-Electric Grid Feeder Telemetry', 'Rapid Voltage Drop Outlier Detection', 'flag', 4, 'Flagged 4 distribution feeders in Lyari showing atypical high variance load'),
-        (?, 'NOAA GFS 0.25 Atmosphere', 'Geographic Bounding Box Karachi [24-26N, 66-68E]', 'fix', 0, 'Bounding box validation passed with zero out-of-boundary records');
+        (?, 'K-Electric Distribution Feeder SCADA', 'Rapid Voltage Drop Outlier Detection', 'flag', 4, 'Flagged 4 distribution feeders in Lyari showing atypical high variance load'),
+        (?, 'NOAA GFS 0.25 Gridded Atmosphere', 'Geographic Bounding Box Karachi [24-26N, 66-68E]', 'fix', 0, 'Bounding box validation passed with zero out-of-boundary records');
         """,
-        [
-            now_utc - timedelta(minutes=22),
-            now_utc - timedelta(minutes=45),
-            now_utc - timedelta(hours=1, minutes=15),
-            now_utc - timedelta(hours=3),
-        ],
+        [batch_time, batch_time, batch_time, batch_time],
     )
 
     # 5. zones(zone_id, name, geometry_geojson)
@@ -165,7 +171,6 @@ def seed_database(db_path: Path = SAMPLE_DB_PATH):
         """
     )
 
-    # Realistic GeoJSON features for major Karachi zones
     karachi_zones = [
         ("KHI-EAST", "Karachi East (Gulshan / Jamshed)", [[67.06, 24.89], [67.12, 24.89], [67.12, 24.94], [67.06, 24.94], [67.06, 24.89]]),
         ("KHI-SOUTH", "Karachi South (Saddar / Lyari / Clifton)", [[66.98, 24.80], [67.05, 24.80], [67.05, 24.87], [66.98, 24.87], [66.98, 24.80]]),
@@ -216,7 +221,6 @@ def seed_database(db_path: Path = SAMPLE_DB_PATH):
     )
 
     # 7. predictions(zone_id, forecast_time, hazard_type, probability, interval_low, interval_high, baseline_value)
-    # Rule 5: Always show uncertainty intervals and baseline comparison where predictions appear.
     conn.execute(
         """
         CREATE TABLE predictions (
@@ -231,14 +235,13 @@ def seed_database(db_path: Path = SAMPLE_DB_PATH):
         """
     )
 
-    # Forecast for next 6h, 12h, 24h, 48h
     time_horizons = [6, 12, 24, 48]
     for hours in time_horizons:
         f_time = now_utc + timedelta(hours=hours)
         conn.execute(
             """
             INSERT INTO predictions VALUES
-            -- Heat hazard (Feels like / WBGT in °C, baseline normal is 35.5C)
+            -- Heat hazard (WBGT in °C, baseline normal 35.5C)
             ('KHI-EAST', ?, 'heat', 0.88, 41.2, 45.8, 35.5),
             ('KHI-SOUTH', ?, 'heat', 0.76, 38.5, 43.1, 34.8),
             ('KHI-CENTRAL', ?, 'heat', 0.91, 42.0, 46.4, 35.8),
@@ -247,7 +250,7 @@ def seed_database(db_path: Path = SAMPLE_DB_PATH):
             ('KHI-WEST', ?, 'heat', 0.82, 39.8, 44.5, 35.0),
             ('KHI-KEAMARI', ?, 'heat', 0.65, 36.2, 40.8, 33.5),
 
-            -- Heavy rain hazard (Accumulated precipitation in mm, baseline normal is 5.0mm)
+            -- Heavy rain hazard (mm, baseline normal 5.0mm)
             ('KHI-EAST', ?, 'heavy_rain', 0.62, 18.0, 52.0, 5.0),
             ('KHI-SOUTH', ?, 'heavy_rain', 0.79, 32.0, 78.0, 6.0),
             ('KHI-CENTRAL', ?, 'heavy_rain', 0.58, 14.0, 46.0, 4.5),
@@ -260,6 +263,8 @@ def seed_database(db_path: Path = SAMPLE_DB_PATH):
         )
 
     # 8. model_eval(group_type, group_value, metric, baseline_score, model_score)
+    # Stratified model evaluation with groups matching DESIGN.md:
+    # Karachi Coastal Fringe has highest MAE (1.48C) -> Weakest group!
     conn.execute(
         """
         CREATE TABLE model_eval (
@@ -274,19 +279,16 @@ def seed_database(db_path: Path = SAMPLE_DB_PATH):
     conn.execute(
         """
         INSERT INTO model_eval VALUES
-        ('hazard_type', 'heat', 'Brier Score (Calibration)', 0.245, 0.089),
-        ('hazard_type', 'heat', 'ROC-AUC', 0.682, 0.914),
-        ('hazard_type', 'heat', 'MAE (Temperature deg C)', 2.85, 1.12),
-        ('hazard_type', 'heavy_rain', 'Brier Score (Calibration)', 0.310, 0.124),
-        ('hazard_type', 'heavy_rain', 'Critical Success Index (CSI)', 0.412, 0.748),
-        ('hazard_type', 'heavy_rain', 'False Alarm Ratio (FAR)', 0.380, 0.165),
-        ('zone_tier', 'coastal', 'MAE (Humidity %)', 14.2, 5.8),
-        ('zone_tier', 'inland_basin', 'MAE (Peak Surface Temp)', 3.4, 1.4);
+        ('overall', 'Karachi Division Overall', 'MAE (Temperature deg C)', 1.94, 0.82),
+        ('spatial_cluster', 'Karachi Coastal Fringe (Kemari, Clifton)', 'MAE (Temperature deg C)', 2.15, 1.48),
+        ('spatial_cluster', 'Inland High-Density Core (Lyari, Orangi)', 'MAE (Temperature deg C)', 1.88, 0.61),
+        ('spatial_cluster', 'Suburban Plain & Semi-Arid (Gadap, Malir)', 'MAE (Temperature deg C)', 1.92, 0.74),
+        ('hazard_type', 'Heat Hazard (WBGT)', 'Brier Score', 0.245, 0.089),
+        ('hazard_type', 'Heavy Rain Precipitation', 'Brier Score', 0.310, 0.124);
         """
     )
 
     # 9. exposure_index(zone_id, hazard_type, exposed_population, facilities_count, vulnerability_score, risk_level, evidence_strength)
-    # Rule 4: Risk colours: Low green, Moderate yellow, High orange, Severe red, always with text labels.
     conn.execute(
         """
         CREATE TABLE exposure_index (
@@ -303,7 +305,6 @@ def seed_database(db_path: Path = SAMPLE_DB_PATH):
     conn.execute(
         """
         INSERT INTO exposure_index VALUES
-        -- Heat exposure
         ('KHI-MALIR', 'heat', 980000, 14, 0.89, 'Severe', 'high'),
         ('KHI-CENTRAL', 'heat', 1420000, 28, 0.82, 'Severe', 'high'),
         ('KHI-EAST', 'heat', 1150000, 34, 0.74, 'High', 'high'),
@@ -312,7 +313,6 @@ def seed_database(db_path: Path = SAMPLE_DB_PATH):
         ('KHI-SOUTH', 'heat', 890000, 31, 0.54, 'Moderate', 'high'),
         ('KHI-KEAMARI', 'heat', 460000, 12, 0.38, 'Low', 'medium'),
 
-        -- Heavy rain exposure
         ('KHI-KORANGI', 'heavy_rain', 1300000, 22, 0.87, 'Severe', 'high'),
         ('KHI-MALIR', 'heavy_rain', 980000, 14, 0.84, 'Severe', 'high'),
         ('KHI-SOUTH', 'heavy_rain', 890000, 31, 0.78, 'High', 'high'),

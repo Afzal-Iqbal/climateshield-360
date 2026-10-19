@@ -7,7 +7,16 @@
  * - UTC to PKT timestamp formatting helper (Rule 3)
  */
 
-import { APIResponse, ErrorResponse, HealthData, MetaData } from '../types';
+import {
+  APIResponse,
+  ErrorResponse,
+  FreshnessResponseData,
+  HealthData,
+  MetaData,
+  ModelEvalResponseData,
+  PipelineStatusData,
+  RunStatusExtended,
+} from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
@@ -27,7 +36,6 @@ export async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<APIResponse<T>> {
-  // Normalize endpoint URL
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const fullUrl = cleanEndpoint.startsWith('/api')
     ? cleanEndpoint
@@ -51,7 +59,6 @@ export async function apiFetch<T>(
       if (errBody.error) errorMsg = errBody.error;
       if (errBody.detail) detailMsg = errBody.detail;
     } catch {
-      // Fallback if not JSON
       detailMsg = response.statusText;
     }
 
@@ -66,6 +73,11 @@ export async function apiFetch<T>(
 export const api = {
   getHealth: () => apiFetch<HealthData>('/health'),
   getMeta: () => apiFetch<MetaData>('/meta'),
+  getStatus: () => apiFetch<PipelineStatusData>('/status'),
+  getFreshness: () => apiFetch<FreshnessResponseData>('/freshness'),
+  getRuns: (hours: number = 24) =>
+    apiFetch<RunStatusExtended[]>(`/runs?hours=${hours}`),
+  getModelEval: () => apiFetch<ModelEvalResponseData>('/model-eval'),
 };
 
 /**
@@ -79,18 +91,36 @@ export function formatPKT(
   if (!utcDateStr) return '—';
   try {
     const date = new Date(utcDateStr);
-    return new Intl.DateTimeFormat('en-PK', {
-      timeZone: 'Asia/Karachi',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: options.second,
-      day: '2-digit',
-      month: 'short',
-      year: options.year,
-      hour12: false,
-      ...options,
-    }).format(date) + ' PKT';
+    return (
+      new Intl.DateTimeFormat('en-PK', {
+        timeZone: 'Asia/Karachi',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: options.second,
+        day: '2-digit',
+        month: 'short',
+        year: options.year,
+        hour12: false,
+        ...options,
+      }).format(date) + ' PKT'
+    );
   } catch {
     return utcDateStr;
   }
+}
+
+/**
+ * Format relative minutes (e.g. "18m ago" or "2h ago").
+ */
+export function formatRelativeMinutes(minutes?: number | null): string {
+  if (minutes === undefined || minutes === null) return '—';
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return `${Math.round(minutes)}m ago`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMins = Math.round(minutes % 60);
+  if (hours < 24) {
+    return remainingMins > 0 ? `${hours}h ${remainingMins}m ago` : `${hours}h ago`;
+  }
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }

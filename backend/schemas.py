@@ -40,6 +40,12 @@ class RunStatus(BaseModel):
     notes: Optional[str] = None
 
 
+class RunStatusExtended(RunStatus):
+    """RunStatus with execution duration metrics for timeline visualization."""
+    duration_seconds: Optional[float] = None
+    is_latest: bool = False
+
+
 class SourceFreshness(BaseModel):
     """Contract: source_freshness(source_name, publisher, licence, last_fetched_at, expected_every_minutes, status)"""
     source_name: str
@@ -50,6 +56,38 @@ class SourceFreshness(BaseModel):
     status: Literal["fresh", "delayed", "stale", "error"]
 
 
+class SourceFreshnessComputed(BaseModel):
+    """
+    Source freshness with dynamically computed SLA status:
+    - Fresh: <= 1.0x expected_every_minutes
+    - Late: <= 3.0x expected_every_minutes
+    - Stale: > 3.0x expected_every_minutes
+    """
+    source_name: str
+    publisher: str
+    licence: str
+    last_fetched_at: datetime
+    expected_every_minutes: int
+    stored_status: str
+    computed_status: Literal["Fresh", "Late", "Stale"]
+    minutes_since_fetch: float
+    ratio: float
+    delay_minutes: float
+
+
+class FreshnessSummary(BaseModel):
+    total: int
+    fresh: int
+    late: int
+    stale: int
+    availability_pct: float
+
+
+class FreshnessResponseData(BaseModel):
+    sources: List[SourceFreshnessComputed]
+    summary: FreshnessSummary
+
+
 class QualityLog(BaseModel):
     """Contract: quality_log(logged_at, source_name, rule, action[fix|fill|flag], rows_affected, explanation)"""
     logged_at: datetime
@@ -58,6 +96,14 @@ class QualityLog(BaseModel):
     action: Literal["fix", "fill", "flag"]
     rows_affected: int
     explanation: str
+
+
+class QualitySummaryCounts(BaseModel):
+    fix: int = 0
+    fill: int = 0
+    flag: int = 0
+    total_actions: int = 0
+    rules_audited: int = 0
 
 
 class Prediction(BaseModel):
@@ -78,6 +124,20 @@ class ModelEval(BaseModel):
     metric: str
     baseline_score: float
     model_score: float
+
+
+class ModelEvalExtended(ModelEval):
+    """ModelEval with computed error reduction and weakest group flag."""
+    error_reduction_pct: Optional[float] = None
+    is_weakest: bool = False
+
+
+class ModelEvalResponseData(BaseModel):
+    evaluations: List[ModelEvalExtended]
+    weakest_group: Optional[ModelEvalExtended] = None
+    overall_baseline_mae: Optional[float] = None
+    overall_model_mae: Optional[float] = None
+    overall_reduction_pct: Optional[float] = None
 
 
 class ExposureIndex(BaseModel):
@@ -117,6 +177,17 @@ class Zone(BaseModel):
     zone_id: str
     name: str
     geometry_geojson: str
+
+
+# --- Pipeline Status Schemas ---
+
+class PipelineStatusData(BaseModel):
+    latest_successful_run: Optional[RunStatusExtended] = None
+    latest_run: Optional[RunStatusExtended] = None
+    is_late: bool
+    minutes_since_last_success: Optional[float] = None
+    status_indicator: Literal["ok", "late", "failed"]
+    quality_summary: QualitySummaryCounts
 
 
 # --- Health & Metadata Models ---

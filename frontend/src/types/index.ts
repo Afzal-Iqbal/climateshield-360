@@ -17,6 +17,7 @@ export interface ErrorResponse {
 export type RiskLevel = 'Low' | 'Moderate' | 'High' | 'Severe';
 export type HazardType = 'heat' | 'heavy_rain';
 export type EvidenceStrength = 'low' | 'medium' | 'high';
+export type SLAStatus = 'Fresh' | 'Late' | 'Stale';
 
 export interface HealthData {
   status: string;
@@ -51,6 +52,11 @@ export interface RunStatus {
   notes?: string;
 }
 
+export interface RunStatusExtended extends RunStatus {
+  duration_seconds?: number | null;
+  is_latest?: boolean;
+}
+
 export interface SourceFreshness {
   source_name: string;
   publisher: string;
@@ -58,6 +64,49 @@ export interface SourceFreshness {
   last_fetched_at: string;
   expected_every_minutes: number;
   status: 'fresh' | 'delayed' | 'stale' | 'error';
+}
+
+export interface SourceFreshnessComputed {
+  source_name: string;
+  publisher: string;
+  licence: string;
+  last_fetched_at: string;
+  expected_every_minutes: number;
+  stored_status: string;
+  computed_status: SLAStatus;
+  minutes_since_fetch: number;
+  ratio: number;
+  delay_minutes: number;
+}
+
+export interface FreshnessSummary {
+  total: number;
+  fresh: number;
+  late: number;
+  stale: number;
+  availability_pct: number;
+}
+
+export interface FreshnessResponseData {
+  sources: SourceFreshnessComputed[];
+  summary: FreshnessSummary;
+}
+
+export interface QualitySummaryCounts {
+  fix: number;
+  fill: number;
+  flag: number;
+  total_actions: number;
+  rules_audited: number;
+}
+
+export interface PipelineStatusData {
+  latest_successful_run?: RunStatusExtended | null;
+  latest_run?: RunStatusExtended | null;
+  is_late: boolean;
+  minutes_since_last_success?: number | null;
+  status_indicator: 'ok' | 'late' | 'failed';
+  quality_summary: QualitySummaryCounts;
 }
 
 export interface QualityLog {
@@ -85,6 +134,19 @@ export interface ModelEval {
   metric: string;
   baseline_score: number;
   model_score: number;
+}
+
+export interface ModelEvalExtended extends ModelEval {
+  error_reduction_pct?: number | null;
+  is_weakest: boolean;
+}
+
+export interface ModelEvalResponseData {
+  evaluations: ModelEvalExtended[];
+  weakest_group?: ModelEvalExtended | null;
+  overall_baseline_mae?: number | null;
+  overall_model_mae?: number | null;
+  overall_reduction_pct?: number | null;
 }
 
 export interface ExposureIndex {
