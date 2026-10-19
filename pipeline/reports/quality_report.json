@@ -1,6 +1,6 @@
 {
-  "generated_at_utc": "2026-10-19T16:30:59.826288+00:00",
-  "started_at_utc": "2026-10-19T16:30:25.796533+00:00",
+  "generated_at_utc": "2026-10-19T17:08:41.428563+00:00",
+  "started_at_utc": "2026-10-19T17:08:04.308167+00:00",
   "pipeline": "climateshield.pipeline.run.make_data",
   "raw_files_unchanged": true,
   "n_raw_files": 154,
@@ -126,7 +126,7 @@
       },
       {
         "path": "data/processed/climateshield.duckdb",
-        "bytes": 25702400
+        "bytes": 25440256
       },
       {
         "path": "data/processed/district_name_lookup.csv",
