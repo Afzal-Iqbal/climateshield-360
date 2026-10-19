@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
+import { motion, useReducedMotion } from 'framer-motion';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -17,6 +18,8 @@ import { api, formatPKT } from '../api/client';
 import { RiskBadge } from '../components/RiskBadge';
 import { SampleBanner } from '../components/SampleBanner';
 import { EmptyState } from '../components/EmptyState';
+import { AnimatedNumber } from '../components/AnimatedNumber';
+import { Skeleton } from '../components/Skeleton';
 import { RiskLevel } from '../types';
 
 interface OverviewProps {
@@ -25,6 +28,7 @@ interface OverviewProps {
 
 export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
   const navigate = useNavigate();
+  const shouldReduceMotion = useReducedMotion();
   const [timeRange, setTimeRange] = useState<'24h' | '48h' | '7d'>('24h');
   const [activeHazardView, setActiveHazardView] = useState<'heat' | 'heavy_rain' | 'both'>('both');
   const [priorityHazardFilter, setPriorityHazardFilter] = useState<'all' | 'heat' | 'heavy_rain'>('all');
@@ -91,20 +95,34 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
     };
   });
 
-  // Mini Map hotspots metadata
-  const mapHotspots = [
-    { id: 'KHI-MALIR', name: 'Malir Basin', x: '72%', y: '48%', level: 'Severe' as RiskLevel, desc: 'High Runoff & Flood Risk' },
-    { id: 'KHI-CENTRAL', name: 'Karachi Central', x: '52%', y: '40%', level: 'Severe' as RiskLevel, desc: 'Extreme Urban Heat Island' },
-    { id: 'KHI-KORANGI', name: 'Korangi Industrial', x: '58%', y: '65%', level: 'Severe' as RiskLevel, desc: 'Causeway Inundation Threat' },
-    { id: 'KHI-WEST', name: 'Orangi / SITE', x: '26%', y: '32%', level: 'High' as RiskLevel, desc: 'High Population Density' },
-    { id: 'KHI-EAST', name: 'Gulshan / East', x: '48%', y: '42%', level: 'High' as RiskLevel, desc: 'Arterial Corridor Saturation' },
-    { id: 'KHI-SOUTH', name: 'Saddar / Lyari', x: '35%', y: '58%', level: 'Moderate' as RiskLevel, desc: 'Drainage Chokepoint' },
-    { id: 'KHI-KEAMARI', name: 'Keamari / Port', x: '18%', y: '62%', level: 'Moderate' as RiskLevel, desc: 'Coastal Surge Watch' },
-  ];
+  // Mini Map hotspots dynamically populated from API priorities (Requirement 6)
+  const mapHotspots = useMemo(() => {
+    const baseSpots = [
+      { id: 'KHI-MALIR', defaultName: 'Malir Basin', x: '72%', y: '48%' },
+      { id: 'KHI-CENTRAL', defaultName: 'Karachi Central', x: '52%', y: '40%' },
+      { id: 'KHI-KORANGI', defaultName: 'Korangi Industrial', x: '58%', y: '65%' },
+      { id: 'KHI-WEST', defaultName: 'Orangi / SITE', x: '26%', y: '32%' },
+      { id: 'KHI-EAST', defaultName: 'Gulshan / East', x: '48%', y: '42%' },
+      { id: 'KHI-SOUTH', defaultName: 'Saddar / Lyari', x: '35%', y: '58%' },
+      { id: 'KHI-KEAMARI', defaultName: 'Keamari / Port', x: '18%', y: '62%' },
+    ];
+
+    return baseSpots.map((spot) => {
+      const p = priorities.find((item) => item.zone_id === spot.id);
+      return {
+        id: spot.id,
+        name: p?.zone_name || spot.defaultName,
+        x: spot.x,
+        y: spot.y,
+        level: (p?.risk_level || 'Moderate') as RiskLevel,
+        desc: p?.action_title || p?.reason || '',
+      };
+    });
+  }, [priorities]);
 
   if (isOverviewError || isPrioritiesError) {
     return (
-      <div className="px-space-md lg:px-space-lg py-space-md flex flex-col gap-space-lg max-w-[1720px] mx-auto w-full">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
         <SampleBanner isSample={isSample} />
         <EmptyState
           icon="error"
@@ -121,36 +139,41 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
   }
 
   return (
-    <div className="px-space-md lg:px-space-lg py-space-md flex flex-col gap-space-lg max-w-[1720px] mx-auto w-full">
+    <motion.div
+      initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2 }}
+      className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6"
+    >
       {/* Sample Data Operational Banner (Rule 2) */}
       <SampleBanner isSample={overviewResponse?.is_sample ?? isSample} />
 
       {/* Overview Top Bar: Title & Range Selector */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md pb-space-xs border-b border-outline-variant/30">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-outline-variant/30">
         <div>
-          <div className="flex items-center gap-space-xs">
+          <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-secondary text-[26px]">dashboard</span>
-            <h1 className="font-headline-lg text-headline-lg font-bold text-on-surface tracking-tight">
+            <h1 className="font-headline-lg text-xl sm:text-2xl font-bold text-on-surface tracking-tight">
               Operational Hazard Overview
             </h1>
           </div>
-          <p className="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+          <p className="font-body-sm text-xs sm:text-sm text-on-surface-variant mt-0.5">
             Real-time multi-hazard telemetry, ensemble probability curves, and ranked municipal interventions for Karachi Division.
           </p>
         </div>
 
         {/* Range Selector: 24h / 48h / 7d */}
         <div className="flex items-center gap-2 self-start sm:self-center">
-          <span className="font-label-mono-sm text-label-mono-sm text-on-surface-variant font-semibold uppercase tracking-wider hidden md:inline">
+          <span className="font-mono text-xs text-on-surface-variant font-semibold uppercase tracking-wider hidden md:inline">
             Horizon:
           </span>
-          <div className="flex items-center bg-surface-container-high rounded-full p-1 shadow-sm border border-outline-variant/40">
+          <div className="flex items-center bg-surface-container-high dark:bg-surface-container-highest/60 rounded-full p-1 shadow-xs border border-outline-variant/40">
             <button
               type="button"
               onClick={() => setTimeRange('24h')}
-              className={`px-3 py-1 rounded-full font-label-mono-sm text-label-mono-sm transition-all ${
+              className={`min-h-[36px] px-3.5 py-1 rounded-full font-mono text-xs transition-all ${
                 timeRange === '24h'
-                  ? 'bg-primary text-on-primary font-bold shadow-sm'
+                  ? 'bg-primary text-on-primary font-bold shadow-xs'
                   : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
@@ -159,9 +182,9 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
             <button
               type="button"
               onClick={() => setTimeRange('48h')}
-              className={`px-3 py-1 rounded-full font-label-mono-sm text-label-mono-sm transition-all ${
+              className={`min-h-[36px] px-3.5 py-1 rounded-full font-mono text-xs transition-all ${
                 timeRange === '48h'
-                  ? 'bg-primary text-on-primary font-bold shadow-sm'
+                  ? 'bg-primary text-on-primary font-bold shadow-xs'
                   : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
@@ -170,9 +193,9 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
             <button
               type="button"
               onClick={() => setTimeRange('7d')}
-              className={`px-3 py-1 rounded-full font-label-mono-sm text-label-mono-sm transition-all ${
+              className={`min-h-[36px] px-3.5 py-1 rounded-full font-mono text-xs transition-all ${
                 timeRange === '7d'
-                  ? 'bg-primary text-on-primary font-bold shadow-sm'
+                  ? 'bg-primary text-on-primary font-bold shadow-xs'
                   : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
@@ -182,198 +205,221 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
         </div>
       </div>
 
-      {/* 4 Key Metric Telemetry Summary Cards (Design Matching) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-space-md">
-        {/* Card 1: Thermal Hazard Level */}
-        <div className="bg-surface-container-lowest rounded-xl p-space-md flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow border border-outline-variant/20">
-          <div className="flex flex-col gap-space-xs">
-            <div className="flex items-center justify-between">
-              <span className="font-label-mono-sm text-label-mono-sm text-on-surface-variant uppercase tracking-wider">
-                Hazard Vector 01
-              </span>
-              <RiskBadge level={overview?.heat_hazard_level || 'Severe'} />
-            </div>
-            <div className="mt-space-sm">
-              <span className="font-title-md text-title-md text-on-surface font-semibold block">
-                Thermal Hazard Level
-              </span>
-              <div className="flex items-baseline gap-space-xs mt-1">
-                <span className="font-metric-display text-metric-display text-on-surface font-bold tracking-tight">
-                  {overview?.heat_summary?.headline_value ?? 43.8}°C
-                </span>
-                <span className="font-body-sm text-body-sm text-on-surface-variant">
-                  Feels Like (WBGT)
-                </span>
+      {/* 4 Key Metric Telemetry Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {isOverviewLoading ? (
+          <>
+            <Skeleton className="h-44 rounded-2xl" />
+            <Skeleton className="h-44 rounded-2xl" />
+            <Skeleton className="h-44 rounded-2xl" />
+            <Skeleton className="h-44 rounded-2xl" />
+          </>
+        ) : (
+          <>
+            {/* Card 1: Thermal Hazard Level */}
+            <motion.div
+              whileHover={shouldReduceMotion ? undefined : { y: -2 }}
+              transition={{ duration: 0.15 }}
+              className="bg-surface dark:bg-surface-container-low rounded-2xl p-5 flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow border border-outline-variant/30 dark:border-outline-variant/20 glass-panel"
+            >
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">
+                    Hazard Vector 01
+                  </span>
+                  <RiskBadge level={overview?.heat_hazard_level || 'Severe'} />
+                </div>
+                <div className="mt-1">
+                  <span className="text-sm font-semibold text-on-surface block">
+                    Thermal Hazard Level
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="font-mono text-3xl sm:text-4xl font-bold tracking-tight text-on-surface">
+                      <AnimatedNumber value={overview?.heat_summary?.headline_value ?? 43.8} decimals={1} />°C
+                    </span>
+                    <span className="text-xs text-on-surface-variant font-medium">
+                      Feels Like (WBGT)
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Uncertainty Range Line Box */}
-          <div className="mt-space-md pt-space-sm bg-surface-container-low rounded-lg p-space-sm flex flex-col gap-space-xs">
-            <div className="flex items-center justify-between font-label-mono-sm text-label-mono-sm">
-              <span className="text-on-surface-variant">Confidence Band (90%)</span>
-              <span className="font-semibold text-on-surface">
-                {overview?.heat_summary?.interval_low ?? 41.5}°C — {overview?.heat_summary?.interval_high ?? 46.2}°C
-              </span>
-            </div>
-            {/* Visual uncertainty bar */}
-            <div className="w-full bg-surface-container-highest h-2 rounded-full relative overflow-hidden">
-              <div className="absolute left-[35%] right-[15%] h-full bg-[#f97316] rounded-full opacity-80" />
-              <div className="absolute left-[60%] top-0 bottom-0 w-1 bg-[#ba1a1a]" />
-            </div>
-            <div className="flex items-center justify-between font-label-mono-sm text-label-mono-sm text-on-surface-variant mt-0.5">
-              <span className="truncate">{overview?.heat_summary?.source || 'PMD Karachi Met & GFS 0.25°'}</span>
-              <span className="px-1.5 py-0.5 bg-surface-container text-on-surface-variant rounded text-[10px] uppercase font-mono">
-                [Sample Data]
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 2: Rainfall Hazard */}
-        <div className="bg-surface-container-lowest rounded-xl p-space-md flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow border border-outline-variant/20">
-          <div className="flex flex-col gap-space-xs">
-            <div className="flex items-center justify-between">
-              <span className="font-label-mono-sm text-label-mono-sm text-on-surface-variant uppercase tracking-wider">
-                Hazard Vector 02
-              </span>
-              <RiskBadge level={overview?.rain_hazard_level || 'Moderate'} />
-            </div>
-            <div className="mt-space-sm">
-              <span className="font-title-md text-title-md text-on-surface font-semibold block">
-                Precipitation Accumulation
-              </span>
-              <div className="flex items-baseline gap-space-xs mt-1">
-                <span className="font-metric-display text-metric-display text-on-surface font-bold tracking-tight">
-                  {overview?.rain_summary?.headline_value ?? 38}
-                </span>
-                <span className="font-title-md text-title-md text-on-surface font-normal">mm</span>
-                <span className="font-body-sm text-body-sm text-on-surface-variant">
-                  / {timeRange}
-                </span>
+              {/* Uncertainty Range Line Box */}
+              <div className="mt-4 pt-2 bg-surface-container-low dark:bg-surface-container-high/40 rounded-xl p-3 flex flex-col gap-1.5 border border-outline-variant/20">
+                <div className="flex items-center justify-between font-mono text-xs">
+                  <span className="text-on-surface-variant">Confidence Band (90%)</span>
+                  <span className="font-semibold text-on-surface">
+                    {overview?.heat_summary?.interval_low ?? 41.5}°C — {overview?.heat_summary?.interval_high ?? 46.2}°C
+                  </span>
+                </div>
+                {/* Visual uncertainty bar */}
+                <div className="w-full bg-surface-container-highest h-2 rounded-full relative overflow-hidden">
+                  <div className="absolute left-[35%] right-[15%] h-full bg-[#f97316] rounded-full opacity-80" />
+                  <div className="absolute left-[60%] top-0 bottom-0 w-1 bg-[#ba1a1a]" />
+                </div>
+                <div className="flex items-center justify-between font-mono text-[10px] text-on-surface-variant mt-0.5">
+                  <span className="truncate">{overview?.heat_summary?.source || 'PMD Karachi Met & GFS 0.25°'}</span>
+                  <span className="px-1.5 py-0.5 bg-surface-container dark:bg-surface-container-highest text-on-surface-variant rounded uppercase font-mono">
+                    [Sample Data]
+                  </span>
+                </div>
               </div>
-            </div>
-          </div>
+            </motion.div>
 
-          {/* Uncertainty Range Line Box */}
-          <div className="mt-space-md pt-space-sm bg-surface-container-low rounded-lg p-space-sm flex flex-col gap-space-xs">
-            <div className="flex items-center justify-between font-label-mono-sm text-label-mono-sm">
-              <span className="text-on-surface-variant">Ensemble Spread</span>
-              <span className="font-semibold text-on-surface">
-                {overview?.rain_summary?.interval_low ?? 15}mm — {overview?.rain_summary?.interval_high ?? 65}mm
-              </span>
-            </div>
-            {/* Visual uncertainty bar */}
-            <div className="w-full bg-surface-container-highest h-2 rounded-full relative overflow-hidden">
-              <div className="absolute left-[20%] right-[30%] h-full bg-secondary rounded-full opacity-80" />
-              <div className="absolute left-[45%] top-0 bottom-0 w-1 bg-primary" />
-            </div>
-            <div className="flex items-center justify-between font-label-mono-sm text-label-mono-sm text-on-surface-variant mt-0.5">
-              <span className="truncate">{overview?.rain_summary?.source || 'PMD Radar (Badin) + ECMWF'}</span>
-              <span className="px-1.5 py-0.5 bg-surface-container text-on-surface-variant rounded text-[10px] uppercase font-mono">
-                [Sample Data]
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3: Zones at Severe Risk */}
-        <div className="bg-surface-container-lowest rounded-xl p-space-md flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow border border-outline-variant/20">
-          <div className="flex flex-col gap-space-xs">
-            <div className="flex items-center justify-between">
-              <span className="font-label-mono-sm text-label-mono-sm text-on-surface-variant uppercase tracking-wider">
-                Vulnerability Status
-              </span>
-              <RiskBadge
-                level={overview && overview.severe_zones_count > 0 ? 'Severe' : 'Low'}
-                label={`${overview?.severe_zones_count ?? 3} Critical`}
-              />
-            </div>
-            <div className="mt-space-sm">
-              <span className="font-title-md text-title-md text-on-surface font-semibold block">
-                Zones Exceeding Threshold
-              </span>
-              <div className="flex items-baseline gap-space-xs mt-1">
-                <span className="font-metric-display text-metric-display text-on-surface font-bold tracking-tight">
-                  {overview?.severe_zones_count ?? 3}
-                </span>
-                <span className="font-headline-md text-headline-md text-on-surface-variant font-normal">
-                  / {overview?.total_zones_count ?? 7}
-                </span>
-                <span className="font-body-sm text-body-sm text-on-surface-variant">
-                  Karachi Zones
-                </span>
+            {/* Card 2: Rainfall Hazard */}
+            <motion.div
+              whileHover={shouldReduceMotion ? undefined : { y: -2 }}
+              transition={{ duration: 0.15 }}
+              className="bg-surface dark:bg-surface-container-low rounded-2xl p-5 flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow border border-outline-variant/30 dark:border-outline-variant/20 glass-panel"
+            >
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">
+                    Hazard Vector 02
+                  </span>
+                  <RiskBadge level={overview?.rain_hazard_level || 'Moderate'} />
+                </div>
+                <div className="mt-1">
+                  <span className="text-sm font-semibold text-on-surface block">
+                    Precipitation Accumulation
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="font-mono text-3xl sm:text-4xl font-bold tracking-tight text-on-surface">
+                      <AnimatedNumber value={overview?.rain_summary?.headline_value ?? 38} decimals={0} />
+                    </span>
+                    <span className="text-lg font-medium text-on-surface">mm</span>
+                    <span className="text-xs text-on-surface-variant">/ {timeRange}</span>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Uncertainty Range Line Box */}
-          <div className="mt-space-md pt-space-sm bg-surface-container-low rounded-lg p-space-sm flex flex-col gap-space-xs">
-            <div className="flex items-center justify-between font-label-mono-sm text-label-mono-sm">
-              <span className="text-on-surface-variant">Distress Hotspots</span>
-              <span className="font-semibold text-error truncate max-w-[150px]">
-                {overview?.severe_zone_names?.slice(0, 2).join(', ') || 'Malir, Central'}
-              </span>
-            </div>
-            <p className="font-body-sm text-body-sm text-on-surface-variant truncate">
-              Compound runoff &amp; extreme heat trapping
-            </p>
-            <div className="flex items-center justify-between font-label-mono-sm text-label-mono-sm text-on-surface-variant mt-0.5">
-              <span className="truncate">Composite Index (NDMA 2023)</span>
-              <span className="px-1.5 py-0.5 bg-surface-container text-on-surface-variant rounded text-[10px] uppercase font-mono">
-                [Sample Data]
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 4: Data Freshness Status */}
-        <div className="bg-surface-container-lowest rounded-xl p-space-md flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow border border-outline-variant/20">
-          <div className="flex flex-col gap-space-xs">
-            <div className="flex items-center justify-between">
-              <span className="font-label-mono-sm text-label-mono-sm text-on-surface-variant uppercase tracking-wider">
-                Pipeline Health
-              </span>
-              <span className="px-2.5 py-1 rounded-full bg-surface-container-high text-on-surface font-label-mono-sm text-label-mono-sm font-semibold flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-secondary text-[16px]">check_circle</span>
-                {overview?.data_freshness_status || 'Nominal'}
-              </span>
-            </div>
-            <div className="mt-space-sm">
-              <span className="font-title-md text-title-md text-on-surface font-semibold block">
-                Ingestion Integrity
-              </span>
-              <div className="flex items-baseline gap-space-xs mt-1">
-                <span className="font-metric-display text-metric-display text-on-surface font-bold tracking-tight">
-                  {overview?.freshness_summary?.integrity_pct ?? 100}%
-                </span>
-                <span className="font-body-sm text-body-sm text-on-surface-variant">
-                  {overview?.freshness_summary?.fresh_sources ?? 5}/{overview?.freshness_summary?.total_sources ?? 6} feeds OK
-                </span>
+              {/* Uncertainty Range Line Box */}
+              <div className="mt-4 pt-2 bg-surface-container-low dark:bg-surface-container-high/40 rounded-xl p-3 flex flex-col gap-1.5 border border-outline-variant/20">
+                <div className="flex items-center justify-between font-mono text-xs">
+                  <span className="text-on-surface-variant">Ensemble Spread</span>
+                  <span className="font-semibold text-on-surface">
+                    {overview?.rain_summary?.interval_low ?? 15}mm — {overview?.rain_summary?.interval_high ?? 65}mm
+                  </span>
+                </div>
+                {/* Visual uncertainty bar */}
+                <div className="w-full bg-surface-container-highest h-2 rounded-full relative overflow-hidden">
+                  <div className="absolute left-[20%] right-[30%] h-full bg-secondary rounded-full opacity-80" />
+                  <div className="absolute left-[45%] top-0 bottom-0 w-1 bg-primary" />
+                </div>
+                <div className="flex items-center justify-between font-mono text-[10px] text-on-surface-variant mt-0.5">
+                  <span className="truncate">{overview?.rain_summary?.source || 'PMD Radar (Badin) + ECMWF'}</span>
+                  <span className="px-1.5 py-0.5 bg-surface-container dark:bg-surface-container-highest text-on-surface-variant rounded uppercase font-mono">
+                    [Sample Data]
+                  </span>
+                </div>
               </div>
-            </div>
-          </div>
+            </motion.div>
 
-          {/* Uncertainty Range Line Box */}
-          <div className="mt-space-md pt-space-sm bg-surface-container-low rounded-lg p-space-sm flex flex-col gap-space-xs">
-            <div className="flex items-center justify-between font-label-mono-sm text-label-mono-sm">
-              <span className="text-on-surface-variant">Lagging Source</span>
-              <span className="font-semibold text-tertiary-fixed-dim truncate max-w-[130px]">
-                {overview?.freshness_summary?.lagging_source || 'None (In Sync)'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between font-label-mono-sm text-label-mono-sm text-on-surface-variant">
-              <span>Cycle: Micro-Batch</span>
-              <span className="text-secondary font-semibold">T-18m ago</span>
-            </div>
-            <div className="flex items-center justify-between font-label-mono-sm text-label-mono-sm text-on-surface-variant mt-0.5">
-              <span className="truncate">Sindh Gateway Node</span>
-              <span className="px-1.5 py-0.5 bg-surface-container text-on-surface-variant rounded text-[10px] uppercase font-mono">
-                Telemetry
-              </span>
-            </div>
-          </div>
-        </div>
+            {/* Card 3: Zones at Severe Risk */}
+            <motion.div
+              whileHover={shouldReduceMotion ? undefined : { y: -2 }}
+              transition={{ duration: 0.15 }}
+              className="bg-surface dark:bg-surface-container-low rounded-2xl p-5 flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow border border-outline-variant/30 dark:border-outline-variant/20 glass-panel"
+            >
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">
+                    Vulnerability Status
+                  </span>
+                  <RiskBadge
+                    level={overview && overview.severe_zones_count > 0 ? 'Severe' : 'Low'}
+                    label={`${overview?.severe_zones_count ?? 3} Critical`}
+                  />
+                </div>
+                <div className="mt-1">
+                  <span className="text-sm font-semibold text-on-surface block">
+                    Zones Exceeding Threshold
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="font-mono text-3xl sm:text-4xl font-bold tracking-tight text-on-surface">
+                      <AnimatedNumber value={overview?.severe_zones_count ?? 3} decimals={0} />
+                    </span>
+                    <span className="text-base text-on-surface-variant font-normal">
+                      / {overview?.total_zones_count ?? 7}
+                    </span>
+                    <span className="text-xs text-on-surface-variant">Karachi Zones</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Uncertainty Range Line Box */}
+              <div className="mt-4 pt-2 bg-surface-container-low dark:bg-surface-container-high/40 rounded-xl p-3 flex flex-col gap-1.5 border border-outline-variant/20">
+                <div className="flex items-center justify-between font-mono text-xs">
+                  <span className="text-on-surface-variant">Distress Hotspots</span>
+                  <span className="font-semibold text-error truncate max-w-[150px]">
+                    {overview?.severe_zone_names?.slice(0, 2).join(', ') || 'Malir, Central'}
+                  </span>
+                </div>
+                <p className="text-xs text-on-surface-variant truncate">
+                  Compound runoff &amp; extreme heat trapping
+                </p>
+                <div className="flex items-center justify-between font-mono text-[10px] text-on-surface-variant mt-0.5">
+                  <span className="truncate">Composite Index (NDMA 2023)</span>
+                  <span className="px-1.5 py-0.5 bg-surface-container dark:bg-surface-container-highest text-on-surface-variant rounded uppercase font-mono">
+                    [Sample Data]
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Card 4: Data Freshness Status */}
+            <motion.div
+              whileHover={shouldReduceMotion ? undefined : { y: -2 }}
+              transition={{ duration: 0.15 }}
+              className="bg-surface dark:bg-surface-container-low rounded-2xl p-5 flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow border border-outline-variant/30 dark:border-outline-variant/20 glass-panel"
+            >
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">
+                    Pipeline Health
+                  </span>
+                  <span className="px-2.5 py-1 rounded-full bg-surface-container-high dark:bg-surface-container-highest text-on-surface font-mono text-xs font-semibold flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-secondary text-[16px]">check_circle</span>
+                    {overview?.data_freshness_status || 'Nominal'}
+                  </span>
+                </div>
+                <div className="mt-1">
+                  <span className="text-sm font-semibold text-on-surface block">
+                    Ingestion Integrity
+                  </span>
+                  <div className="flex items-baseline gap-2 mt-1">
+                    <span className="font-mono text-3xl sm:text-4xl font-bold tracking-tight text-on-surface">
+                      <AnimatedNumber value={overview?.freshness_summary?.integrity_pct ?? 100} decimals={0} />%
+                    </span>
+                    <span className="text-xs text-on-surface-variant">
+                      {overview?.freshness_summary?.fresh_sources ?? 5}/{overview?.freshness_summary?.total_sources ?? 6} feeds OK
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Uncertainty Range Line Box */}
+              <div className="mt-4 pt-2 bg-surface-container-low dark:bg-surface-container-high/40 rounded-xl p-3 flex flex-col gap-1.5 border border-outline-variant/20">
+                <div className="flex items-center justify-between font-mono text-xs">
+                  <span className="text-on-surface-variant">Lagging Source</span>
+                  <span className="font-semibold text-secondary truncate max-w-[130px]">
+                    {overview?.freshness_summary?.lagging_source || 'None (In Sync)'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between font-mono text-xs text-on-surface-variant">
+                  <span>Cycle: Micro-Batch</span>
+                  <span className="text-secondary font-semibold">T-18m ago</span>
+                </div>
+                <div className="flex items-center justify-between font-mono text-[10px] text-on-surface-variant mt-0.5">
+                  <span className="truncate">Sindh Gateway Node</span>
+                  <span className="px-1.5 py-0.5 bg-surface-container dark:bg-surface-container-highest text-on-surface-variant rounded uppercase font-mono">
+                    Telemetry
+                  </span>
+                </div>
+              </div>
+            </motion.div>
+          </>
+        )}
       </div>
 
       {/* Main Operational Workspace: 70% Map & Chart / 30% Decision Support Priorities */}
@@ -745,6 +791,8 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                           fill="transparent"
                           stroke="none"
                           legendType="none"
+                          isAnimationActive={!shouldReduceMotion}
+                          animationDuration={800}
                         />
                         <Area
                           type="monotone"
@@ -754,6 +802,8 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                           fillOpacity={0.16}
                           stroke="none"
                           name="Heat 90% CI Band"
+                          isAnimationActive={!shouldReduceMotion}
+                          animationDuration={800}
                         />
                         <Line
                           type="monotone"
@@ -763,6 +813,8 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                           dot={{ r: 3.5 }}
                           activeDot={{ r: 5 }}
                           name="Heat Model Probability"
+                          isAnimationActive={!shouldReduceMotion}
+                          animationDuration={800}
                         />
                         <Line
                           type="monotone"
@@ -772,6 +824,8 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                           strokeWidth={1.5}
                           dot={false}
                           name="Heat Climatology Baseline"
+                          isAnimationActive={!shouldReduceMotion}
+                          animationDuration={800}
                         />
                       </>
                     )}
@@ -786,6 +840,8 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                           fill="transparent"
                           stroke="none"
                           legendType="none"
+                          isAnimationActive={!shouldReduceMotion}
+                          animationDuration={800}
                         />
                         <Area
                           type="monotone"
@@ -795,6 +851,8 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                           fillOpacity={0.18}
                           stroke="none"
                           name="Rain 90% CI Band"
+                          isAnimationActive={!shouldReduceMotion}
+                          animationDuration={800}
                         />
                         <Line
                           type="monotone"
@@ -804,6 +862,8 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                           dot={{ r: 3.5 }}
                           activeDot={{ r: 5 }}
                           name="Rain Model Probability"
+                          isAnimationActive={!shouldReduceMotion}
+                          animationDuration={800}
                         />
                         <Line
                           type="monotone"
@@ -813,6 +873,8 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                           strokeWidth={1.5}
                           dot={false}
                           name="Rain Climatology Baseline"
+                          isAnimationActive={!shouldReduceMotion}
+                          animationDuration={800}
                         />
                       </>
                     )}
@@ -964,6 +1026,6 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
           </div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 };

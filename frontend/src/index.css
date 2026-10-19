@@ -4,14 +4,31 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --bg-page: #f7f9fb;
+    --text-page: #191c1e;
+    --card-bg: #ffffff;
+    --card-glass: rgba(255, 255, 255, 0.85);
+    --border-subtle: rgba(116, 119, 126, 0.2);
+  }
+
+  .dark {
+    --bg-page: #0a1124;
+    --text-page: #f1f5f9;
+    --card-bg: #0f1933;
+    --card-glass: rgba(15, 25, 51, 0.85);
+    --border-subtle: rgba(255, 255, 255, 0.1);
+  }
+
   html, body {
     margin: 0;
     padding: 0;
-    background-color: #f7f9fb;
-    color: #191c1e;
+    background-color: var(--bg-page);
+    color: var(--text-page);
+    min-width: 360px;
+    overflow-x: hidden;
   }
 
-  /* Telemetry figures tabular numbers per DESIGN.md */
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
@@ -30,4 +47,31 @@
   white-space: nowrap;
   direction: ltr;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Hide scrollbars while allowing smooth scrolling */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Glassmorphism & Soft Shadow utilities */
+.glass-panel {
+  background: var(--card-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-subtle);
+}
+
+/* Respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import maplibregl from 'maplibre-gl';
 import { api } from '../api/client';
-import { SampleBanner } from '../components/SampleBanner';
 import { RiskBadge } from '../components/RiskBadge';
 import { EmptyState } from '../components/EmptyState';
 import {
@@ -29,7 +29,8 @@ interface RiskMapProps {
   isSample?: boolean;
 }
 
-export const RiskMap: React.FC<RiskMapProps> = ({ isSample: initialIsSample }) => {
+export const RiskMap: React.FC<RiskMapProps> = () => {
+  const shouldReduceMotion = useReducedMotion();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedZoneId = searchParams.get('zone') || searchParams.get('zone_id') || null;
 
@@ -97,7 +98,6 @@ export const RiskMap: React.FC<RiskMapProps> = ({ isSample: initialIsSample }) =
   });
 
   const zonesGeoJSON = zonesResponse?.data;
-  const isSample = zonesResponse?.is_sample ?? initialIsSample ?? true;
 
   // Filtered Zones based on Severity Filter
   const filteredZonesGeoJSON = useMemo(() => {
@@ -147,22 +147,20 @@ export const RiskMap: React.FC<RiskMapProps> = ({ isSample: initialIsSample }) =
     if (!mapContainerRef.current || mapRef.current) return;
 
     // Resilient MapLibre Style Specification
-    // Free tile source with graceful blank dark nautical background fallback (#0A1A2F)
+    // Free tile source (OpenStreetMap raster tiles) with graceful blank dark nautical background fallback (#0A1A2F)
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
       style: {
         version: 8,
         sources: {
-          'carto-dark': {
+          'osm-raster': {
             type: 'raster',
             tiles: [
-              'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-              'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-              'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
             ],
             tileSize: 256,
             attribution:
-              '&copy; <a href="https://carto.com/">CARTO</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+              '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors',
           },
         },
         layers: [
@@ -170,15 +168,15 @@ export const RiskMap: React.FC<RiskMapProps> = ({ isSample: initialIsSample }) =
             id: 'background',
             type: 'background',
             paint: {
-              'background-color': '#0A1A2F', // Nautical dark GIS canvas
+              'background-color': '#0A1A2F', // Nautical dark GIS canvas fallback
             },
           },
           {
-            id: 'carto-dark-tiles',
+            id: 'osm-raster-tiles',
             type: 'raster',
-            source: 'carto-dark',
+            source: 'osm-raster',
             minzoom: 0,
-            maxzoom: 20,
+            maxzoom: 19,
             paint: {
               'raster-opacity': 0.65,
             },
@@ -198,8 +196,8 @@ export const RiskMap: React.FC<RiskMapProps> = ({ isSample: initialIsSample }) =
     );
 
     map.on('error', (e) => {
-      // Graceful offline/tile degradation
-      if (e.error && String(e.error).includes('tiles')) {
+      // Graceful offline/tile degradation: falls back to dark nautical blank background (#0A1A2F)
+      if (e.error && String(e.error).toLowerCase().includes('tile')) {
         setTilesOffline(true);
       }
     });
@@ -455,278 +453,253 @@ export const RiskMap: React.FC<RiskMapProps> = ({ isSample: initialIsSample }) =
   }, [selectedZoneId, zonesGeoJSON]);
 
   return (
-    <div className="flex flex-col w-full h-[calc(100vh-80px)] md:h-[calc(100vh-96px)] overflow-hidden bg-background">
+    <motion.div
+      initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.2 }}
+      className="flex flex-col w-full flex-1 min-h-[calc(100vh-140px)] overflow-hidden bg-background"
+    >
       {/* ------------------------------------------------------------------ */}
-      {/* TOP CONTROL & FILTER TOOLBAR                                      */}
+      {/* RESPONSIVE SINGLE CONTROL BAR (Requirement 5 & 8)                  */}
       {/* ------------------------------------------------------------------ */}
-      <div className="bg-surface border-b border-outline-variant/30 px-space-md lg:px-space-lg py-2.5 shrink-0 z-20 shadow-xs">
-        <div className="flex flex-col gap-2">
-          {/* Top Line: Header & Controls */}
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2">
-            <div className="flex items-center gap-space-sm min-w-0">
-              <div className="w-2.5 h-6 bg-error rounded-full shrink-0" aria-hidden="true" />
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="font-headline-md text-[17px] font-bold text-on-surface truncate">
-                    Karachi Geographic Hazard &amp; Exposure Risk Map
-                  </h1>
-                  <SampleBanner isSample={isSample} />
-                  {tilesOffline && (
-                    <span className="font-mono text-[11px] bg-surface-container-highest text-on-surface-variant px-2 py-0.5 rounded-full border border-outline-variant/40">
-                      Vector Fallback Active
-                    </span>
-                  )}
-                </div>
-                <span className="font-mono text-[11px] text-on-surface-variant truncate">
-                  WGS 84 · High-Resolution Town Polygons &amp; Critical Infrastructure Points
-                </span>
-              </div>
-            </div>
-
-            {/* Quick Action Buttons */}
-            <div className="flex items-center gap-1.5 self-start lg:self-auto shrink-0 flex-wrap">
-              <button
-                type="button"
-                onClick={handleResetView}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-medium transition-colors border border-outline-variant/30"
-                title="Reset map view to Karachi Division"
-              >
-                <span className="material-symbols-outlined text-[16px]">center_focus_strong</span>
-                <span>Reset View</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleCopyLink}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-medium transition-colors border border-outline-variant/30"
-                title="Share link with current filters and selected zone"
-              >
-                <span className="material-symbols-outlined text-[16px]">share</span>
-                <span>{copiedLink ? 'Copied!' : 'Share Layer'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleDownloadGeoJSON}
-                className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary hover:bg-primary-container text-on-primary text-xs font-semibold transition-colors shadow-xs"
-                title="Download GeoJSON FeatureCollection"
-              >
-                <span className="material-symbols-outlined text-[16px]">download</span>
-                <span>Export GeoJSON</span>
-              </button>
-            </div>
+      <div className="bg-surface/95 dark:bg-surface-container-low/95 backdrop-blur-md border-b border-outline-variant/30 px-3 sm:px-6 py-2.5 shrink-0 z-20 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        {/* Left Cluster: Hazard Mode Toggle */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div
+            className="inline-flex items-center bg-surface-container-high dark:bg-surface-container-highest/60 p-1 rounded-xl border border-outline-variant/40"
+            role="group"
+            aria-label="Hazard type selection"
+          >
+            <button
+              type="button"
+              onClick={() => setHazardMode('heat')}
+              className={`min-h-[44px] px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                hazardMode === 'heat'
+                  ? 'bg-primary text-on-primary font-bold shadow-xs'
+                  : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px] text-amber-400">thermostat</span>
+              <span>Heatwave</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setHazardMode('rain')}
+              className={`min-h-[44px] px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                hazardMode === 'rain'
+                  ? 'bg-primary text-on-primary font-bold shadow-xs'
+                  : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px] text-cyan-400">rainy</span>
+              <span>Monsoon Rain</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setHazardMode('combined')}
+              className={`min-h-[44px] px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                hazardMode === 'combined'
+                  ? 'bg-primary text-on-primary font-bold shadow-xs'
+                  : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              <span className="material-symbols-outlined text-[16px] text-error">warning</span>
+              <span>Combined Risk</span>
+            </button>
           </div>
 
-          {/* Bottom Line: Filters Row (Hazard Toggle, Severity Chips, Facility Layer Toggles) */}
-          <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-2 pt-1 border-t border-outline-variant/20">
-            {/* Left Cluster: Hazard & Severity Filters */}
-            <div className="flex flex-wrap items-center gap-2.5">
-              {/* Hazard Mode Toggle */}
-              <div
-                className="inline-flex items-center bg-surface-container-high p-0.5 rounded-lg border border-outline-variant/40"
-                role="group"
-                aria-label="Hazard type selection"
-              >
+          {/* Severity Filter Chips (Rule 4: Always text labels) */}
+          <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="Risk severity filter">
+            {(['all', 'Severe', 'High', 'Moderate', 'Low'] as SeverityFilter[]).map((level) => {
+              const isActive = severityFilter === level;
+              return (
                 <button
+                  key={level}
                   type="button"
-                  onClick={() => setHazardMode('heat')}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${
-                    hazardMode === 'heat'
-                      ? 'bg-primary text-on-primary font-semibold shadow-xs'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[14px] text-amber-400">thermostat</span>
-                  <span>Heatwave</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setHazardMode('rain')}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${
-                    hazardMode === 'rain'
-                      ? 'bg-primary text-on-primary font-semibold shadow-xs'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[14px] text-cyan-400">rainy</span>
-                  <span>Monsoon Rain</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setHazardMode('combined')}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all flex items-center gap-1 ${
-                    hazardMode === 'combined'
-                      ? 'bg-primary text-on-primary font-semibold shadow-xs'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[14px] text-error">warning</span>
-                  <span>Combined Risk</span>
-                </button>
-              </div>
-
-              <div className="h-4 w-px bg-outline-variant/50 hidden sm:block" />
-
-              {/* Severity Filter Chips (Rule 4: Always text labels) */}
-              <div className="flex items-center gap-1 flex-wrap" role="group" aria-label="Risk severity filter">
-                <span className="font-mono text-[10px] text-on-surface-variant uppercase font-semibold pr-1">
-                  Severity:
-                </span>
-                {(['all', 'Severe', 'High', 'Moderate', 'Low'] as SeverityFilter[]).map((level) => {
-                  const isActive = severityFilter === level;
-                  return (
-                    <button
-                      key={level}
-                      type="button"
-                      onClick={() => setSeverityFilter(level)}
-                      className={`px-2 py-0.5 rounded-full text-xs font-mono font-medium transition-colors border ${
-                        isActive
-                          ? level === 'Severe'
-                            ? 'bg-error text-on-error border-error font-bold'
-                            : level === 'High'
-                            ? 'bg-[#C2410C] text-white border-[#C2410C] font-bold'
-                            : level === 'Moderate'
-                            ? 'bg-[#B45309] text-white border-[#B45309] font-bold'
-                            : level === 'Low'
-                            ? 'bg-[#059669] text-white border-[#059669] font-bold'
-                            : 'bg-primary text-on-primary border-primary font-bold'
-                          : 'bg-surface-container-high text-on-surface-variant border-outline-variant/30 hover:bg-surface-variant'
-                      }`}
-                    >
-                      {level === 'all'
-                        ? 'All Tiers'
-                        : level === 'Severe'
-                        ? 'Severe (Red)'
+                  onClick={() => setSeverityFilter(level)}
+                  className={`min-h-[44px] px-3 py-1.5 rounded-full text-xs font-mono font-medium transition-colors border flex items-center ${
+                    isActive
+                      ? level === 'Severe'
+                        ? 'bg-error text-on-error border-error font-bold shadow-xs'
                         : level === 'High'
-                        ? 'High (Orange)'
+                        ? 'bg-[#C2410C] text-white border-[#C2410C] font-bold shadow-xs'
                         : level === 'Moderate'
-                        ? 'Moderate (Yellow)'
-                        : 'Low (Green)'}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Right Cluster: Facility Type Toggles */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-mono text-[10px] text-on-surface-variant uppercase font-semibold">
-                Facilities:
-              </span>
-              <label className="flex items-center gap-1.5 cursor-pointer bg-surface-container px-2 py-1 rounded text-xs text-on-surface hover:bg-surface-container-high transition-colors border border-outline-variant/30">
-                <input
-                  type="checkbox"
-                  checked={enabledFacilityTypes.hospital}
-                  onChange={() => toggleFacilityType('hospital')}
-                  className="rounded text-error focus:ring-error w-3.5 h-3.5"
-                />
-                <span className="material-symbols-outlined text-[15px] text-error">local_hospital</span>
-                <span>Hospitals</span>
-              </label>
-
-              <label className="flex items-center gap-1.5 cursor-pointer bg-surface-container px-2 py-1 rounded text-xs text-on-surface hover:bg-surface-container-high transition-colors border border-outline-variant/30">
-                <input
-                  type="checkbox"
-                  checked={enabledFacilityTypes.school}
-                  onChange={() => toggleFacilityType('school')}
-                  className="rounded text-blue-500 focus:ring-blue-500 w-3.5 h-3.5"
-                />
-                <span className="material-symbols-outlined text-[15px] text-blue-500">school</span>
-                <span>Schools</span>
-              </label>
-
-              <label className="flex items-center gap-1.5 cursor-pointer bg-surface-container px-2 py-1 rounded text-xs text-on-surface hover:bg-surface-container-high transition-colors border border-outline-variant/30">
-                <input
-                  type="checkbox"
-                  checked={enabledFacilityTypes.shelter}
-                  onChange={() => toggleFacilityType('shelter')}
-                  className="rounded text-emerald-500 focus:ring-emerald-500 w-3.5 h-3.5"
-                />
-                <span className="material-symbols-outlined text-[15px] text-emerald-500">night_shelter</span>
-                <span>Shelters</span>
-              </label>
-
-              <label className="flex items-center gap-1.5 cursor-pointer bg-surface-container px-2 py-1 rounded text-xs text-on-surface hover:bg-surface-container-high transition-colors border border-outline-variant/30">
-                <input
-                  type="checkbox"
-                  checked={enabledFacilityTypes.power_substation}
-                  onChange={() => toggleFacilityType('power_substation')}
-                  className="rounded text-amber-500 focus:ring-amber-500 w-3.5 h-3.5"
-                />
-                <span className="material-symbols-outlined text-[15px] text-amber-500">bolt</span>
-                <span>Power Grids</span>
-              </label>
-
-              <label className="flex items-center gap-1.5 cursor-pointer bg-surface-container px-2 py-1 rounded text-xs text-on-surface hover:bg-surface-container-high transition-colors border border-outline-variant/30">
-                <input
-                  type="checkbox"
-                  checked={enabledFacilityTypes.drainage_culvert}
-                  onChange={() => toggleFacilityType('drainage_culvert')}
-                  className="rounded text-cyan-500 focus:ring-cyan-500 w-3.5 h-3.5"
-                />
-                <span className="material-symbols-outlined text-[15px] text-cyan-500">water_loss</span>
-                <span>Drainage Nullahs</span>
-              </label>
-            </div>
+                        ? 'bg-[#B45309] text-white border-[#B45309] font-bold shadow-xs'
+                        : level === 'Low'
+                        ? 'bg-[#059669] text-white border-[#059669] font-bold shadow-xs'
+                        : 'bg-primary text-on-primary border-primary font-bold shadow-xs'
+                      : 'bg-surface-container dark:bg-surface-container-high/60 text-on-surface-variant border-outline-variant/30 hover:bg-surface-container-high'
+                  }`}
+                >
+                  {level === 'all'
+                    ? 'All Tiers'
+                    : level === 'Severe'
+                    ? 'Severe (Red)'
+                    : level === 'High'
+                    ? 'High (Orange)'
+                    : level === 'Moderate'
+                    ? 'Moderate (Yellow)'
+                    : 'Low (Green)'}
+                </button>
+              );
+            })}
           </div>
+        </div>
+
+        {/* Right Cluster: Facilities Layer Toggles & Action Controls */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Facility Toggles */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <label className="min-h-[44px] flex items-center gap-1.5 cursor-pointer bg-surface-container dark:bg-surface-container-high/60 px-2.5 py-1.5 rounded-xl text-xs text-on-surface hover:bg-surface-container-high transition-colors border border-outline-variant/30 select-none">
+              <input
+                type="checkbox"
+                checked={enabledFacilityTypes.hospital}
+                onChange={() => toggleFacilityType('hospital')}
+                className="rounded text-error focus:ring-error w-4 h-4"
+              />
+              <span className="material-symbols-outlined text-[16px] text-error">local_hospital</span>
+              <span className="hidden sm:inline">Hospitals</span>
+            </label>
+
+            <label className="min-h-[44px] flex items-center gap-1.5 cursor-pointer bg-surface-container dark:bg-surface-container-high/60 px-2.5 py-1.5 rounded-xl text-xs text-on-surface hover:bg-surface-container-high transition-colors border border-outline-variant/30 select-none">
+              <input
+                type="checkbox"
+                checked={enabledFacilityTypes.school}
+                onChange={() => toggleFacilityType('school')}
+                className="rounded text-blue-500 focus:ring-blue-500 w-4 h-4"
+              />
+              <span className="material-symbols-outlined text-[16px] text-blue-500">school</span>
+              <span className="hidden sm:inline">Schools</span>
+            </label>
+
+            <label className="min-h-[44px] flex items-center gap-1.5 cursor-pointer bg-surface-container dark:bg-surface-container-high/60 px-2.5 py-1.5 rounded-xl text-xs text-on-surface hover:bg-surface-container-high transition-colors border border-outline-variant/30 select-none">
+              <input
+                type="checkbox"
+                checked={enabledFacilityTypes.shelter}
+                onChange={() => toggleFacilityType('shelter')}
+                className="rounded text-emerald-500 focus:ring-emerald-500 w-4 h-4"
+              />
+              <span className="material-symbols-outlined text-[16px] text-emerald-500">night_shelter</span>
+              <span className="hidden sm:inline">Shelters</span>
+            </label>
+
+            <label className="min-h-[44px] flex items-center gap-1.5 cursor-pointer bg-surface-container dark:bg-surface-container-high/60 px-2.5 py-1.5 rounded-xl text-xs text-on-surface hover:bg-surface-container-high transition-colors border border-outline-variant/30 select-none">
+              <input
+                type="checkbox"
+                checked={enabledFacilityTypes.power_substation}
+                onChange={() => toggleFacilityType('power_substation')}
+                className="rounded text-amber-500 focus:ring-amber-500 w-4 h-4"
+              />
+              <span className="material-symbols-outlined text-[16px] text-amber-500">bolt</span>
+              <span className="hidden sm:inline">Power</span>
+            </label>
+
+            <label className="min-h-[44px] flex items-center gap-1.5 cursor-pointer bg-surface-container dark:bg-surface-container-high/60 px-2.5 py-1.5 rounded-xl text-xs text-on-surface hover:bg-surface-container-high transition-colors border border-outline-variant/30 select-none">
+              <input
+                type="checkbox"
+                checked={enabledFacilityTypes.drainage_culvert}
+                onChange={() => toggleFacilityType('drainage_culvert')}
+                className="rounded text-cyan-500 focus:ring-cyan-500 w-4 h-4"
+              />
+              <span className="material-symbols-outlined text-[16px] text-cyan-500">water_loss</span>
+              <span className="hidden sm:inline">Nullahs</span>
+            </label>
+          </div>
+
+          <div className="h-5 w-px bg-outline-variant/40 hidden md:block" />
+
+          {tilesOffline && (
+            <span className="font-mono text-[10px] bg-amber-500/20 text-amber-500 border border-amber-500/40 px-2.5 py-1 rounded-full shrink-0">
+              Vector Fallback Active
+            </span>
+          )}
+
+          {/* Action buttons */}
+          <button
+            type="button"
+            onClick={handleResetView}
+            className="min-h-[44px] flex items-center gap-1 px-3 py-1.5 rounded-xl bg-surface-container dark:bg-surface-container-high/60 hover:bg-surface-container-high text-on-surface text-xs font-medium transition-colors border border-outline-variant/30"
+            title="Reset map view to Karachi Division"
+          >
+            <span className="material-symbols-outlined text-[18px]">center_focus_strong</span>
+            <span className="hidden sm:inline">Reset</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleCopyLink}
+            className="min-h-[44px] flex items-center gap-1 px-3 py-1.5 rounded-xl bg-surface-container dark:bg-surface-container-high/60 hover:bg-surface-container-high text-on-surface text-xs font-medium transition-colors border border-outline-variant/30"
+            title="Share link with current filters and selected zone"
+          >
+            <span className="material-symbols-outlined text-[18px]">share</span>
+            <span>{copiedLink ? 'Copied!' : 'Share'}</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleDownloadGeoJSON}
+            className="min-h-[44px] flex items-center gap-1 px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-semibold transition-colors shadow-xs"
+            title="Download GeoJSON FeatureCollection"
+          >
+            <span className="material-symbols-outlined text-[18px]">download</span>
+            <span className="hidden sm:inline">Export</span>
+          </button>
         </div>
       </div>
 
       {/* ------------------------------------------------------------------ */}
-      {/* MAIN WORKSPACE: MAP CANVAS + SLIDE-OUT DETAIL DRAWER               */}
+      {/* MAP CANVAS VIEWPORT (Fills remaining height, legend & drawer float) */}
       {/* ------------------------------------------------------------------ */}
-      <div className="relative flex-1 w-full flex flex-col lg:flex-row overflow-hidden bg-[#0A1A2F]">
-        {/* Interactive Map Canvas Container */}
-        <div className="relative flex-1 h-[450px] lg:h-full overflow-hidden bg-[#0A1A2F]">
-          {/* Map Container Element */}
-          <div
-            ref={mapContainerRef}
-            className="w-full h-full"
-            role="region"
-            aria-label="Karachi Spatial Risk Map"
-          />
+      <div className="relative flex-1 w-full h-[calc(100vh-140px)] min-h-[500px] overflow-hidden bg-[#0A1A2F]">
+        {/* Map Container Element */}
+        <div
+          ref={mapContainerRef}
+          className="absolute inset-0 w-full h-full"
+          role="region"
+          aria-label="Karachi Spatial Risk Map"
+        />
 
-          {/* Top-Left Floating Map Navigation Controls */}
-          <div className="absolute top-3 left-3 z-10 flex items-center gap-1 bg-primary/90 backdrop-blur-md p-1 rounded-xl shadow-lg border border-outline-variant/30">
-            <button
-              type="button"
-              onClick={handleZoomIn}
-              className="w-8 h-8 rounded-lg bg-surface-container-highest/20 hover:bg-surface-container-highest/40 text-on-primary flex items-center justify-center transition-colors"
-              title="Zoom In"
-              aria-label="Zoom In"
-            >
-              <span className="material-symbols-outlined text-[20px]">add</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleZoomOut}
-              className="w-8 h-8 rounded-lg bg-surface-container-highest/20 hover:bg-surface-container-highest/40 text-on-primary flex items-center justify-center transition-colors"
-              title="Zoom Out"
-              aria-label="Zoom Out"
-            >
-              <span className="material-symbols-outlined text-[20px]">remove</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleResetView}
-              className="w-8 h-8 rounded-lg bg-surface-container-highest/20 hover:bg-surface-container-highest/40 text-on-primary flex items-center justify-center transition-colors"
-              title="Reset View"
-              aria-label="Reset View"
-            >
-              <span className="material-symbols-outlined text-[18px]">center_focus_strong</span>
-            </button>
-          </div>
+        {/* Top-Left Floating Map Navigation Controls */}
+        <div className="absolute top-4 left-4 z-20 flex items-center gap-1.5 bg-surface/90 dark:bg-primary-container/90 backdrop-blur-md p-1.5 rounded-2xl shadow-xl border border-outline-variant/30">
+          <button
+            type="button"
+            onClick={handleZoomIn}
+            className="min-h-[44px] min-w-[44px] rounded-xl bg-surface-container/60 hover:bg-surface-container dark:bg-surface-container-highest/20 dark:hover:bg-surface-container-highest/40 text-on-surface dark:text-on-primary flex items-center justify-center transition-colors"
+            title="Zoom In"
+            aria-label="Zoom In"
+          >
+            <span className="material-symbols-outlined text-[20px]">add</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleZoomOut}
+            className="min-h-[44px] min-w-[44px] rounded-xl bg-surface-container/60 hover:bg-surface-container dark:bg-surface-container-highest/20 dark:hover:bg-surface-container-highest/40 text-on-surface dark:text-on-primary flex items-center justify-center transition-colors"
+            title="Zoom Out"
+            aria-label="Zoom Out"
+          >
+            <span className="material-symbols-outlined text-[20px]">remove</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleResetView}
+            className="min-h-[44px] min-w-[44px] rounded-xl bg-surface-container/60 hover:bg-surface-container dark:bg-surface-container-highest/20 dark:hover:bg-surface-container-highest/40 text-on-surface dark:text-on-primary flex items-center justify-center transition-colors"
+            title="Reset View"
+            aria-label="Reset View"
+          >
+            <span className="material-symbols-outlined text-[18px]">center_focus_strong</span>
+          </button>
+        </div>
 
-          {/* Bottom-Left Floating Legend Pill (Rule 4: Always text labels) */}
-          <div className="absolute bottom-3 left-3 z-10 pointer-events-auto flex flex-col gap-1.5 max-w-[320px]">
-            <div className="bg-primary/95 backdrop-blur-md p-3 rounded-xl text-on-primary shadow-xl border border-primary-container">
-              <div className="flex items-center justify-between mb-2">
-                <span className="font-mono text-[11px] uppercase tracking-wider text-on-primary-container font-semibold">
-                  Zone Risk Level
-                </span>
-                <span className="font-mono text-[10px] text-secondary-container">
-                  {hazardMode === 'heat' ? 'Heatwave' : hazardMode === 'rain' ? 'Monsoon' : 'Compound'}
-                </span>
-              </div>
-              <div className="grid grid-cols-4 gap-1 text-center font-mono text-[11px]">
+        {/* Bottom-Left Floating Legend Pill (Rule 4: Always text labels) */}
+        <div className="absolute bottom-4 left-4 z-20 pointer-events-auto flex flex-col gap-1.5 max-w-[320px]">
+          <div className="bg-surface/95 dark:bg-primary/95 backdrop-blur-md p-3.5 rounded-2xl text-on-surface dark:text-on-primary shadow-xl border border-outline-variant/30 dark:border-primary-container">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-mono text-[11px] uppercase tracking-wider text-on-surface-variant dark:text-on-primary-container font-semibold">
+                Zone Risk Level
+              </span>
+              <span className="font-mono text-[10px] text-secondary">
+                {hazardMode === 'heat' ? 'Heatwave' : hazardMode === 'rain' ? 'Monsoon' : 'Compound'}
+              </span>
+            </div>
+            <div className="grid grid-cols-4 gap-1 text-center font-mono text-[11px]">
                 <div className="flex flex-col items-center">
                   <span className="w-full h-2 rounded bg-[#10B981] mb-1 shadow-xs" />
                   <span className="text-[10px] text-emerald-300 font-medium">Low (Green)</span>
@@ -858,76 +831,78 @@ export const RiskMap: React.FC<RiskMapProps> = ({ isSample: initialIsSample }) =
               </div>
             </div>
           )}
-        </div>
 
-        {/* ------------------------------------------------------------------ */}
-        {/* RIGHT SLIDE-OUT DETAIL DRAWER (Tabs: Hazard, Exposure, Vulnerability, Evidence) */}
-        {/* ------------------------------------------------------------------ */}
-        {selectedZoneId ? (
-          <aside
-            className="w-full lg:w-[480px] xl:w-[520px] bg-surface-container-lowest border-l border-outline-variant/30 flex flex-col h-full overflow-y-auto shrink-0 z-30 shadow-2xl transition-all duration-200"
-            aria-label="Zone Detailed Dossier"
-          >
-            {/* Drawer Header */}
-            <div className="sticky top-0 z-20 bg-surface border-b border-outline-variant/30 p-space-md shadow-xs flex flex-col gap-2">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex flex-col min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    {zoneDetail?.vulnerability?.risk_level ? (
-                      <RiskBadge level={zoneDetail.vulnerability.risk_level} />
-                    ) : selectedZoneProps?.risk_level ? (
-                      <RiskBadge level={selectedZoneProps.risk_level} />
-                    ) : null}
-                    <span className="font-mono text-[11px] bg-surface-container-highest text-on-surface-variant px-2 py-0.5 rounded">
-                      Town Code: {selectedZoneId}
-                    </span>
-                  </div>
-                  <h2 className="font-headline-md text-lg font-bold text-on-surface tracking-tight truncate">
-                    {zoneDetail?.name || selectedZoneProps?.name || selectedZoneId}
-                  </h2>
-                  <span className="text-xs text-on-surface-variant">
-                    Detailed Exposure Dossier · Karachi Division Municipal Ward
-                  </span>
-                </div>
-
-                {/* Close Drawer Button */}
-                <button
-                  type="button"
-                  onClick={() => handleSelectZone(null)}
-                  className="w-8 h-8 rounded-lg hover:bg-surface-container-highest text-on-surface-variant flex items-center justify-center transition-colors shrink-0"
-                  title="Close Detail Drawer"
-                  aria-label="Close Detail Drawer"
-                >
-                  <span className="material-symbols-outlined text-[20px]">close</span>
-                </button>
-              </div>
-
-              {/* Action Buttons: Export & GeoJSON */}
-              <div className="flex items-center gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={handleCopyLink}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-medium transition-colors border border-outline-variant/30"
-                >
-                  <span className="material-symbols-outlined text-[16px]">link</span>
-                  <span>{copiedLink ? 'Copied URL!' : 'Share Dossier'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDownloadGeoJSON}
-                  className="flex items-center justify-center gap-1 py-1.5 px-3 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-xs font-medium transition-colors border border-outline-variant/30"
-                >
-                  <span className="material-symbols-outlined text-[16px]">data_object</span>
-                  <span>Export</span>
-                </button>
-              </div>
-
-              {/* 4 Tabs Navigation Bar: Hazard, Exposure, Vulnerability, Evidence */}
-              <div
-                className="grid grid-cols-4 gap-1 bg-surface-container-high p-1 rounded-xl mt-1 border border-outline-variant/30"
-                role="tablist"
-                aria-label="Zone Dossier Sections"
+          {/* Floating Zone Detail Drawer inside Map Viewport (Requirement 5) */}
+          <AnimatePresence>
+            {selectedZoneId && (
+              <motion.aside
+                initial={shouldReduceMotion ? { opacity: 1 } : { x: 40, opacity: 0 }}
+                animate={shouldReduceMotion ? { opacity: 1 } : { x: 0, opacity: 1 }}
+                exit={shouldReduceMotion ? { opacity: 0 } : { x: 40, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="absolute top-4 right-4 bottom-4 w-[calc(100%-32px)] sm:w-[460px] xl:w-[500px] bg-surface/98 dark:bg-surface-container-lowest/98 backdrop-blur-2xl border border-outline-variant/40 rounded-2xl flex flex-col z-30 shadow-2xl overflow-hidden pointer-events-auto"
+                aria-label="Zone Detailed Dossier"
               >
+                {/* Drawer Header */}
+                <div className="sticky top-0 z-20 bg-surface/95 dark:bg-surface-container-low/95 border-b border-outline-variant/30 p-4 shadow-xs flex flex-col gap-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex flex-col min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        {zoneDetail?.vulnerability?.risk_level ? (
+                          <RiskBadge level={zoneDetail.vulnerability.risk_level} />
+                        ) : selectedZoneProps?.risk_level ? (
+                          <RiskBadge level={selectedZoneProps.risk_level} />
+                        ) : null}
+                        <span className="font-mono text-[11px] bg-surface-container-highest text-on-surface-variant px-2 py-0.5 rounded">
+                          Town Code: {selectedZoneId}
+                        </span>
+                      </div>
+                      <h2 className="font-headline-md text-lg font-bold text-on-surface tracking-tight truncate">
+                        {zoneDetail?.name || selectedZoneProps?.name || selectedZoneId}
+                      </h2>
+                      <span className="text-xs text-on-surface-variant">
+                        Detailed Exposure Dossier · Karachi Division Municipal Ward
+                      </span>
+                    </div>
+
+                    {/* Close Drawer Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleSelectZone(null)}
+                      className="min-h-[44px] min-w-[44px] rounded-xl hover:bg-surface-container-highest text-on-surface-variant flex items-center justify-center transition-colors shrink-0"
+                      title="Close Detail Drawer"
+                      aria-label="Close Detail Drawer"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">close</span>
+                    </button>
+                  </div>
+
+                  {/* Action Buttons: Export & GeoJSON */}
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleCopyLink}
+                      className="min-h-[44px] flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-surface-container dark:bg-surface-container-high/60 hover:bg-surface-container-highest text-on-surface text-xs font-medium transition-colors border border-outline-variant/30"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">link</span>
+                      <span>{copiedLink ? 'Copied URL!' : 'Share Dossier'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDownloadGeoJSON}
+                      className="min-h-[44px] flex items-center justify-center gap-1 py-1.5 px-3 rounded-xl bg-surface-container dark:bg-surface-container-high/60 hover:bg-surface-container-highest text-on-surface text-xs font-medium transition-colors border border-outline-variant/30"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">data_object</span>
+                      <span>Export</span>
+                    </button>
+                  </div>
+
+                  {/* 4 Tabs Navigation Bar: Hazard, Exposure, Vulnerability, Evidence */}
+                  <div
+                    className="grid grid-cols-4 gap-1 bg-surface-container-high dark:bg-surface-container-highest/60 p-1 rounded-xl mt-1 border border-outline-variant/30"
+                    role="tablist"
+                    aria-label="Zone Dossier Sections"
+                  >
                 <button
                   type="button"
                   role="tab"
@@ -1387,9 +1362,10 @@ export const RiskMap: React.FC<RiskMapProps> = ({ isSample: initialIsSample }) =
                 </>
               )}
             </div>
-          </aside>
-        ) : null}
-      </div>
+          </motion.aside>
+        )}
+      </AnimatePresence>
     </div>
+  </motion.div>
   );
 };

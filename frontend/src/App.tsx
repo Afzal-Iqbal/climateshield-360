@@ -10,6 +10,7 @@ import { DataQuality } from './pages/DataQuality';
 import { PipelineFreshness } from './pages/PipelineFreshness';
 import { AboutLimits } from './pages/AboutLimits';
 import { api } from './api/client';
+import { ThemeProvider } from './context/ThemeContext';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -50,9 +51,11 @@ const AppRoutes: React.FC = () => {
 export const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <ThemeProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 };
