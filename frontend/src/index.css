@@ -1,32 +1,30 @@
 @import 'maplibre-gl/dist/maplibre-gl.css';
+@import './design/tokens.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --bg-page: #f7f9fb;
-    --text-page: #191c1e;
-    --card-bg: #ffffff;
-    --card-glass: rgba(255, 255, 255, 0.85);
-    --border-subtle: rgba(116, 119, 126, 0.2);
-  }
-
-  .dark {
-    --bg-page: #0a1124;
-    --text-page: #f1f5f9;
-    --card-bg: #0f1933;
-    --card-glass: rgba(15, 25, 51, 0.85);
-    --border-subtle: rgba(255, 255, 255, 0.1);
+    --bg-page: var(--bg-base);
+    --text-page: var(--text-primary);
   }
 
   html, body {
     margin: 0;
     padding: 0;
-    background-color: var(--bg-page);
-    color: var(--text-page);
+    background-color: var(--bg-base);
+    color: var(--text-primary);
+    font-family: var(--font-body);
     min-width: 360px;
     overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
   }
 
   .tabular-nums {
@@ -58,12 +56,21 @@
   scrollbar-width: none;
 }
 
-/* Glassmorphism & Soft Shadow utilities */
-.glass-panel {
-  background: var(--card-glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border-subtle);
+/* Custom styled sleek scrollbars for command panels */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--brand-cyan);
 }
 
 /* Respect prefers-reduced-motion */
@@ -73,5 +80,10 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  .skeleton-shimmer::after,
+  .pulsing-severe::after,
+  .header-aura {
+    animation: none !important;
   }
 }

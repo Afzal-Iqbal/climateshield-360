@@ -8,16 +8,30 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ReferenceLine,
 } from 'recharts';
 import { api } from '../api/client';
-import { EmptyState } from '../components/EmptyState';
-import { Skeleton } from '../components/Skeleton';
-import { RiskBadge } from '../components/RiskBadge';
 import {
-  RiskLevel,
+  PageContainer,
+  PageHeader,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  StatCard,
+  Tabs,
+  Select,
+  Table,
+  ErrorBoundary,
+  EmptyState,
+  ErrorState,
+  SkeletonRow,
+  SkeletonChart,
+  Column,
+} from '../components/ui';
+import {
   ObservedWeatherPoint,
   PredictedPoint,
   ThresholdLevel,
@@ -53,6 +67,7 @@ export const Forecast: React.FC<ForecastPageProps> = ({ isSample = false }) => {
   const {
     data: forecastResponse,
     isLoading: isLoadingForecast,
+    isError: isForecastError,
     refetch: refetchForecast,
   } = useQuery({
     queryKey: ['forecast', selectedHazard, selectedCity, selectedRange],
@@ -83,7 +98,6 @@ export const Forecast: React.FC<ForecastPageProps> = ({ isSample = false }) => {
     }
 
     if (viewGranularity === 'hourly') {
-      // Map hourly observations
       const points = forecast.observed.map((obs: ObservedWeatherPoint) => ({
         time: obs.timestamp_pkt,
         timestamp_utc: obs.timestamp_utc,
@@ -98,10 +112,8 @@ export const Forecast: React.FC<ForecastPageProps> = ({ isSample = false }) => {
         baseline: undefined as number | undefined,
       }));
 
-      // Overlay predictions onto matching or forward timestamps
       if (forecast.predicted && forecast.predicted.length > 0) {
         forecast.predicted.forEach((pred: PredictedPoint) => {
-          // Check if timestamp already in observed
           const existingIdx = points.findIndex((p: { time: string }) => p.time === pred.forecast_time_pkt);
           if (existingIdx >= 0) {
             points[existingIdx].predicted = pred.median;
@@ -110,7 +122,6 @@ export const Forecast: React.FC<ForecastPageProps> = ({ isSample = false }) => {
             points[existingIdx].interval_band = [pred.interval_low, pred.interval_high];
             points[existingIdx].baseline = pred.baseline_value;
           } else {
-            // Forward prediction point
             points.push({
               time: pred.forecast_time_pkt,
               timestamp_utc: pred.forecast_time_utc,
@@ -130,17 +141,16 @@ export const Forecast: React.FC<ForecastPageProps> = ({ isSample = false }) => {
 
       return points;
     } else {
-      // Daily aggregation
       const dayMap: { [date: string]: { date: string; maxObserved: number; totalObserved: number; count: number; baseline: number } } = {};
       forecast.observed.forEach((obs: ObservedWeatherPoint) => {
-        const dateKey = obs.timestamp_pkt.slice(0, 6); // e.g. "19 Oct"
+        const dateKey = obs.timestamp_pkt.slice(0, 6);
         if (!dayMap[dateKey]) {
           dayMap[dateKey] = {
             date: dateKey,
             maxObserved: obs.value,
             totalObserved: obs.value,
             count: 1,
-            baseline: forecast.baseline.value || 0,
+            baseline: forecast.baseline.value ?? 0,
           };
         } else {
           dayMap[dateKey].maxObserved = Math.max(dayMap[dateKey].maxObserved, obs.value);
@@ -151,695 +161,500 @@ export const Forecast: React.FC<ForecastPageProps> = ({ isSample = false }) => {
 
       return Object.values(dayMap).map((d) => ({
         time: d.date,
-        observed: selectedHazard === 'heat' ? Math.round(d.maxObserved * 10) / 10 : Math.round(d.totalObserved * 10) / 10,
-        baseline: d.baseline,
+        observed: selectedHazard === 'heavy_rain' ? Number(d.totalObserved.toFixed(1)) : Number(d.maxObserved.toFixed(1)),
         predicted: undefined,
         interval_low: undefined,
         interval_high: undefined,
-        interval_band: undefined,
+        baseline: d.baseline,
       }));
     }
   }, [forecast, viewGranularity, selectedHazard]);
 
-  // Determine current observed value and status
-  const latestObserved = forecast?.observed && forecast.observed.length > 0
-    ? forecast.observed[forecast.observed.length - 1]
-    : null;
+  // Derive latest observed and predicted metrics
+  const latestObserved = forecast?.observed?.[forecast.observed.length - 1];
+  const latestPredicted = forecast?.predicted?.[0];
 
-  const latestPredicted = forecast?.predicted && forecast.predicted.length > 0
-    ? forecast.predicted[0]
-    : null;
-
-  // Determine risk level based on thresholds
-  const currentRiskLevel: RiskLevel = useMemo(() => {
-    if (!forecast || !latestObserved) return 'Low';
+  const currentRiskLevel = useMemo(() => {
+    if (!latestObserved || !forecast?.thresholds?.levels) return 'Low';
     const val = latestObserved.value;
-    const thresh = forecast.thresholds.levels;
-    const severeT = thresh.find((t: ThresholdLevel) => t.level === 'severe')?.value ?? 999;
-    const warningT = thresh.find((t: ThresholdLevel) => t.level === 'warning')?.value ?? 999;
-    const advisoryT = thresh.find((t: ThresholdLevel) => t.level === 'advisory')?.value ?? 999;
-
-    if (val >= severeT) return 'Severe';
-    if (val >= warningT) return 'High';
-    if (val >= advisoryT) return 'Moderate';
+    const levels = forecast.thresholds.levels;
+    for (const lvl of [...levels].reverse()) {
+      if (val >= lvl.value) return lvl.level;
+    }
     return 'Low';
-  }, [forecast, latestObserved]);
+  }, [latestObserved, forecast]);
+
+  // Error table columns
+  const errorColumns: Column<GroupErrorItem>[] = [
+    {
+      key: 'group_value',
+      header: 'Monitored Sub-Division',
+      render: (item) => (
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-white font-display">{item.group_value}</span>
+          {item.is_weakest && (
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 uppercase tracking-wider">
+              Weakest Group
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'model_score',
+      header: 'Model Score',
+      align: 'right',
+      render: (item) => <span className="font-mono-val font-semibold">{item.model_score}</span>,
+    },
+    {
+      key: 'baseline_score',
+      header: 'Baseline Score',
+      align: 'right',
+      render: (item) => <span className="font-mono-val text-slate-400">{item.baseline_score}</span>,
+    },
+    {
+      key: 'gain_pct',
+      header: 'Improvement',
+      align: 'right',
+      render: (item) => {
+        const imp = item.gain_pct;
+        const isPos = imp > 0;
+        return (
+          <span className={`font-mono-val font-bold ${isPos ? 'text-emerald-400' : 'text-red-400'}`}>
+            {isPos ? `+${imp}%` : `${imp}%`}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'metric',
+      header: 'Metric',
+      align: 'right',
+      render: (item) => <span className="font-mono-val text-slate-400 text-xs">{item.metric}</span>,
+    },
+  ];
+
+  if (isForecastError) {
+    return (
+      <PageContainer>
+        <ErrorState
+          title="Weather Forecast Feed Unavailable"
+          error="Failed to load atmospheric and model data for the selected district."
+          onRetry={refetchForecast}
+        />
+      </PageContainer>
+    );
+  }
 
   return (
-    <div className="w-full flex-1 flex flex-col px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto space-y-6">
-      {/* ============================================================ */}
-      {/* PAGE HEADER & CONTROLS BAR                                   */}
-      {/* ============================================================ */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-outline-variant/30">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-on-surface">
-              Heat & Rain Forecast
-            </h1>
-            {isSample && (
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                SAMPLE DATA
-              </span>
-            )}
-          </div>
-          <p className="text-sm text-on-surface-variant mt-1">
-            Continuous observed meteorological time-series and LightGBM quantile regression with uncertainty intervals.
-          </p>
-        </div>
-
-        {/* Global Controls: Hazard, City, Range, and Granularity */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Hazard Selector Toggle */}
-          <div
-            className="inline-flex rounded-xl p-1 bg-surface-container border border-outline-variant/30 text-xs font-semibold"
-            role="group"
-            aria-label="Hazard Type"
-          >
-            <button
-              type="button"
-              onClick={() => setSelectedHazard('heavy_rain')}
-              className={`px-3 py-1.5 rounded-lg transition-all min-h-[36px] flex items-center gap-1.5 ${
-                selectedHazard === 'heavy_rain'
-                  ? 'bg-secondary text-on-secondary shadow-xs'
-                  : 'text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[16px]">rainy</span>
-              <span>Heavy Rain (ML)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setSelectedHazard('heat')}
-              className={`px-3 py-1.5 rounded-lg transition-all min-h-[36px] flex items-center gap-1.5 ${
-                selectedHazard === 'heat'
-                  ? 'bg-amber-600 text-white shadow-xs'
-                  : 'text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[16px]">thermostat</span>
-              <span>Heat (Observed)</span>
-            </button>
-          </div>
-
-          {/* City Selector Dropdown */}
-          <div className="relative">
-            <select
-              aria-label="Select City"
+    <PageContainer>
+      {/* Page Header */}
+      <PageHeader
+        title={selectedHazard === 'heavy_rain' ? 'Heavy Rain NWP & ML Forecast' : 'Heat Wave Threshold Monitoring'}
+        subtitle="Empirical sensor observations, LightGBM quantile regression predictions, and calibrated error bounds."
+        lastUpdated={latestObserved?.timestamp_utc}
+        isLive={!isSample}
+        actions={
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* City Selector */}
+            <Select
+              options={CITIES.map((c) => ({ value: c, label: c }))}
               value={selectedCity}
-              onChange={(e) => setSelectedCity(e.target.value)}
-              className="min-h-[40px] px-3 pr-8 rounded-xl bg-surface-container border border-outline-variant/40 text-xs font-semibold text-on-surface focus:outline-none focus:ring-2 focus:ring-secondary appearance-none cursor-pointer"
-            >
-              {CITIES.map((c) => (
-                <option key={c} value={c}>
-                  {c} {c === 'Karachi' ? '(Operational Focus)' : ''}
-                </option>
-              ))}
-            </select>
-            <span className="material-symbols-outlined text-[18px] text-on-surface-variant absolute right-2.5 top-2.5 pointer-events-none">
-              expand_more
-            </span>
-          </div>
+              onChange={setSelectedCity}
+              icon="location_city"
+            />
 
-          {/* Horizon Range Toggle */}
-          <div
-            className="inline-flex rounded-xl p-1 bg-surface-container border border-outline-variant/30 text-xs font-semibold"
-            role="group"
-            aria-label="Horizon Range"
-          >
-            {(['24h', '48h', '7d'] as const).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => setSelectedRange(r)}
-                className={`px-2.5 py-1.5 rounded-lg transition-all min-h-[36px] ${
-                  selectedRange === r
-                    ? 'bg-primary text-on-primary font-bold shadow-xs'
-                    : 'text-on-surface-variant hover:text-on-surface'
-                }`}
-              >
-                {r}
-              </button>
-            ))}
-          </div>
+            {/* Hazard Selector */}
+            <Tabs
+              size="sm"
+              tabs={[
+                { id: 'heavy_rain', label: 'Rain (ML)', icon: 'rainy' },
+                { id: 'heat', label: 'Heat (Observed)', icon: 'thermostat' },
+              ]}
+              activeTab={selectedHazard}
+              onChange={(id) => setSelectedHazard(id as any)}
+            />
 
-          {/* Granularity Toggle */}
-          <div
-            className="inline-flex rounded-xl p-1 bg-surface-container border border-outline-variant/30 text-xs font-semibold"
-            role="group"
-            aria-label="Granularity"
-          >
-            <button
-              type="button"
-              onClick={() => setViewGranularity('hourly')}
-              className={`px-2.5 py-1.5 rounded-lg transition-all min-h-[36px] ${
-                viewGranularity === 'hourly'
-                  ? 'bg-secondary-container text-on-secondary-container font-bold shadow-xs'
-                  : 'text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              Hourly
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewGranularity('daily')}
-              className={`px-2.5 py-1.5 rounded-lg transition-all min-h-[36px] ${
-                viewGranularity === 'daily'
-                  ? 'bg-secondary-container text-on-secondary-container font-bold shadow-xs'
-                  : 'text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              Daily
-            </button>
+            {/* Range Selector */}
+            <Tabs
+              size="sm"
+              tabs={[
+                { id: '24h', label: '24h' },
+                { id: '48h', label: '48h' },
+                { id: '7d', label: '7d' },
+              ]}
+              activeTab={selectedRange}
+              onChange={(id) => setSelectedRange(id as any)}
+            />
           </div>
-        </div>
-      </div>
+        }
+      />
 
-      {/* ============================================================ */}
-      {/* 4 TOP METRIC CARDS                                           */}
-      {/* ============================================================ */}
-      {isLoadingForecast ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Skeleton className="h-28 rounded-2xl" />
-          <Skeleton className="h-28 rounded-2xl" />
-          <Skeleton className="h-28 rounded-2xl" />
-          <Skeleton className="h-28 rounded-2xl" />
-        </div>
-      ) : forecast ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Card 1: Current / Latest Observed */}
-          <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
-                Latest Observed ({selectedCity})
-              </span>
-              <span className="material-symbols-outlined text-secondary text-[20px]">sensors</span>
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-3xl font-bold font-headline-lg text-on-surface">
-                {latestObserved?.value ?? '—'}
-              </span>
-              <span className="text-sm font-semibold text-on-surface-variant">
-                {latestObserved?.unit ?? ''}
-              </span>
-            </div>
-            <div className="mt-2 flex items-center justify-between text-[11px] text-on-surface-variant">
-              <span>{latestObserved?.weather_condition || 'Nominal'}</span>
-              <span className="font-mono">{latestObserved?.timestamp_pkt || '—'}</span>
-            </div>
-          </div>
-
-          {/* Card 2: ML Prediction or Heat Observation Mode */}
-          <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
-                {selectedHazard === 'heavy_rain' ? 'Next-Hour ML Quantile' : 'Heat Monitoring'}
-              </span>
-              <span className="material-symbols-outlined text-primary text-[20px]">
-                {selectedHazard === 'heavy_rain' ? 'online_prediction' : 'wb_sunny'}
-              </span>
-            </div>
-            {selectedHazard === 'heavy_rain' ? (
-              latestPredicted ? (
-                <div>
-                  <div className="mt-2 flex items-baseline gap-2">
-                    <span className="text-3xl font-bold font-headline-lg text-secondary">
-                      {latestPredicted.median}
-                    </span>
-                    <span className="text-sm font-semibold text-on-surface-variant">mm/hr</span>
-                    <span className="text-xs font-mono ml-auto text-amber-600 dark:text-amber-400 font-bold">
-                      P(≥2.5mm): {(latestPredicted.probability * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="mt-2 text-[11px] text-on-surface-variant font-mono flex items-center justify-between">
-                    <span>80% CI: [{latestPredicted.interval_low}, {latestPredicted.interval_high}]</span>
-                    <span>{latestPredicted.forecast_time_pkt}</span>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-2">
-                  <span className="text-xs text-on-surface-variant italic">
-                    No active prediction row in warehouse
-                  </span>
-                </div>
-              )
-            ) : (
-              <div>
-                <div className="mt-2 flex items-baseline gap-2">
-                  <span className="text-3xl font-bold font-headline-lg text-amber-600 dark:text-amber-400">
-                    {latestObserved?.value ?? '—'}°C
-                  </span>
-                  <span className="text-xs text-on-surface-variant">vs 40.0°C Danger</span>
-                </div>
-                <div className="mt-2 text-[11px] text-on-surface-variant italic truncate">
-                  Heat is observed against thresholds and is not ML-predicted
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Card 3: 24h Persistence Baseline */}
-          <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
-                24h Persistence Baseline
-              </span>
-              <span className="material-symbols-outlined text-outline text-[20px]">history</span>
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-3xl font-bold font-headline-lg text-on-surface">
-                {forecast.baseline.value !== null && forecast.baseline.value !== undefined
-                  ? forecast.baseline.value
-                  : '—'}
-              </span>
-              <span className="text-sm font-semibold text-on-surface-variant">
-                {forecast.thresholds.unit}
-              </span>
-            </div>
-            <div className="mt-2 text-[11px] text-on-surface-variant font-mono">
-              Formula: y&#770;<sub>t</sub> = y<sub>t-24h</sub>
-            </div>
-          </div>
-
-          {/* Card 4: Action Threshold & Risk Status */}
-          <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between shadow-xs">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
-                Action Threshold
-              </span>
-              <RiskBadge level={currentRiskLevel} />
-            </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-3xl font-bold font-headline-lg text-error">
-                {forecast.thresholds.primary_threshold}
-              </span>
-              <span className="text-sm font-semibold text-on-surface-variant">
-                {forecast.thresholds.unit}
-              </span>
-            </div>
-            <div className="mt-2 text-[11px] text-on-surface-variant truncate">
-              {forecast.thresholds.primary_label}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {/* ============================================================ */}
-      {/* NOTICE BANNER FOR HEAT HAZARD (Rule 1 & Prompt Requirement)  */}
-      {/* ============================================================ */}
+      {/* Heat Hazard Notice Banner (Strict adherence to Rule 21: Heat is observed, not ML-predicted) */}
       {selectedHazard === 'heat' && (
-        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-3 text-xs text-amber-800 dark:text-amber-200">
-          <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 shrink-0 text-[20px]">
+        <div className="w-full flex items-center gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-200">
+          <span className="material-symbols-outlined text-amber-400 text-[20px] shrink-0">
             info
           </span>
-          <div>
-            <span className="font-bold">METHODOLOGY NOTE: </span>
-            <span>
-              Heat is observed against official thresholds (35°C Caution, 40°C Danger, 45°C Severe) and is not ML-predicted.
-              Chart displays solid observed series against physical health action thresholds.
-            </span>
-          </div>
+          <p>
+            <strong>Note on Heat Hazard: </strong> Heat is monitored as <em>direct observations against meteorological thresholds</em> and is <strong>not ML-predicted</strong>. Heavy rain features full LightGBM quantile regression.
+          </p>
         </div>
       )}
 
-      {/* ============================================================ */}
-      {/* TIME-SERIES CHART SECTION                                     */}
-      {/* Observations = Solid Line                                    */}
-      {/* Predictions = Dashed Line or Shaded Band                     */}
-      {/* Baseline = Dotted Line                                       */}
-      {/* Threshold = Reference Line                                   */}
-      {/* ============================================================ */}
-      <div className="p-4 sm:p-6 rounded-2xl bg-surface-container border border-outline-variant/30 shadow-xs flex flex-col space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div>
-            <h2 className="text-lg font-bold text-on-surface">
-              {selectedCity} {selectedHazard === 'heavy_rain' ? 'Rainfall & Inundation Risk' : 'Ambient Heat & Temperature'} Time Series
-            </h2>
-            <p className="text-xs text-on-surface-variant mt-0.5">
-              {viewGranularity === 'hourly' ? 'Hourly observations with uncertainty intervals' : 'Daily aggregated values'} ({selectedRange} horizon)
-            </p>
-          </div>
-
-          {/* Legend Badges */}
-          <div className="flex flex-wrap items-center gap-3 text-xs">
-            <div className="flex items-center gap-1.5">
-              <span className="w-3.5 h-0.5 bg-[#006398] rounded-full inline-block" />
-              <span className="font-semibold text-on-surface">Observed</span>
-            </div>
-            {selectedHazard === 'heavy_rain' && (
-              <>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3.5 h-0.5 border-t-2 border-dashed border-[#b91c1c] inline-block" />
-                  <span className="font-semibold text-on-surface">Predicted (Q50)</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3.5 h-2.5 bg-[#5bb8fe]/40 border border-[#5bb8fe] rounded-xs inline-block" />
-                  <span className="font-semibold text-on-surface">80% Uncertainty Band [Q10 - Q90]</span>
-                </div>
-              </>
-            )}
-            <div className="flex items-center gap-1.5">
-              <span className="w-3.5 h-0.5 border-t-2 border-dotted border-[#74777e] inline-block" />
-              <span className="font-semibold text-on-surface">24h Baseline</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <span className="w-3.5 h-0.5 border-t border-dashed border-red-500 inline-block" />
-              <span className="font-semibold text-error">Threshold</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Chart Rendering or Empty State */}
+      {/* 4 Hero Metric StatCards */}
+      <ErrorBoundary fallbackTitle="Metric Cards Error">
         {isLoadingForecast ? (
-          <Skeleton className="w-full h-80 rounded-xl" />
-        ) : chartData.length === 0 ? (
-          <EmptyState
-            title="No Telemetry Available"
-            description={`No hourly meteorological records were retrieved for ${selectedCity} in the specified horizon.`}
-            icon="query_builder"
-            actionText="Retry Query"
-            onAction={() => refetchForecast()}
-          />
-        ) : (
-          <div className="w-full h-80 sm:h-96">
-            <ResponsiveContainer width="100%" height="100%">
-              <ComposedChart data={chartData} margin={{ top: 15, right: 20, left: 0, bottom: 25 }}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                <XAxis
-                  dataKey="time"
-                  tick={{ fontSize: 11, fill: 'currentColor' }}
-                  angle={-30}
-                  textAnchor="end"
-                  height={50}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: 'currentColor' }}
-                  unit={selectedHazard === 'heat' ? '°C' : 'mm'}
-                  domain={['auto', 'auto']}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                    borderRadius: '12px',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    color: '#fff',
-                    fontSize: '12px',
-                    boxShadow: '0 8px 30px rgba(0, 0, 0, 0.2)',
-                  }}
-                  formatter={(value: any, name: string) => {
-                    if (value === undefined || value === null) return ['—', name];
-                    if (Array.isArray(value)) {
-                      return [`[${value[0]} - ${value[1]}] ${forecast?.thresholds.unit}`, '80% Uncertainty Band'];
-                    }
-                    return [`${value} ${forecast?.thresholds.unit}`, name];
-                  }}
-                  labelFormatter={(label) => `Time: ${label}`}
-                />
-                <Legend verticalAlign="top" height={36} />
+          <SkeletonRow count={4} />
+        ) : forecast ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Card 1: Latest Observed */}
+            <StatCard
+              label={`Latest Observed (${selectedCity})`}
+              value={latestObserved?.value ?? '—'}
+              unit={latestObserved?.unit || (selectedHazard === 'heavy_rain' ? 'mm/hr' : '°C')}
+              icon="sensors"
+              accent={selectedHazard === 'heavy_rain' ? 'rain' : 'heat'}
+              sublabel={latestObserved?.weather_condition || 'Nominal atmospheric state'}
+              baselineValue={latestObserved?.timestamp_pkt || '—'}
+              baselineLabel="Observed at"
+            />
 
-                {/* Shaded Uncertainty Band (Heavy Rain only) */}
-                {selectedHazard === 'heavy_rain' && (
+            {/* Card 2: ML Prediction or Heat Monitoring */}
+            {selectedHazard === 'heavy_rain' ? (
+              <StatCard
+                label="Next-Hour ML Quantile"
+                value={latestPredicted?.median ?? '—'}
+                unit="mm/hr"
+                icon="online_prediction"
+                accent={latestPredicted && latestPredicted.probability > 0.6 ? 'severe' : 'cyan'}
+                isKeyCard={latestPredicted && latestPredicted.probability > 0.6}
+                sublabel={`P(≥2.5mm): ${latestPredicted ? (latestPredicted.probability * 100).toFixed(1) : 0}%`}
+                uncertaintyRange={
+                  latestPredicted
+                    ? { low: latestPredicted.interval_low, high: latestPredicted.interval_high, unit: 'mm' }
+                    : undefined
+                }
+                baselineValue={latestPredicted?.forecast_time_pkt}
+                baselineLabel="Target PKT"
+              />
+            ) : (
+              <StatCard
+                label="Heat Index Monitoring"
+                value={latestObserved?.value ?? '—'}
+                unit="°C"
+                icon="wb_sunny"
+                accent="heat"
+                sublabel="Observed against thresholds (not ML-predicted)"
+                baselineValue="40.0°C"
+                baselineLabel="Danger threshold"
+              />
+            )}
+
+            {/* Card 3: 24h Persistence Baseline */}
+            <StatCard
+              label="24h Persistence Baseline"
+              value={forecast.baseline.value !== null && forecast.baseline.value !== undefined ? forecast.baseline.value : '—'}
+              unit={forecast.thresholds.unit}
+              icon="history"
+              accent="cyan"
+              sublabel="Formula: ŷ_t = y_(t-24h)"
+              baselineValue="Persistence benchmark"
+              baselineLabel="Type"
+            />
+
+            {/* Card 4: Action Threshold */}
+            <StatCard
+              label="Action Threshold"
+              value={forecast.thresholds.primary_threshold}
+              unit={forecast.thresholds.unit}
+              icon="flag"
+              accent={currentRiskLevel === 'Severe' ? 'severe' : currentRiskLevel === 'High' ? 'high' : 'low'}
+              sublabel={forecast.thresholds.primary_label}
+              baselineValue={currentRiskLevel}
+              baselineLabel="Current status"
+            />
+          </div>
+        ) : null}
+      </ErrorBoundary>
+
+      {/* Main Forecast Chart: Solid Observed Line + Dashed/Shaded Prediction + Baseline */}
+      <ErrorBoundary fallbackTitle="Forecast Chart Error">
+        <Card className="flex flex-col">
+          <CardHeader
+            action={
+              <div className="flex items-center gap-1 bg-slate-900/80 p-1 rounded-xl border border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setViewGranularity('hourly')}
+                  className={`px-3 py-1 rounded-lg text-xs font-mono-val transition-colors ${
+                    viewGranularity === 'hourly' ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-400/40' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Hourly
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewGranularity('daily')}
+                  className={`px-3 py-1 rounded-lg text-xs font-mono-val transition-colors ${
+                    viewGranularity === 'daily' ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-400/40' : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Daily Max
+                </button>
+              </div>
+            }
+          >
+            <CardTitle icon="show_chart">
+              {selectedHazard === 'heavy_rain' ? 'Monsoon Precipitation Time Series' : 'Ambient Temperature & Heat Stress Curve'}
+            </CardTitle>
+            <CardDescription>
+              Solid line = Empirical observations · Dashed line = Quantile predictions · Shaded area = 80% CI band
+            </CardDescription>
+          </CardHeader>
+
+          {isLoadingForecast ? (
+            <SkeletonChart height="h-80" />
+          ) : chartData.length === 0 ? (
+            <EmptyState
+              title="No Weather Observations"
+              reason={`No sensor readings or forecast points recorded for ${selectedCity} in this horizon.`}
+              pipelineSource="Source: Open-Meteo & PMD archives via DuckDB"
+            />
+          ) : (
+            <div className="w-full h-88 pt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={chartData} margin={{ top: 10, right: 20, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="bandGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={selectedHazard === 'heavy_rain' ? '#38bdf8' : '#f59e0b'} stopOpacity={0.35} />
+                      <stop offset="95%" stopColor={selectedHazard === 'heavy_rain' ? '#38bdf8' : '#f59e0b'} stopOpacity={0.0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                  <XAxis
+                    dataKey="time"
+                    stroke="#64748b"
+                    fontSize={11}
+                    tickLine={false}
+                    fontFamily="JetBrains Mono"
+                  />
+                  <YAxis
+                    stroke="#64748b"
+                    fontSize={11}
+                    tickLine={false}
+                    unit={forecast?.thresholds?.unit ? ` ${forecast.thresholds.unit}` : ''}
+                    fontFamily="JetBrains Mono"
+                  />
+                  <RechartsTooltip
+                    contentStyle={{
+                      backgroundColor: '#09101c',
+                      border: '1px solid rgba(255,255,255,0.15)',
+                      borderRadius: '12px',
+                      fontSize: '12px',
+                      color: '#f1f5f9',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                      fontFamily: 'Inter',
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px' }} />
+
+                  {/* 80% Uncertainty Band Shading */}
                   <Area
                     type="monotone"
                     dataKey="interval_band"
-                    name="80% Uncertainty Band [Q10 - Q90]"
-                    stroke="#5bb8fe"
-                    fill="#5bb8fe"
-                    fillOpacity={0.25}
-                    isAnimationActive={false}
+                    stroke="none"
+                    fill="url(#bandGradient)"
+                    name="80% Uncertainty Band"
                   />
-                )}
 
-                {/* Observed Weather Time Series: Solid Line */}
-                <Line
-                  type="monotone"
-                  dataKey="observed"
-                  name="Observed"
-                  stroke="#006398"
-                  strokeWidth={2.5}
-                  dot={{ r: 2 }}
-                  activeDot={{ r: 5 }}
-                  isAnimationActive={true}
-                />
-
-                {/* Predicted Series: Dashed Line */}
-                {selectedHazard === 'heavy_rain' && (
+                  {/* Solid Observed Line (Requirement 21) */}
                   <Line
                     type="monotone"
-                    dataKey="predicted"
-                    name="Predicted"
-                    stroke="#ba1a1a"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    dot={{ r: 4, stroke: '#ba1a1a', strokeWidth: 1.5, fill: '#fff' }}
-                    isAnimationActive={true}
+                    dataKey="observed"
+                    name={`Observed (${selectedCity}) [Solid]`}
+                    stroke={selectedHazard === 'heavy_rain' ? '#0284c7' : '#ea580c'}
+                    strokeWidth={2.8}
+                    dot={{ r: 3, fill: selectedHazard === 'heavy_rain' ? '#0284c7' : '#ea580c' }}
+                    activeDot={{ r: 6 }}
                   />
-                )}
 
-                {/* 24h Baseline Line: Dotted Line */}
-                <Line
-                  type="monotone"
-                  dataKey="baseline"
-                  name="24h Baseline"
-                  stroke="#74777e"
-                  strokeWidth={1.5}
-                  strokeDasharray="2 2"
-                  dot={false}
-                  isAnimationActive={false}
-                />
+                  {/* Dashed ML Predicted Line (Requirement 21) */}
+                  {selectedHazard === 'heavy_rain' && (
+                    <Line
+                      type="monotone"
+                      dataKey="predicted"
+                      name="LightGBM Predicted (Median) [Dashed]"
+                      stroke="#38bdf8"
+                      strokeWidth={2.5}
+                      strokeDasharray="5 5"
+                      dot={{ r: 3, fill: '#38bdf8' }}
+                      activeDot={{ r: 6 }}
+                    />
+                  )}
 
-                {/* Action Threshold Reference Lines */}
-                {forecast?.thresholds?.levels?.map((thresh: ThresholdLevel) => (
-                  <ReferenceLine
-                    key={thresh.level}
-                    y={thresh.value}
-                    stroke={thresh.color}
-                    strokeDasharray="4 4"
-                    label={{
-                      value: `${thresh.label}`,
-                      position: 'insideTopRight',
-                      fill: thresh.color,
-                      fontSize: 10,
-                      fontWeight: 600,
-                    }}
+                  {/* Baseline Dotted Line */}
+                  <Line
+                    type="monotone"
+                    dataKey="baseline"
+                    name="24h Persistence Baseline [Dotted]"
+                    stroke="#64748b"
+                    strokeWidth={1.5}
+                    strokeDasharray="2 3"
+                    dot={false}
                   />
-                ))}
-              </ComposedChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </div>
 
-      {/* ============================================================ */}
-      {/* MODEL EVALUATION & DISAGGREGATED AUDIT SECTION               */}
-      {/* Shows model vs baseline metrics, periods, interval coverage, */}
-      {/* and the per-group error table with the weakest group flagged. */}
-      {/* ============================================================ */}
-      <div className="p-4 sm:p-6 rounded-2xl bg-surface-container border border-outline-variant/30 shadow-xs flex flex-col space-y-6">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-bold text-on-surface">
-              Model Performance vs Baseline Audit
-            </h2>
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-secondary/10 text-secondary border border-secondary/30 font-semibold">
-              LightGBM Quantile Regressors v1.0
-            </span>
-          </div>
-          <p className="text-xs text-on-surface-variant mt-1">
-            Grounded against the 24h persistence baseline (y&#770;<sub>t</sub> = y<sub>t-24h</sub>). Disaggregated fairness evaluation across monitored divisions.
-          </p>
-        </div>
-
-        {/* 3 Overview Metric Chips */}
-        {isLoadingModel ? (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Skeleton className="h-24 rounded-xl" />
-            <Skeleton className="h-24 rounded-xl" />
-            <Skeleton className="h-24 rounded-xl" />
-          </div>
-        ) : modelSummary ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* MAE Improvement */}
-            <div className="p-3.5 rounded-xl bg-surface-container-high border border-outline-variant/30 flex flex-col justify-between">
-              <span className="text-xs font-semibold text-on-surface-variant">MAE Improvement</span>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-risk-low">
-                  +{modelSummary.metrics.mae_improvement_pct}%
-                </span>
-                <span className="text-xs text-on-surface-variant">
-                  ({modelSummary.metrics.model_mae} vs {modelSummary.metrics.baseline_mae})
-                </span>
-              </div>
-              <span className="text-[10px] text-risk-low font-bold mt-1">
-                ✓ Exceeds 20% Improvement Target
-              </span>
+                  {/* Threshold Reference Lines */}
+                  {forecast?.thresholds?.levels?.map((thresh: ThresholdLevel) => (
+                    <ReferenceLine
+                      key={thresh.level}
+                      y={thresh.value}
+                      stroke={thresh.color}
+                      strokeDasharray="4 4"
+                      label={{
+                        value: thresh.label,
+                        position: 'insideTopRight',
+                        fill: thresh.color,
+                        fontSize: 10,
+                        fontWeight: 600,
+                      }}
+                    />
+                  ))}
+                </ComposedChart>
+              </ResponsiveContainer>
             </div>
+          )}
+        </Card>
+      </ErrorBoundary>
 
-            {/* RMSE Improvement */}
-            <div className="p-3.5 rounded-xl bg-surface-container-high border border-outline-variant/30 flex flex-col justify-between">
-              <span className="text-xs font-semibold text-on-surface-variant">RMSE Improvement</span>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-risk-low">
-                  +{modelSummary.metrics.rmse_improvement_pct}%
-                </span>
-                <span className="text-xs text-on-surface-variant">
-                  ({modelSummary.metrics.model_rmse} vs {modelSummary.metrics.baseline_rmse})
-                </span>
-              </div>
-              <span className="text-[10px] text-on-surface-variant mt-1">
-                Lower dispersion during peak surges
+      {/* Model Performance & Disaggregated Audit Section */}
+      <ErrorBoundary fallbackTitle="Model Audit Error">
+        <Card className="flex flex-col gap-6">
+          <CardHeader
+            action={
+              <span className="px-2.5 py-1 rounded-full text-[11px] font-mono-val font-semibold bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                LightGBM Quantile Regressors v1.0
               </span>
-            </div>
+            }
+          >
+            <CardTitle icon="analytics">Model Performance vs Baseline Audit</CardTitle>
+            <CardDescription>
+              Disaggregated fairness evaluation and MAE improvements across Karachi Divisions vs 24h persistence baseline
+            </CardDescription>
+          </CardHeader>
 
-            {/* Interval Coverage */}
-            <div className="p-3.5 rounded-xl bg-surface-container-high border border-outline-variant/30 flex flex-col justify-between">
-              <span className="text-xs font-semibold text-on-surface-variant">80% Interval Coverage</span>
-              <div className="mt-1 flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-secondary">
-                  {modelSummary.interval_coverage.observed_coverage_pct}%
-                </span>
-                <span className="text-xs text-on-surface-variant">
-                  (Nominal: 80.0%)
-                </span>
-              </div>
-              <span className="text-[10px] text-on-surface-variant font-mono mt-1">
-                Avg width: {modelSummary.interval_coverage.average_interval_width} mm
-              </span>
-            </div>
-
-            {/* Training & Test Periods */}
-            <div className="p-3.5 rounded-xl bg-surface-container-high border border-outline-variant/30 flex flex-col justify-between">
-              <span className="text-xs font-semibold text-on-surface-variant">Training & Test Split</span>
-              <div className="mt-1 text-xs font-mono font-bold text-on-surface">
-                Train: {modelSummary.training_period.rows_count.toLocaleString()} rows
-              </div>
-              <div className="text-[11px] text-on-surface-variant font-mono">
-                Test: {modelSummary.test_period.rows_count.toLocaleString()} rows
-              </div>
-              <span className="text-[10px] text-on-surface-variant mt-1">
-                Split date: 2025-01-01
-              </span>
-            </div>
-          </div>
-        ) : null}
-
-        {/* Weakest Group Alert Box */}
-        {modelSummary?.weakest_group && (
-          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-start gap-3">
-              <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-[24px] shrink-0 mt-0.5">
-                warning
-              </span>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-amber-900 dark:text-amber-100 uppercase tracking-wide">
-                    Weakest Group Identified:
-                  </span>
-                  <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-amber-600 text-white font-mono">
-                    {modelSummary.weakest_group.name}
-                  </span>
-                  <span className="text-xs font-mono text-amber-800 dark:text-amber-300">
-                    MAE: {modelSummary.weakest_group.mae}
+          {isLoadingModel ? (
+            <SkeletonRow count={4} />
+          ) : modelSummary ? (
+            <>
+              {/* Summary Metric Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-white/10 flex flex-col justify-between">
+                  <span className="text-xs text-slate-400 font-medium">MAE Improvement</span>
+                  <div className="mt-1 flex items-baseline gap-2">
+                    <span className="text-2xl font-bold font-display text-emerald-400">
+                      +{modelSummary.metrics.mae_improvement_pct}%
+                    </span>
+                    <span className="text-xs text-slate-400 font-mono-val">
+                      ({modelSummary.metrics.model_mae} vs {modelSummary.metrics.baseline_mae})
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-emerald-400 font-semibold mt-1">
+                    ✓ Exceeds 20% Improvement Target
                   </span>
                 </div>
-                <p className="text-xs text-amber-800 dark:text-amber-200 mt-1">
-                  <strong>Recommendation: </strong>
-                  {modelSummary.weakest_group.recommendation}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* Errors-by-Group Table */}
-        <div className="overflow-x-auto rounded-xl border border-outline-variant/30">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-surface-container-high text-on-surface font-semibold border-b border-outline-variant/30">
-              <tr>
-                <th className="px-4 py-3">Group / Location</th>
-                <th className="px-4 py-3">Dimension</th>
-                <th className="px-4 py-3">Metric</th>
-                <th className="px-4 py-3 text-right">Baseline Score</th>
-                <th className="px-4 py-3 text-right">Model Score</th>
-                <th className="px-4 py-3 text-right">Error Reduction</th>
-                <th className="px-4 py-3 text-center">Audit Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-outline-variant/20 bg-surface">
-              {isLoadingModel ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-on-surface-variant">
-                    Loading disaggregated evaluation table...
-                  </td>
-                </tr>
-              ) : modelSummary?.groups && modelSummary.groups.length > 0 ? (
-                modelSummary.groups.map((grp: GroupErrorItem) => (
-                  <tr
-                    key={grp.group_value}
-                    className={`transition-colors hover:bg-surface-container ${
-                      grp.is_weakest ? 'bg-amber-500/10 dark:bg-amber-500/15 font-semibold' : ''
-                    }`}
-                  >
-                    <td className="px-4 py-2.5 flex items-center gap-2">
-                      <span>{grp.group_value}</span>
-                      {grp.is_weakest && (
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-600 text-white uppercase tracking-wider">
-                          Weakest Group
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-white/10 flex flex-col justify-between">
+                  <span className="text-xs text-slate-400 font-medium">RMSE Improvement</span>
+                  <div className="mt-1 flex items-baseline gap-2">
+                    <span className="text-2xl font-bold font-display text-emerald-400">
+                      +{modelSummary.metrics.rmse_improvement_pct}%
+                    </span>
+                    <span className="text-xs text-slate-400 font-mono-val">
+                      ({modelSummary.metrics.model_rmse} vs {modelSummary.metrics.baseline_rmse})
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-1">
+                    Reduced dispersion during peak spikes
+                  </span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-white/10 flex flex-col justify-between">
+                  <span className="text-xs text-slate-400 font-medium">80% Interval Coverage</span>
+                  <div className="mt-1 flex items-baseline gap-2">
+                    <span className="text-2xl font-bold font-display text-cyan-400">
+                      {modelSummary.interval_coverage.observed_coverage_pct}%
+                    </span>
+                    <span className="text-xs text-slate-400 font-mono-val">
+                      (Target: 80.0%)
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-slate-400 font-mono-val mt-1">
+                    Avg width: {modelSummary.interval_coverage.average_interval_width} mm
+                  </span>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-900/60 border border-white/10 flex flex-col justify-between">
+                  <span className="text-xs text-slate-400 font-medium">Training & Test Rows</span>
+                  <div className="mt-1 text-xs font-mono-val text-white">
+                    Train: {modelSummary.training_period.rows_count.toLocaleString()} rows
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-mono-val">
+                    Test: {modelSummary.test_period.rows_count.toLocaleString()} rows
+                  </div>
+                  <span className="text-[10px] text-slate-500 font-mono-val mt-1">
+                    Split date: 2025-01-01
+                  </span>
+                </div>
+              </div>
+
+              {/* Weakest Group Alert Box (Requirement 21) */}
+              {modelSummary.weakest_group && (
+                <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/35 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-start gap-3">
+                    <span className="material-symbols-outlined text-amber-400 text-[22px] shrink-0">
+                      warning
+                    </span>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-amber-200 uppercase tracking-wider text-[11px]">
+                          Weakest Group Identified:
                         </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2.5 font-mono text-on-surface-variant capitalize">
-                      {grp.group_type}
-                    </td>
-                    <td className="px-4 py-2.5 font-mono text-on-surface-variant">
-                      {grp.metric}
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-mono">
-                      {grp.baseline_score.toFixed(4)}
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-mono font-bold">
-                      {grp.model_score.toFixed(4)}
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-mono">
-                      <span
-                        className={`font-bold ${
-                          grp.gain_pct >= 20
-                            ? 'text-risk-low'
-                            : grp.gain_pct > 0
-                            ? 'text-secondary'
-                            : 'text-error'
-                        }`}
-                      >
-                        {grp.gain_pct > 0 ? `+${grp.gain_pct}%` : `${grp.gain_pct}%`}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
-                      {grp.is_weakest ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                          Needs Calibration
+                        <span className="px-2 py-0.5 rounded font-bold bg-amber-500/20 text-amber-300 font-mono-val border border-amber-500/40">
+                          {modelSummary.weakest_group.name}
                         </span>
-                      ) : grp.gain_pct >= 20 ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                          Target Exceeded
+                        <span className="font-mono-val text-amber-300">
+                          MAE: {modelSummary.weakest_group.mae}
                         </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 text-sky-700 dark:text-sky-300 border border-sky-500/30">
-                          Verified
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-on-surface-variant italic">
-                    No stratified evaluation metrics found in warehouse.
-                  </td>
-                </tr>
+                      </div>
+                      <p className="text-slate-300 mt-1">
+                        <strong>Operational recommendation: </strong>
+                        {modelSummary.weakest_group.recommendation}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+
+              {/* Disaggregated Group Errors Table */}
+              {modelSummary.groups && modelSummary.groups.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider font-mono-val">
+                    Disaggregated Model Evaluation by District
+                  </h4>
+                  <Table
+                    columns={errorColumns}
+                    data={modelSummary.groups}
+                    keyExtractor={(item) => `${item.group_type}-${item.group_value}`}
+                  />
+                </div>
+              )}
+            </>
+          ) : null}
+        </Card>
+      </ErrorBoundary>
+    </PageContainer>
   );
 };
+
+export default Forecast;

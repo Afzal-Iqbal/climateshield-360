@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { motion, useReducedMotion } from 'framer-motion';
+import { useReducedMotion } from 'framer-motion';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -9,18 +9,29 @@ import {
   Line,
   XAxis,
   YAxis,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
   ReferenceLine,
 } from 'recharts';
 
 import { api, formatPKT } from '../api/client';
-import { RiskBadge } from '../components/RiskBadge';
-import { SampleBanner } from '../components/SampleBanner';
-import { EmptyState } from '../components/EmptyState';
-import { AnimatedNumber } from '../components/AnimatedNumber';
-import { ClimateGlobe } from '../components/ClimateGlobe';
-import { Skeleton } from '../components/Skeleton';
+import {
+  PageContainer,
+  PageHeader,
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  StatCard,
+  RiskBadge,
+  Tabs,
+  Button,
+  ErrorBoundary,
+  EmptyState,
+  ErrorState,
+  SkeletonRow,
+  SkeletonChart,
+} from '../components/ui';
 import { RiskLevel } from '../types';
 
 interface OverviewProps {
@@ -73,42 +84,44 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
 
   const overview = overviewResponse?.data;
   const priorities = prioritiesResponse?.data || [];
-  const allPrioritiesCount = allPrioritiesResponse?.data?.length ?? 0;
+  const allPrioritiesCount = allPrioritiesResponse?.data?.length ?? priorities.length;
   const visiblePriorities = showAllPriorities ? priorities : priorities.slice(0, 5);
 
   // Build combined chart dataset from prediction points
   const heatPoints = overview?.predictions_series?.heat || [];
   const rainPoints = overview?.predictions_series?.heavy_rain || [];
 
-  const chartData = heatPoints.map((hp, idx) => {
-    const rp = rainPoints[idx] || {};
-    const pktTime = formatPKT(hp.forecast_time, {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+  const chartData = useMemo(() => {
+    return heatPoints.map((hp, idx) => {
+      const rp = rainPoints[idx] || {};
+      const pktTime = formatPKT(hp.forecast_time, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      return {
+        forecast_time: hp.forecast_time,
+        short_time: `+${hp.hours_ahead}h`,
+        full_time: `+${hp.hours_ahead}h (${pktTime.split(',')[1]?.trim() || pktTime})`,
+        display_time: `+${hp.hours_ahead}h`,
+        hours_ahead: hp.hours_ahead,
+        // Heat hazard metrics
+        heat_prob: Math.round((hp.probability ?? 0) * 100),
+        heat_ci_base: Math.round((hp.interval_low ?? 0) * 100),
+        heat_ci_range: Math.round(Math.max(0, (hp.interval_high ?? 0) - (hp.interval_low ?? 0)) * 100),
+        heat_baseline: Math.round((hp.baseline_value ?? 0) * 100),
+        // Rain hazard metrics
+        rain_prob: Math.round((rp.probability ?? 0) * 100),
+        rain_ci_base: Math.round((rp.interval_low ?? 0) * 100),
+        rain_ci_range: Math.round(Math.max(0, (rp.interval_high ?? 0) - (rp.interval_low ?? 0)) * 100),
+        rain_baseline: Math.round((rp.baseline_value ?? 0) * 100),
+      };
     });
+  }, [heatPoints, rainPoints]);
 
-    return {
-      forecast_time: hp.forecast_time,
-      short_time: `+${hp.hours_ahead}h`,
-      full_time: `+${hp.hours_ahead}h (${pktTime.split(',')[1]?.trim() || pktTime})`,
-      display_time: `+${hp.hours_ahead}h`,
-      hours_ahead: hp.hours_ahead,
-      // Heat hazard metrics
-      heat_prob: Math.round(hp.probability * 100),
-      heat_ci_base: Math.round(hp.interval_low * 100),
-      heat_ci_range: Math.round(Math.max(0, hp.interval_high - hp.interval_low) * 100),
-      heat_baseline: Math.round(hp.baseline_value * 100),
-      // Rain hazard metrics
-      rain_prob: Math.round((rp.probability ?? 0) * 100),
-      rain_ci_base: Math.round((rp.interval_low ?? 0) * 100),
-      rain_ci_range: Math.round(Math.max(0, (rp.interval_high ?? 0) - (rp.interval_low ?? 0)) * 100),
-      rain_baseline: Math.round((rp.baseline_value ?? 0) * 100),
-    };
-  });
-
-  // Mini Map hotspots dynamically populated from API priorities (Requirement 6)
+  // Mini Map hotspots dynamically populated from API priorities
   const mapHotspots = useMemo(() => {
     const baseSpots = [
       { id: 'KHI-MALIR', defaultName: 'Malir Basin', x: '72%', y: '48%' },
@@ -135,1019 +148,655 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
 
   const paintFor = (id: string) => {
     const level = mapHotspots.find((spot) => spot.id === id)?.level;
-    if (level === 'Severe') return { fill: '#b91c1c', stroke: '#ef4444' };
-    if (level === 'High') return { fill: '#ea580c', stroke: '#f97316' };
-    if (level === 'Moderate') return { fill: '#d97706', stroke: '#f59e0b' };
-    if (level === 'Low') return { fill: '#047857', stroke: '#34d399' };
+    if (level === 'Severe') return { fill: '#ef4444', stroke: '#f87171' };
+    if (level === 'High') return { fill: '#f97316', stroke: '#fb923c' };
+    if (level === 'Moderate') return { fill: '#f59e0b', stroke: '#fbbf24' };
+    if (level === 'Low') return { fill: '#10b981', stroke: '#34d399' };
     return { fill: '#334155', stroke: '#94a3b8' };
   };
+
   const labelFor = (id: string, fallback: string) => {
     const spot = mapHotspots.find((item) => item.id === id);
     return `${spot?.name || fallback}${spot?.level ? ` (${spot.level})` : ' (no score)'}`;
   };
+
   const severeOnMap = mapHotspots.filter((spot) => spot.level === 'Severe').length;
 
   if (isOverviewError || isPrioritiesError) {
     return (
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
-        <SampleBanner isSample={isSample} />
-        <EmptyState
-          icon="error"
+      <PageContainer>
+        <ErrorState
           title="Telemetry Feed Disconnected"
-          description="Unable to retrieve real-time overview data from DuckDB warehouse. Please verify backend connection and try again."
-          actionText="Retry Connection"
-          onAction={() => {
+          error="Unable to retrieve real-time overview data from DuckDB warehouse."
+          onRetry={() => {
             refetchOverview();
             refetchPriorities();
           }}
         />
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <motion.div
-      initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
-      className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6"
-    >
-      {/* Sample Data Operational Banner (Rule 2) */}
-      <SampleBanner isSample={overviewResponse?.is_sample ?? isSample} />
-
-      {/* Overview Top Bar: Title & Range Selector */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-outline-variant/30">
-        <div>
+    <PageContainer>
+      {/* Page Header with Time Horizon Switcher */}
+      <PageHeader
+        title="Operational Hazard Overview"
+        subtitle="Real-time multi-hazard telemetry, ensemble probability curves, and ranked municipal interventions for Karachi Division."
+        lastUpdated={overviewResponse?.generated_at}
+        isLive={!isSample}
+        actions={
           <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-secondary text-[26px]">dashboard</span>
-            <h1 className="font-headline-lg text-xl sm:text-2xl font-bold text-on-surface tracking-tight">
-              Operational Hazard Overview
-            </h1>
+            <span className="font-mono-val text-[11px] text-slate-400 font-semibold uppercase tracking-wider hidden sm:inline">
+              Horizon:
+            </span>
+            <Tabs
+              size="sm"
+              tabs={[
+                { id: '24h', label: 'Next 24h' },
+                { id: '48h', label: '48 Hours' },
+                { id: '7d', label: '7 Days' },
+              ]}
+              activeTab={timeRange}
+              onChange={(id) => setTimeRange(id as any)}
+            />
           </div>
-          <p className="font-body-sm text-xs sm:text-sm text-on-surface-variant mt-0.5">
-            Real-time multi-hazard telemetry, ensemble probability curves, and ranked municipal interventions for Karachi Division.
-          </p>
-        </div>
-
-        {/* Range Selector: 24h / 48h / 7d */}
-        <div className="flex items-center gap-2 self-start sm:self-center">
-          <span className="font-mono text-xs text-on-surface-variant font-semibold uppercase tracking-wider hidden md:inline">
-            Horizon:
-          </span>
-          <div className="flex items-center bg-surface-container-high dark:bg-surface-container-highest/60 rounded-full p-1 shadow-xs border border-outline-variant/40">
-            <button
-              type="button"
-              onClick={() => setTimeRange('24h')}
-              className={`min-h-[36px] px-3.5 py-1 rounded-full font-mono text-xs transition-all ${
-                timeRange === '24h'
-                  ? 'bg-primary text-on-primary font-bold shadow-xs'
-                  : 'text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              Next 24h
-            </button>
-            <button
-              type="button"
-              onClick={() => setTimeRange('48h')}
-              className={`min-h-[36px] px-3.5 py-1 rounded-full font-mono text-xs transition-all ${
-                timeRange === '48h'
-                  ? 'bg-primary text-on-primary font-bold shadow-xs'
-                  : 'text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              48 Hours
-            </button>
-            <button
-              type="button"
-              onClick={() => setTimeRange('7d')}
-              className={`min-h-[36px] px-3.5 py-1 rounded-full font-mono text-xs transition-all ${
-                timeRange === '7d'
-                  ? 'bg-primary text-on-primary font-bold shadow-xs'
-                  : 'text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              7 Days
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <ClimateGlobe
-        heatLabel={overview?.heat_summary?.label || 'Heat'}
-        heatValue={
-          overview?.heat_summary
-            ? `${overview.heat_summary.headline_value} ${overview.heat_summary.unit}`
-            : '—'
         }
-        rainLabel={overview?.rain_summary?.label || 'Rain'}
-        rainValue={
-          overview?.rain_summary
-            ? `${overview.rain_summary.headline_value} ${overview.rain_summary.unit}`
-            : '—'
-        }
-        riskLevel={overview?.heat_hazard_level}
       />
 
-      {/* 4 Key Metric Telemetry Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      {/* 4 Hero Stat Cards */}
+      <ErrorBoundary fallbackTitle="Hero Telemetry Error">
         {isOverviewLoading ? (
-          <>
-            <Skeleton className="h-44 rounded-2xl" />
-            <Skeleton className="h-44 rounded-2xl" />
-            <Skeleton className="h-44 rounded-2xl" />
-            <Skeleton className="h-44 rounded-2xl" />
-          </>
+          <SkeletonRow count={4} />
         ) : (
-          <>
-            {/* Card 1: Thermal Hazard Level */}
-            <motion.div
-              whileHover={shouldReduceMotion ? undefined : { y: -2 }}
-              transition={{ duration: 0.15 }}
-              className="bg-surface dark:bg-surface-container-low rounded-2xl p-5 flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow border border-outline-variant/30 dark:border-outline-variant/20 glass-panel"
-            >
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">
-                    Hazard Vector 01
-                  </span>
-                  {overview?.heat_hazard_level ? (
-                    <RiskBadge level={overview.heat_hazard_level} />
-                  ) : (
-                    <span className="font-mono text-[10px] text-on-surface-variant">No level</span>
-                  )}
-                </div>
-                <div className="mt-1">
-                  <span className="text-sm font-semibold text-on-surface block">
-                    Thermal Hazard Level
-                  </span>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <span className="font-mono text-3xl sm:text-4xl font-bold tracking-tight text-on-surface">
-                      <AnimatedNumber value={overview?.heat_summary?.headline_value ?? 43.8} decimals={1} />°C
-                    </span>
-                    <span className="text-xs text-on-surface-variant font-medium">
-                      Feels Like (WBGT)
-                    </span>
-                  </div>
-                </div>
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Card 1: Thermal Hazard */}
+            <StatCard
+              label="Hazard Vector 01 · Thermal"
+              value={overview?.heat_summary?.headline_value ?? '—'}
+              unit={overview?.heat_summary?.unit || '°C'}
+              icon="thermostat"
+              accent={overview?.heat_hazard_level === 'Severe' ? 'severe' : overview?.heat_hazard_level === 'High' ? 'high' : 'heat'}
+              isKeyCard={overview?.heat_hazard_level === 'Severe' || overview?.heat_hazard_level === 'High'}
+              sublabel={overview?.heat_summary?.label || 'Peak Heat Index'}
+              uncertaintyRange={
+                overview?.heat_summary?.interval_low !== undefined && overview?.heat_summary?.interval_high !== undefined
+                  ? { low: overview.heat_summary.interval_low, high: overview.heat_summary.interval_high, unit: overview.heat_summary.unit }
+                  : undefined
+              }
+              baselineValue="Climatological Summer Median"
+              baselineLabel="Reference"
+            />
 
-              {/* Uncertainty Range Line Box */}
-              <div className="mt-4 pt-2 bg-surface-container-low dark:bg-surface-container-high/40 rounded-xl p-3 flex flex-col gap-1.5 border border-outline-variant/20">
-                <div className="flex items-center justify-between font-mono text-xs">
-                  <span className="text-on-surface-variant">Confidence Band (90%)</span>
-                  <span className="font-semibold text-on-surface">
-                    {overview?.heat_summary?.interval_low ?? 41.5}°C — {overview?.heat_summary?.interval_high ?? 46.2}°C
-                  </span>
-                </div>
-                {/* Visual uncertainty bar */}
-                <div className="w-full bg-surface-container-highest h-2 rounded-full relative overflow-hidden">
-                  <div className="absolute left-[35%] right-[15%] h-full bg-[#f97316] rounded-full opacity-80" />
-                  <div className="absolute left-[60%] top-0 bottom-0 w-1 bg-[#ba1a1a]" />
-                </div>
-                <div className="flex items-center justify-between font-mono text-[10px] text-on-surface-variant mt-0.5">
-                  <span className="truncate">{overview?.heat_summary?.source || 'PMD Karachi Met & GFS 0.25°'}</span>
-                  <span className="px-1.5 py-0.5 bg-surface-container dark:bg-surface-container-highest text-on-surface-variant rounded uppercase font-mono">
-                    [Sample Data]
-                  </span>
-                </div>
-              </div>
-            </motion.div>
+            {/* Card 2: Rain Inundation */}
+            <StatCard
+              label="Hazard Vector 02 · Rain"
+              value={overview?.rain_summary?.headline_value ?? '—'}
+              unit={overview?.rain_summary?.unit || 'mm/24h'}
+              icon="rainy"
+              accent={overview?.rain_hazard_level === 'Severe' ? 'severe' : overview?.rain_hazard_level === 'High' ? 'high' : 'rain'}
+              isKeyCard={overview?.rain_hazard_level === 'Severe' || overview?.rain_hazard_level === 'High'}
+              sublabel={overview?.rain_summary?.label || 'Precipitation Volume'}
+              uncertaintyRange={
+                overview?.rain_summary?.interval_low !== undefined && overview?.rain_summary?.interval_high !== undefined
+                  ? { low: overview.rain_summary.interval_low, high: overview.rain_summary.interval_high, unit: overview.rain_summary.unit }
+                  : undefined
+              }
+              baselineValue="Monsoon Seasonal Baseline"
+              baselineLabel="Reference"
+            />
 
-            {/* Card 2: Rainfall Hazard */}
-            <motion.div
-              whileHover={shouldReduceMotion ? undefined : { y: -2 }}
-              transition={{ duration: 0.15 }}
-              className="bg-surface dark:bg-surface-container-low rounded-2xl p-5 flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow border border-outline-variant/30 dark:border-outline-variant/20 glass-panel"
-            >
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">
-                    Hazard Vector 02
-                  </span>
-                  <RiskBadge level={overview?.rain_hazard_level || 'Moderate'} />
-                </div>
-                <div className="mt-1">
-                  <span className="text-sm font-semibold text-on-surface block">
-                    Precipitation Accumulation
-                  </span>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <span className="font-mono text-3xl sm:text-4xl font-bold tracking-tight text-on-surface">
-                      <AnimatedNumber value={overview?.rain_summary?.headline_value ?? 38} decimals={0} />
-                    </span>
-                    <span className="text-lg font-medium text-on-surface">mm</span>
-                    <span className="text-xs text-on-surface-variant">/ {timeRange}</span>
-                  </div>
-                </div>
-              </div>
+            {/* Card 3: Severe Zones */}
+            <StatCard
+              label="Severe Risk Districts"
+              value={overview?.severe_zones_count ?? 0}
+              unit={`/ ${overview?.total_zones_count ?? 7}`}
+              icon="crisis_alert"
+              accent={overview?.severe_zones_count && overview.severe_zones_count > 0 ? 'severe' : 'cyan'}
+              isKeyCard={overview?.severe_zones_count ? overview.severe_zones_count > 0 : false}
+              sublabel={overview?.severe_zone_names?.length ? `Hotspots: ${overview.severe_zone_names.join(', ')}` : 'No severe alerts active'}
+              baselineValue="Monitored Divisions"
+              baselineLabel="Scope"
+            />
 
-              {/* Uncertainty Range Line Box */}
-              <div className="mt-4 pt-2 bg-surface-container-low dark:bg-surface-container-high/40 rounded-xl p-3 flex flex-col gap-1.5 border border-outline-variant/20">
-                <div className="flex items-center justify-between font-mono text-xs">
-                  <span className="text-on-surface-variant">Ensemble Spread</span>
-                  <span className="font-semibold text-on-surface">
-                    {overview?.rain_summary?.interval_low ?? 15}mm — {overview?.rain_summary?.interval_high ?? 65}mm
-                  </span>
-                </div>
-                {/* Visual uncertainty bar */}
-                <div className="w-full bg-surface-container-highest h-2 rounded-full relative overflow-hidden">
-                  <div className="absolute left-[20%] right-[30%] h-full bg-secondary rounded-full opacity-80" />
-                  <div className="absolute left-[45%] top-0 bottom-0 w-1 bg-primary" />
-                </div>
-                <div className="flex items-center justify-between font-mono text-[10px] text-on-surface-variant mt-0.5">
-                  <span className="truncate">{overview?.rain_summary?.source || 'PMD Radar (Badin) + ECMWF'}</span>
-                  <span className="px-1.5 py-0.5 bg-surface-container dark:bg-surface-container-highest text-on-surface-variant rounded uppercase font-mono">
-                    [Sample Data]
-                  </span>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Card 3: Zones at Severe Risk */}
-            <motion.div
-              whileHover={shouldReduceMotion ? undefined : { y: -2 }}
-              transition={{ duration: 0.15 }}
-              className="bg-surface dark:bg-surface-container-low rounded-2xl p-5 flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow border border-outline-variant/30 dark:border-outline-variant/20 glass-panel"
-            >
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">
-                    Vulnerability Status
-                  </span>
-                  <RiskBadge
-                    level={overview && overview.severe_zones_count > 0 ? 'Severe' : 'Low'}
-                    label={`${overview?.severe_zones_count ?? 3} Critical`}
-                  />
-                </div>
-                <div className="mt-1">
-                  <span className="text-sm font-semibold text-on-surface block">
-                    Zones Exceeding Threshold
-                  </span>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <span className="font-mono text-3xl sm:text-4xl font-bold tracking-tight text-on-surface">
-                      <AnimatedNumber value={overview?.severe_zones_count ?? 3} decimals={0} />
-                    </span>
-                    <span className="text-base text-on-surface-variant font-normal">
-                      / {overview?.total_zones_count ?? 7}
-                    </span>
-                    <span className="text-xs text-on-surface-variant">Karachi Zones</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Uncertainty Range Line Box */}
-              <div className="mt-4 pt-2 bg-surface-container-low dark:bg-surface-container-high/40 rounded-xl p-3 flex flex-col gap-1.5 border border-outline-variant/20">
-                <div className="flex items-center justify-between font-mono text-xs">
-                  <span className="text-on-surface-variant">Distress Hotspots</span>
-                  <span className="font-semibold text-error truncate max-w-[150px]">
-                    {overview?.severe_zone_names?.slice(0, 2).join(', ') || 'Malir, Central'}
-                  </span>
-                </div>
-                <p className="text-xs text-on-surface-variant truncate">
-                  Compound runoff &amp; extreme heat trapping
-                </p>
-                <div className="flex items-center justify-between font-mono text-[10px] text-on-surface-variant mt-0.5">
-                  <span className="truncate">Composite Index (NDMA 2023)</span>
-                  <span className="px-1.5 py-0.5 bg-surface-container dark:bg-surface-container-highest text-on-surface-variant rounded uppercase font-mono">
-                    [Sample Data]
-                  </span>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Card 4: Data Freshness Status */}
-            <motion.div
-              whileHover={shouldReduceMotion ? undefined : { y: -2 }}
-              transition={{ duration: 0.15 }}
-              className="bg-surface dark:bg-surface-container-low rounded-2xl p-5 flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow border border-outline-variant/30 dark:border-outline-variant/20 glass-panel"
-            >
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">
-                    Pipeline Health
-                  </span>
-                  <span className="px-2.5 py-1 rounded-full bg-surface-container-high dark:bg-surface-container-highest text-on-surface font-mono text-xs font-semibold flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-secondary text-[16px]">check_circle</span>
-                    {overview?.data_freshness_status || 'Nominal'}
-                  </span>
-                </div>
-                <div className="mt-1">
-                  <span className="text-sm font-semibold text-on-surface block">
-                    Ingestion Integrity
-                  </span>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <span className="font-mono text-3xl sm:text-4xl font-bold tracking-tight text-on-surface">
-                      <AnimatedNumber value={overview?.freshness_summary?.integrity_pct ?? 100} decimals={0} />%
-                    </span>
-                    <span className="text-xs text-on-surface-variant">
-                      {overview?.freshness_summary?.fresh_sources ?? 5}/{overview?.freshness_summary?.total_sources ?? 6} feeds OK
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Uncertainty Range Line Box */}
-              <div className="mt-4 pt-2 bg-surface-container-low dark:bg-surface-container-high/40 rounded-xl p-3 flex flex-col gap-1.5 border border-outline-variant/20">
-                <div className="flex items-center justify-between font-mono text-xs">
-                  <span className="text-on-surface-variant">Lagging Source</span>
-                  <span className="font-semibold text-secondary truncate max-w-[130px]">
-                    {overview?.freshness_summary?.lagging_source || 'None (In Sync)'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between font-mono text-xs text-on-surface-variant">
-                  <span>Cycle: Micro-Batch</span>
-                  <span className="text-secondary font-semibold">T-18m ago</span>
-                </div>
-                <div className="flex items-center justify-between font-mono text-[10px] text-on-surface-variant mt-0.5">
-                  <span className="truncate">Sindh Gateway Node</span>
-                  <span className="px-1.5 py-0.5 bg-surface-container dark:bg-surface-container-highest text-on-surface-variant rounded uppercase font-mono">
-                    Telemetry
-                  </span>
-                </div>
-              </div>
-            </motion.div>
-          </>
+            {/* Card 4: Freshness & Integrity */}
+            <StatCard
+              label="Data Freshness"
+              value={overview?.freshness_summary?.integrity_pct !== undefined ? `${overview.freshness_summary.integrity_pct}%` : '100%'}
+              icon="verified"
+              accent="cyan"
+              sublabel={`${overview?.freshness_summary?.fresh_sources ?? 0} of ${overview?.freshness_summary?.total_sources ?? 0} sources fresh`}
+              baselineValue={overview?.data_freshness_status || 'NOMINAL'}
+              baselineLabel="Warehouse Status"
+            />
+          </div>
         )}
-      </div>
+      </ErrorBoundary>
 
-      {/* Main Operational Workspace: 70% Map & Chart / 30% Decision Support Priorities */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-lg items-start">
-        {/* Left Column (8 of 12 cols = ~67%) */}
-        <div className="lg:col-span-8 flex flex-col gap-space-lg">
-          {/* Mini Map Preview Linking to Full Risk Map */}
-          <div className="bg-surface-container-lowest rounded-xl shadow-sm overflow-hidden flex flex-col border border-outline-variant/20">
-            {/* Header & Controls */}
-            <div className="p-space-md flex flex-col sm:flex-row sm:items-center justify-between gap-space-md bg-surface-container-low border-b border-outline-variant/20">
-              <div className="flex flex-col min-w-0">
-                <div className="flex items-center gap-space-xs">
-                  <span className="material-symbols-outlined text-secondary text-[22px]">radar</span>
-                  <span className="font-title-md text-title-md text-on-surface font-semibold truncate">
-                    Karachi Division Urban Hazard Distribution (Mini Preview)
-                  </span>
-                </div>
-                <span className="font-label-mono-sm text-label-mono-sm text-on-surface-variant">
-                  Horizon {timeRange}. Colors follow the priority list, not a separate map model.
-                </span>
-              </div>
-
-              {/* Direct Link to Full Risk Map */}
-              <Link
-                to="/risk-map"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-secondary text-on-secondary rounded-lg font-label-mono-sm text-label-mono-sm font-semibold hover:bg-secondary/90 transition-colors shadow-sm shrink-0"
-              >
-                <span>Launch Interactive Risk Map</span>
-                <span className="material-symbols-outlined text-[16px]">open_in_new</span>
-              </Link>
-            </div>
-
-            {/* Interactive Vector Canvas Preview */}
-            <div className="relative w-full h-[380px] bg-[#0c1f33] overflow-hidden select-none">
-              <svg className="w-full h-full object-cover" viewBox="0 0 900 440" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <defs>
-                  <linearGradient id="sea-grad" x1="0" y1="440" x2="900" y2="440" gradientUnits="userSpaceOnUse">
-                    <stop offset="0%" stopColor="#051424" />
-                    <stop offset="100%" stopColor="#092038" />
-                  </linearGradient>
-                </defs>
-                <rect width="900" height="440" fill="url(#sea-grad)" />
-
-                {/* Sea waves */}
-                <path d="M 40 390 Q 90 380 140 390 T 240 390" stroke="#1e3a5f" strokeWidth="1.5" strokeDasharray="4 6" />
-                <path d="M 120 420 Q 180 410 240 420 T 360 420" stroke="#1e3a5f" strokeWidth="1.5" strokeDasharray="4 6" />
-                <text x="50" y="425" fill="#476d99" fontFamily="JetBrains Mono" fontSize="11" letterSpacing="2">
-                  ARABIAN SEA (MANORA CHANNEL)
-                </text>
-
-                {/* Zones Polygons (Stylized) */}
-                {/* Malir Basin (East - Severe) */}
-                <path
-                  d="M 640 130 L 880 110 L 870 300 L 670 290 L 670 210 Z"
-                  fill={paintFor('KHI-MALIR').fill}
-                  fillOpacity="0.45"
-                  stroke={paintFor('KHI-MALIR').stroke}
-                  strokeWidth="2"
-                  className="cursor-pointer hover:fill-opacity-70 transition-all"
-                  onClick={() => navigate('/risk-map?zone=KHI-MALIR')}
-                />
-                <text x="690" y="200" fill="#e2e8f0" fontFamily="JetBrains Mono" fontSize="11" fontWeight="bold">
-                  {labelFor('KHI-MALIR', 'Malir')}
-                </text>
-
-                {/* Central / Gulshan (Mid-East - Severe) */}
-                <path
-                  d="M 420 120 L 640 130 L 670 210 L 490 220 L 410 170 Z"
-                  fill={paintFor('KHI-CENTRAL').fill}
-                  fillOpacity="0.4"
-                  stroke={paintFor('KHI-CENTRAL').stroke}
-                  strokeWidth="1.8"
-                  className="cursor-pointer hover:fill-opacity-70 transition-all"
-                  onClick={() => navigate('/risk-map?zone=KHI-CENTRAL')}
-                />
-                <text x="450" y="175" fill="#e2e8f0" fontFamily="JetBrains Mono" fontSize="11" fontWeight="600">
-                  {labelFor('KHI-CENTRAL', 'Central')}
-                </text>
-
-                {/* Orangi & West (North-West - High) */}
-                <path
-                  d="M 190 70 L 290 60 L 410 120 L 350 190 L 190 160 Z"
-                  fill={paintFor('KHI-WEST').fill}
-                  fillOpacity="0.4"
-                  stroke={paintFor('KHI-WEST').stroke}
-                  strokeWidth="1.5"
-                  className="cursor-pointer hover:fill-opacity-70 transition-all"
-                  onClick={() => navigate('/risk-map?zone=KHI-WEST')}
-                />
-                <text x="220" y="125" fill="#fed7aa" fontFamily="JetBrains Mono" fontSize="11" fontWeight="600">
-                  ORANGI / SITE
-                </text>
-
-                {/* Korangi Industrial & Creek (South-East - Severe Flood) */}
-                <path
-                  d="M 490 220 L 670 210 L 670 320 L 480 330 Z"
-                  fill={paintFor('KHI-KORANGI').fill}
-                  fillOpacity="0.5"
-                  stroke={paintFor('KHI-KORANGI').stroke}
-                  strokeWidth="2"
-                  className="cursor-pointer hover:fill-opacity-70 transition-all"
-                  onClick={() => navigate('/risk-map?zone=KHI-KORANGI')}
-                />
-                <text x="510" y="275" fill="#e2e8f0" fontFamily="JetBrains Mono" fontSize="11" fontWeight="bold">
-                  {labelFor('KHI-KORANGI', 'Korangi')}
-                </text>
-
-                {/* Lyari / South (Central Dense - Moderate) */}
-                <path
-                  d="M 230 180 L 350 190 L 360 255 L 250 250 Z"
-                  fill={paintFor('KHI-SOUTH').fill}
-                  fillOpacity="0.35"
-                  stroke={paintFor('KHI-SOUTH').stroke}
-                  strokeWidth="1.5"
-                  className="cursor-pointer hover:fill-opacity-60 transition-all"
-                  onClick={() => navigate('/risk-map?zone=KHI-SOUTH')}
-                />
-                <text x="260" y="225" fill="#fef08a" fontFamily="JetBrains Mono" fontSize="11" fontWeight="600">
-                  SADDAR / LYARI
-                </text>
-
-                {/* Kemari / Port Zone (South-West Coastal) */}
-                <path
-                  d="M 120 180 L 230 180 L 250 250 L 220 330 L 90 280 Z"
-                  fill={paintFor('KHI-KEAMARI').fill}
-                  fillOpacity="0.4"
-                  stroke={paintFor('KHI-KEAMARI').stroke}
-                  strokeWidth="1.5"
-                  className="cursor-pointer hover:fill-opacity-60 transition-all"
-                  onClick={() => navigate('/risk-map?zone=KHI-KEAMARI')}
-                />
-                <text x="120" y="255" fill="#bae6fd" fontFamily="JetBrains Mono" fontSize="11" fontWeight="600">
-                  KEAMARI PORT
-                </text>
-
-                {/* Major Drains: Gujjar Nullah & Malir River */}
-                <path d="M 390 80 Q 380 140 340 185" stroke="#38bdf8" strokeWidth="2" strokeDasharray="3 3" />
-                <path d="M 680 150 Q 610 230 540 330" stroke="#38bdf8" strokeWidth="3" />
-                <text x="610" y="270" fill="#38bdf8" fontFamily="JetBrains Mono" fontSize="9">
-                  Malir Basin Channel
-                </text>
-              </svg>
-
-              {/* Interactive Pulsing Hotspot Pins */}
-              {mapHotspots.map((hs) => (
-                <div
-                  key={hs.id}
-                  style={{ left: hs.x, top: hs.y }}
-                  className="absolute -translate-x-1/2 -translate-y-1/2 group cursor-pointer"
-                  onMouseEnter={() => setHoveredZone(hs.id)}
-                  onMouseLeave={() => setHoveredZone(null)}
-                  onClick={() => navigate(`/risk-map?zone=${hs.id}`)}
-                >
-                  <div className="relative flex items-center justify-center">
-                    <span
-                      className={`animate-ping absolute inline-flex h-6 w-6 rounded-full opacity-75 ${
-                        hs.level === 'Severe' ? 'bg-error' : hs.level === 'High' ? 'bg-[#f97316]' : hs.level === 'Low' ? 'bg-[#34d399]' : hs.level === 'Moderate' ? 'bg-[#eab308]' : 'bg-slate-500'
-                      }`}
-                    />
-                    <span
-                      className={`relative inline-flex rounded-full h-3.5 w-3.5 border-2 border-white shadow-md ${
-                        hs.level === 'Severe' ? 'bg-error' : hs.level === 'High' ? 'bg-[#f97316]' : hs.level === 'Low' ? 'bg-[#34d399]' : hs.level === 'Moderate' ? 'bg-[#eab308]' : 'bg-slate-500'
-                      }`}
-                    />
-                  </div>
-
-                  {/* Hotspot Floating Tooltip */}
-                  <div className="hidden group-hover:block absolute bottom-6 left-1/2 -translate-x-1/2 bg-primary-container text-on-primary rounded-lg px-2.5 py-1.5 shadow-xl text-center whitespace-nowrap z-30 pointer-events-none">
-                    <div className="font-label-mono-sm text-[11px] font-bold">{hs.name}</div>
-                    <div className="font-body-sm text-[10px] text-on-primary-container">{hs.desc}</div>
-                    <div className="text-[9px] text-secondary font-semibold mt-0.5">Click to view in Risk Map →</div>
-                  </div>
-                </div>
-              ))}
-
-              {/* Floating Zone Inspector HUD */}
-              <div className="absolute top-3 left-3 bg-primary-container/95 backdrop-blur text-on-primary rounded-xl p-space-sm max-w-[260px] shadow-xl border border-white/10 pointer-events-none">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-label-mono-sm text-[10px] uppercase text-secondary font-bold">
-                    Zone Inspector
-                  </span>
-                  <span className="px-1.5 py-0.2 rounded bg-surface-container-high font-label-mono-sm text-[9px] text-on-surface font-bold">
-                    {severeOnMap} severe in the priority list
-                  </span>
-                </div>
-                <div className="font-title-md text-title-md font-semibold text-on-primary mt-0.5">
-                  {hoveredZone
-                    ? mapHotspots.find((h) => h.id === hoveredZone)?.name
-                    : 'Karachi Metropolitan Area'}
-                </div>
-                <div className="mt-1.5 space-y-0.5 font-label-mono-sm text-[11px]">
-                  <div className="flex justify-between text-on-primary-container">
-                    <span>Active Horizon:</span>
-                    <span className="text-on-primary font-bold">{timeRange}</span>
-                  </div>
-                  <div className="flex justify-between text-on-primary-container">
-                    <span>Compound Vulnerability:</span>
-                    <span className="text-error font-bold">Critical (Malir/Central)</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Legend Footer */}
-              <div className="absolute bottom-2 left-2 right-2 bg-primary-container/90 backdrop-blur rounded-lg px-3 py-1.5 flex flex-wrap items-center justify-between gap-2 text-on-primary font-label-mono-sm text-[11px]">
-                <div className="flex items-center gap-3">
-                  <span className="text-on-primary-container font-semibold">Tiers:</span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-full bg-error" /> Severe (Red Alert)
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#f97316]" /> High (Warning)
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-2.5 h-2.5 rounded-full bg-[#eab308]" /> Moderate (Watch)
-                  </span>
-                </div>
-                <Link to="/risk-map" className="text-secondary hover:underline flex items-center gap-1 font-semibold">
-                  <span>Open Risk Map</span>
-                  <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-                </Link>
-              </div>
-            </div>
-          </div>
-
-          {/* Recharts Line Chart: Hazard Probability with Shaded Interval Band & Climatology Baseline */}
-          <div className="bg-surface-container-lowest rounded-xl shadow-sm p-space-md flex flex-col gap-space-md border border-outline-variant/20">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-space-sm pb-space-xs border-b border-outline-variant/20">
-              <div className="flex flex-col">
-                <div className="flex items-center gap-space-xs">
-                  <span className="material-symbols-outlined text-secondary text-[20px]">show_chart</span>
-                  <span className="font-title-md text-title-md text-on-surface font-semibold">
-                    {timeRange === '24h'
-                      ? '24-Hour'
-                      : timeRange === '48h'
-                      ? '48-Hour'
-                      : '7-Day'}{' '}
-                    Ensemble Hazard Probability &amp; Uncertainty Timeline
-                  </span>
-                </div>
-                <span className="font-label-mono-sm text-label-mono-sm text-on-surface-variant">
-                  Ensemble NWP Forecast vs 30-Year Climatological Norm (Karachi Met Office WMO 41780)
-                </span>
-              </div>
-
-              {/* Hazard Mode Switcher (Heat / Rain / Both) */}
-              <div className="flex items-center bg-surface-container-high p-1 rounded-lg self-start sm:self-center">
-                <button
-                  type="button"
-                  onClick={() => setActiveHazardView('heat')}
-                  className={`px-2.5 py-1 rounded font-label-mono-sm text-label-mono-sm transition-all ${
-                    activeHazardView === 'heat'
-                      ? 'bg-primary text-on-primary font-bold shadow-sm'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  Heat Wave
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveHazardView('heavy_rain')}
-                  className={`px-2.5 py-1 rounded font-label-mono-sm text-label-mono-sm transition-all ${
-                    activeHazardView === 'heavy_rain'
-                      ? 'bg-primary text-on-primary font-bold shadow-sm'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  Heavy Rain
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveHazardView('both')}
-                  className={`px-2.5 py-1 rounded font-label-mono-sm text-label-mono-sm transition-all ${
-                    activeHazardView === 'both'
-                      ? 'bg-primary text-on-primary font-bold shadow-sm'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  Both Hazards
-                </button>
-              </div>
-            </div>
-
-            {/* Recharts Area + Line Chart */}
-            <div className="w-full h-80 sm:h-72 bg-surface-container-low rounded-lg p-2 select-none">
-              {isOverviewLoading ? (
-                <div className="h-full flex items-center justify-center font-label-mono-sm text-on-surface-variant">
-                  Loading ensemble projection series...
-                </div>
-              ) : chartData.length === 0 ? (
-                <div className="h-full flex items-center justify-center font-label-mono-sm text-on-surface-variant">
-                  No prediction data available for {timeRange}.
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartData} margin={{ top: 20, right: 25, left: 0, bottom: 5 }}>
-                    <XAxis
-                      dataKey="short_time"
-                      stroke="#74777e"
-                      fontSize={11}
-                      tickLine={false}
-                      fontFamily="JetBrains Mono"
-                      interval="preserveStartEnd"
-                      minTickGap={25}
-                    />
-                    <YAxis
-                      stroke="#74777e"
-                      fontSize={11}
-                      tickFormatter={(v) => `${v}%`}
-                      domain={[0, 100]}
-                      tickLine={false}
-                      fontFamily="JetBrains Mono"
-                    />
-                    <Tooltip
-                      content={({ active, payload }) => {
-                        if (!active || !payload || !payload.length) return null;
-                        const d = payload[0]?.payload;
-                        return (
-                          <div className="bg-primary-container text-on-primary p-space-sm rounded-lg shadow-xl text-xs font-mono space-y-1 border border-white/10">
-                            <div className="font-bold text-secondary-container">
-                              {d.full_time || d.display_time}
-                            </div>
-                            <div className="text-[11px] text-on-primary-container">
-                              Forecast: {formatPKT(d.forecast_time, { dateStyle: 'medium', timeStyle: 'short' })}
-                            </div>
-                            {activeHazardView !== 'heavy_rain' && (
-                              <div className="border-t border-white/10 pt-1">
-                                <div className="text-[#ffb77d] font-bold">Heat Hazard Probability: {d.heat_prob}%</div>
-                                <div className="text-on-primary-container text-[11px]">
-                                  90% CI: {d.heat_ci_base}% — {d.heat_ci_base + d.heat_ci_range}%
-                                </div>
-                                <div className="text-on-surface-variant text-[10px]">
-                                  Climatology Baseline: {d.heat_baseline}%
-                                </div>
-                              </div>
-                            )}
-                            {activeHazardView !== 'heat' && (
-                              <div className="border-t border-white/10 pt-1">
-                                <div className="text-[#38bdf8] font-bold">Rain Hazard Probability: {d.rain_prob}%</div>
-                                <div className="text-on-primary-container text-[11px]">
-                                  90% CI: {d.rain_ci_base}% — {d.rain_ci_base + d.rain_ci_range}%
-                                </div>
-                                <div className="text-on-surface-variant text-[10px]">
-                                  Climatology Baseline: {d.rain_baseline}%
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      }}
-                    />
-                    <Legend
-                      verticalAlign="top"
-                      content={({ payload }) => {
-                        if (!payload || !payload.length) return null;
-                        return (
-                          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pb-2.5 px-1 text-xs select-none">
-                            {payload.map((entry, index) => {
-                              const isBaseline = entry.value?.toString().toLowerCase().includes('baseline');
-                              const isBand = entry.value?.toString().toLowerCase().includes('ci');
-                              return (
-                                <div key={`legend-${index}`} className="flex items-center gap-1.5 whitespace-nowrap">
-                                  {isBand ? (
-                                    <span
-                                      className="w-3 h-2 rounded-xs opacity-75 inline-block shrink-0"
-                                      style={{ backgroundColor: entry.color }}
-                                    />
-                                  ) : isBaseline ? (
-                                    <span className="w-3.5 h-0 border-t-2 border-dashed border-[#74777e] inline-block shrink-0" />
-                                  ) : (
-                                    <span
-                                      className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
-                                      style={{ backgroundColor: entry.color }}
-                                    />
-                                  )}
-                                  <span className="font-label-mono-sm text-[11px] text-on-surface">
-                                    {entry.value}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      }}
-                    />
-                    {/* Critical Alert Threshold line at 75% with collision-free pill label */}
-                    <ReferenceLine
-                      y={75}
-                      stroke="#ba1a1a"
-                      strokeDasharray="4 4"
-                      label={(props: any): React.ReactElement => {
-                        const viewBox = props?.viewBox;
-                        if (!viewBox) return <g />;
-                        const { x = 0, y = 0 } = viewBox;
-                        const badgeWidth = 175;
-                        const badgeHeight = 18;
-                        const posX = x + 8;
-                        const posY = y - badgeHeight - 2;
-                        return (
-                          <g className="select-none pointer-events-none">
-                            <rect
-                              x={posX}
-                              y={posY}
-                              width={badgeWidth}
-                              height={badgeHeight}
-                              rx={4}
-                              fill="#111c26"
-                              fillOpacity={0.92}
-                              stroke="#ba1a1a"
-                              strokeWidth={1}
-                            />
-                            <text
-                              x={posX + 8}
-                              y={posY + 12}
-                              fill="#f87171"
-                              fontSize={10}
-                              fontWeight="700"
-                              fontFamily="JetBrains Mono, monospace"
-                            >
-                              Critical Risk Threshold (75%)
-                            </text>
-                          </g>
-                        );
-                      }}
-                    />
-
-                    {/* Heat Hazard Series: Shaded Interval Band + Line */}
-                    {activeHazardView !== 'heavy_rain' && (
-                      <>
-                        <Area
-                          type="monotone"
-                          dataKey="heat_ci_base"
-                          stackId="heat_ci"
-                          fill="transparent"
-                          stroke="none"
-                          legendType="none"
-                          isAnimationActive={!shouldReduceMotion}
-                          animationDuration={800}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="heat_ci_range"
-                          stackId="heat_ci"
-                          fill="#d97706"
-                          fillOpacity={0.16}
-                          stroke="none"
-                          name="Heat 90% CI"
-                          isAnimationActive={!shouldReduceMotion}
-                          animationDuration={800}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="heat_prob"
-                          stroke="#d97706"
-                          strokeWidth={2.5}
-                          dot={{ r: 3.5 }}
-                          activeDot={{ r: 5 }}
-                          name="Heat Forecast"
-                          isAnimationActive={!shouldReduceMotion}
-                          animationDuration={800}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="heat_baseline"
-                          stroke="#74777e"
-                          strokeDasharray="4 4"
-                          strokeWidth={1.5}
-                          dot={false}
-                          name="Heat Baseline"
-                          isAnimationActive={!shouldReduceMotion}
-                          animationDuration={800}
-                        />
-                      </>
-                    )}
-
-                    {/* Rain Hazard Series: Shaded Interval Band + Line */}
-                    {activeHazardView !== 'heat' && (
-                      <>
-                        <Area
-                          type="monotone"
-                          dataKey="rain_ci_base"
-                          stackId="rain_ci"
-                          fill="transparent"
-                          stroke="none"
-                          legendType="none"
-                          isAnimationActive={!shouldReduceMotion}
-                          animationDuration={800}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="rain_ci_range"
-                          stackId="rain_ci"
-                          fill="#006398"
-                          fillOpacity={0.18}
-                          stroke="none"
-                          name="Rain 90% CI"
-                          isAnimationActive={!shouldReduceMotion}
-                          animationDuration={800}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="rain_prob"
-                          stroke="#006398"
-                          strokeWidth={2.5}
-                          dot={{ r: 3.5 }}
-                          activeDot={{ r: 5 }}
-                          name="Rain Forecast"
-                          isAnimationActive={!shouldReduceMotion}
-                          animationDuration={800}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="rain_baseline"
-                          stroke="#74777e"
-                          strokeDasharray="6 6"
-                          strokeWidth={1.5}
-                          dot={false}
-                          name="Rain Baseline"
-                          isAnimationActive={!shouldReduceMotion}
-                          animationDuration={800}
-                        />
-                      </>
-                    )}
-                  </ComposedChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between text-on-surface-variant font-label-mono-sm text-label-mono-sm pt-1">
-              <span className="truncate">
-                Shaded band represents 90% ensemble spread across GFS 0.25° and ECMWF IFS NWP runs.
-              </span>
-              <span className="px-1.5 py-0.5 bg-surface-container rounded text-[10px] uppercase font-mono shrink-0">
-                WMO Station 41780
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Column (4 of 12 cols = ~33%): Ranked Priority Actions Panel */}
-        <div className="lg:col-span-4 flex flex-col gap-space-md">
-          <div className="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant/20 flex flex-col lg:max-h-[500px] overflow-visible lg:overflow-hidden">
-            {/* Sticky Panel Header */}
-            <div className="sticky top-0 z-10 bg-surface-container-lowest border-b border-outline-variant/20 p-space-md shrink-0 rounded-t-xl">
-              <div className="flex flex-col gap-space-xs">
-                <div className="flex items-center justify-between">
-                  <span className="font-label-mono-sm text-label-mono-sm uppercase text-secondary font-semibold tracking-wider">
-                    Decision Support System
-                  </span>
-                  <span className="px-2.5 py-0.5 rounded-full bg-error text-on-error font-label-mono-sm text-label-mono-sm font-semibold">
-                    {priorities.length} Actions Pinned
-                  </span>
-                </div>
-                <h2 className="font-headline-md text-headline-md text-on-surface font-bold">
-                  Ranked Priority Actions
-                </h2>
-                <p className="font-body-sm text-body-sm text-on-surface-variant">
-                  Algorithmic risk ranking by severity level then exposed population from <code className="text-secondary font-mono">exposure_index</code>.
-                </p>
-
-                {/* Filter Pills for Priorities */}
-                <div className="flex items-center gap-1.5 bg-surface-container p-1 rounded-lg mt-1">
+      {/* Main Grid: Hazard Probability Chart + Tilted 3D Mini Map Preview */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6">
+        {/* Left Column: Ensemble Hazard Timeline Chart (7 cols) */}
+        <div className="lg:col-span-7 flex flex-col gap-4">
+          <Card className="flex flex-col h-full">
+            <CardHeader
+              action={
+                <div className="flex items-center gap-1 bg-slate-900/80 p-1 rounded-xl border border-white/10">
                   <button
                     type="button"
-                    onClick={() => {
-                      setPriorityHazardFilter('all');
-                      setShowAllPriorities(false);
-                    }}
-                    className={`flex-1 py-1 px-2 rounded font-label-mono-sm text-xs transition-colors ${
-                      priorityHazardFilter === 'all'
-                        ? 'bg-primary text-on-primary font-bold shadow-sm'
-                        : 'text-on-surface-variant hover:text-on-surface'
-                    }`}
-                  >
-                    All ({allPrioritiesCount})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPriorityHazardFilter('heat');
-                      setShowAllPriorities(false);
-                    }}
-                    className={`flex-1 py-1 px-2 rounded font-label-mono-sm text-xs transition-colors ${
-                      priorityHazardFilter === 'heat'
-                        ? 'bg-primary text-on-primary font-bold shadow-sm'
-                        : 'text-on-surface-variant hover:text-on-surface'
+                    onClick={() => setActiveHazardView('heat')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-mono-val transition-colors ${
+                      activeHazardView === 'heat' ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40' : 'text-slate-400 hover:text-white'
                     }`}
                   >
                     Heat
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setPriorityHazardFilter('heavy_rain');
-                      setShowAllPriorities(false);
-                    }}
-                    className={`flex-1 py-1 px-2 rounded font-label-mono-sm text-xs transition-colors ${
-                      priorityHazardFilter === 'heavy_rain'
-                        ? 'bg-primary text-on-primary font-bold shadow-sm'
-                        : 'text-on-surface-variant hover:text-on-surface'
+                    onClick={() => setActiveHazardView('heavy_rain')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-mono-val transition-colors ${
+                      activeHazardView === 'heavy_rain' ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-500/40' : 'text-slate-400 hover:text-white'
                     }`}
                   >
                     Rain
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveHazardView('both')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-mono-val transition-colors ${
+                      activeHazardView === 'both' ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-400/40' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Both
+                  </button>
+                </div>
+              }
+            >
+              <CardTitle icon="show_chart">
+                {timeRange === '24h' ? '24-Hour' : timeRange === '48h' ? '48-Hour' : '7-Day'} Ensemble Hazard Timeline
+              </CardTitle>
+              <CardDescription>
+                Probabilistic hazard trajectory with 90% confidence uncertainty band and 30-year baseline
+              </CardDescription>
+            </CardHeader>
+
+            {isOverviewLoading ? (
+              <SkeletonChart height="h-72" />
+            ) : chartData.length === 0 ? (
+              <EmptyState
+                title="No Hazard Predictions Found"
+                reason="The automated model run has not published curve forecasts for this horizon yet."
+                pipelineSource="Run prefect pipeline flow: flows/hourly_pipeline.py"
+              />
+            ) : (
+              <div className="w-full h-80 pt-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={chartData} margin={{ top: 10, right: 15, left: -15, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="heatGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.0} />
+                      </linearGradient>
+                      <linearGradient id="rainGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#38bdf8" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis
+                      dataKey="short_time"
+                      stroke="#64748b"
+                      fontSize={11}
+                      tickLine={false}
+                      fontFamily="JetBrains Mono"
+                    />
+                    <YAxis
+                      stroke="#64748b"
+                      fontSize={11}
+                      tickLine={false}
+                      unit="%"
+                      domain={[0, 100]}
+                      fontFamily="JetBrains Mono"
+                    />
+                    <RechartsTooltip
+                      contentStyle={{
+                        backgroundColor: '#09101c',
+                        border: '1px solid rgba(255,255,255,0.15)',
+                        borderRadius: '12px',
+                        fontSize: '12px',
+                        color: '#f1f5f9',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                        fontFamily: 'Inter',
+                      }}
+                      labelFormatter={(label, payload) => payload?.[0]?.payload?.full_time || label}
+                      formatter={(val: any, name: string) => [`${val}%`, name]}
+                    />
+                    <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '10px', fontFamily: 'Inter' }} />
+
+                    {/* Heat Hazard Elements */}
+                    {(activeHazardView === 'heat' || activeHazardView === 'both') && (
+                      <>
+                        <Area
+                          type="monotone"
+                          dataKey="heat_ci_range"
+                          baseValue="dataMin"
+                          stroke="none"
+                          fill="url(#heatGradient)"
+                          name="Heat 90% Confidence"
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="heat_prob"
+                          stroke="#f59e0b"
+                          strokeWidth={2.5}
+                          dot={{ fill: '#f59e0b', r: 3 }}
+                          activeDot={{ r: 5 }}
+                          name="Heat Probability"
+                        />
+                        <Line
+                          type="stepAfter"
+                          dataKey="heat_baseline"
+                          stroke="#78350f"
+                          strokeDasharray="4 4"
+                          strokeWidth={1.5}
+                          dot={false}
+                          name="Heat Climatology Baseline"
+                        />
+                      </>
+                    )}
+
+                    {/* Rain Hazard Elements */}
+                    {(activeHazardView === 'heavy_rain' || activeHazardView === 'both') && (
+                      <>
+                        <Area
+                          type="monotone"
+                          dataKey="rain_ci_range"
+                          baseValue="dataMin"
+                          stroke="none"
+                          fill="url(#rainGradient)"
+                          name="Rain 90% Confidence"
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="rain_prob"
+                          stroke="#38bdf8"
+                          strokeWidth={2.5}
+                          dot={{ fill: '#38bdf8', r: 3 }}
+                          activeDot={{ r: 5 }}
+                          name="Rain Probability"
+                        />
+                        <Line
+                          type="stepAfter"
+                          dataKey="rain_baseline"
+                          stroke="#0369a1"
+                          strokeDasharray="4 4"
+                          strokeWidth={1.5}
+                          dot={false}
+                          name="Rain Climatology Baseline"
+                        />
+                      </>
+                    )}
+
+                    <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="3 3" label={{ value: 'Severe Threshold (70%)', fill: '#f87171', fontSize: 10 }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </Card>
+        </div>
+
+        {/* Right Column: Tilted 3D Mini Map Preview (5 cols) */}
+        <div className="lg:col-span-5 flex flex-col">
+          <Card className="flex flex-col justify-between h-full overflow-hidden relative">
+            <CardHeader
+              action={
+                <Link to="/risk-map">
+                  <Button variant="primary" size="sm" icon="open_in_new" iconPosition="right">
+                    Open 3D Map
+                  </Button>
+                </Link>
+              }
+            >
+              <CardTitle icon="radar">3D District Risk Preview</CardTitle>
+              <CardDescription>
+                Tilted spatial preview · {severeOnMap} severe hotspot{severeOnMap !== 1 ? 's' : ''} detected
+              </CardDescription>
+            </CardHeader>
+
+            {/* Tilted 3D Map Container with CSS 3D Perspective (Pitch 40) */}
+            <div className="relative w-full h-72 sm:h-80 overflow-hidden rounded-xl bg-slate-950/80 border border-white/10 flex items-center justify-center">
+              <div
+                style={{
+                  transform: shouldReduceMotion
+                    ? 'none'
+                    : 'perspective(900px) rotateX(40deg) rotateZ(-12deg) scale(0.95)',
+                  transformStyle: 'preserve-3d',
+                  transition: 'transform 0.4s ease',
+                }}
+                className="relative w-[115%] h-[120%] shrink-0 shadow-2xl"
+              >
+                {/* Visual SVG Map */}
+                <svg
+                  viewBox="0 0 1000 450"
+                  className="w-full h-full select-none"
+                  preserveAspectRatio="xMidYMid meet"
+                >
+                  <defs>
+                    <radialGradient id="coastGlow" cx="20%" cy="80%" r="60%">
+                      <stop offset="0%" stopColor="#0891b2" stopOpacity="0.25" />
+                      <stop offset="100%" stopColor="#020617" stopOpacity="0" />
+                    </radialGradient>
+                  </defs>
+
+                  {/* Coastline Arabian Sea background */}
+                  <rect width="1000" height="450" fill="url(#coastGlow)" />
+                  <path
+                    d="M 0 350 Q 200 320 400 380 T 800 420 L 1000 450 L 0 450 Z"
+                    fill="#0369a1"
+                    fillOpacity="0.15"
+                  />
+
+                  {/* Malir Basin */}
+                  <path
+                    d="M 640 130 L 880 110 L 870 300 L 670 290 L 670 210 Z"
+                    fill={paintFor('KHI-MALIR').fill}
+                    fillOpacity="0.4"
+                    stroke={paintFor('KHI-MALIR').stroke}
+                    strokeWidth="2"
+                    className="cursor-pointer hover:fill-opacity-70 transition-all"
+                    onClick={() => navigate('/risk-map?zone=KHI-MALIR')}
+                  />
+                  <text x="690" y="200" fill="#f1f5f9" fontFamily="JetBrains Mono" fontSize="12" fontWeight="bold">
+                    {labelFor('KHI-MALIR', 'Malir')}
+                  </text>
+
+                  {/* Central */}
+                  <path
+                    d="M 420 120 L 640 130 L 670 210 L 490 220 L 410 170 Z"
+                    fill={paintFor('KHI-CENTRAL').fill}
+                    fillOpacity="0.4"
+                    stroke={paintFor('KHI-CENTRAL').stroke}
+                    strokeWidth="2"
+                    className="cursor-pointer hover:fill-opacity-70 transition-all"
+                    onClick={() => navigate('/risk-map?zone=KHI-CENTRAL')}
+                  />
+                  <text x="450" y="175" fill="#f1f5f9" fontFamily="JetBrains Mono" fontSize="12" fontWeight="bold">
+                    {labelFor('KHI-CENTRAL', 'Central')}
+                  </text>
+
+                  {/* Orangi & West */}
+                  <path
+                    d="M 190 70 L 290 60 L 410 120 L 350 190 L 190 160 Z"
+                    fill={paintFor('KHI-WEST').fill}
+                    fillOpacity="0.4"
+                    stroke={paintFor('KHI-WEST').stroke}
+                    strokeWidth="2"
+                    className="cursor-pointer hover:fill-opacity-70 transition-all"
+                    onClick={() => navigate('/risk-map?zone=KHI-WEST')}
+                  />
+                  <text x="220" y="125" fill="#fb923c" fontFamily="JetBrains Mono" fontSize="11" fontWeight="600">
+                    ORANGI / SITE
+                  </text>
+
+                  {/* Korangi */}
+                  <path
+                    d="M 490 220 L 670 210 L 670 320 L 480 330 Z"
+                    fill={paintFor('KHI-KORANGI').fill}
+                    fillOpacity="0.45"
+                    stroke={paintFor('KHI-KORANGI').stroke}
+                    strokeWidth="2"
+                    className="cursor-pointer hover:fill-opacity-70 transition-all"
+                    onClick={() => navigate('/risk-map?zone=KHI-KORANGI')}
+                  />
+                  <text x="510" y="275" fill="#f1f5f9" fontFamily="JetBrains Mono" fontSize="12" fontWeight="bold">
+                    {labelFor('KHI-KORANGI', 'Korangi')}
+                  </text>
+
+                  {/* South */}
+                  <path
+                    d="M 230 180 L 350 190 L 360 255 L 250 250 Z"
+                    fill={paintFor('KHI-SOUTH').fill}
+                    fillOpacity="0.35"
+                    stroke={paintFor('KHI-SOUTH').stroke}
+                    strokeWidth="2"
+                    className="cursor-pointer hover:fill-opacity-60 transition-all"
+                    onClick={() => navigate('/risk-map?zone=KHI-SOUTH')}
+                  />
+                  <text x="260" y="225" fill="#fbbf24" fontFamily="JetBrains Mono" fontSize="11" fontWeight="600">
+                    SADDAR / LYARI
+                  </text>
+
+                  {/* Keamari */}
+                  <path
+                    d="M 120 180 L 230 180 L 250 250 L 220 330 L 90 280 Z"
+                    fill={paintFor('KHI-KEAMARI').fill}
+                    fillOpacity="0.4"
+                    stroke={paintFor('KHI-KEAMARI').stroke}
+                    strokeWidth="2"
+                    className="cursor-pointer hover:fill-opacity-60 transition-all"
+                    onClick={() => navigate('/risk-map?zone=KHI-KEAMARI')}
+                  />
+                  <text x="120" y="255" fill="#38bdf8" fontFamily="JetBrains Mono" fontSize="11" fontWeight="600">
+                    KEAMARI PORT
+                  </text>
+
+                  {/* Drainage vectors */}
+                  <path d="M 390 80 Q 380 140 340 185" stroke="#38bdf8" strokeWidth="2" strokeDasharray="4 4" />
+                  <path d="M 680 150 Q 610 230 540 330" stroke="#38bdf8" strokeWidth="2.5" />
+                </svg>
+
+                {/* Hotspot Pulse Pins */}
+                {mapHotspots.map((hs) => (
+                  <div
+                    key={hs.id}
+                    style={{ left: hs.x, top: hs.y }}
+                    className="absolute -translate-x-1/2 -translate-y-1/2 group cursor-pointer"
+                    onMouseEnter={() => setHoveredZone(hs.id)}
+                    onMouseLeave={() => setHoveredZone(null)}
+                    onClick={() => navigate(`/risk-map?zone=${hs.id}`)}
+                  >
+                    <div className="relative flex items-center justify-center">
+                      <span
+                        className={`animate-ping absolute inline-flex h-6 w-6 rounded-full opacity-75 ${
+                          hs.level === 'Severe'
+                            ? 'bg-red-500'
+                            : hs.level === 'High'
+                            ? 'bg-orange-500'
+                            : hs.level === 'Moderate'
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-500'
+                        }`}
+                      />
+                      <span
+                        className={`relative inline-flex rounded-full h-3.5 w-3.5 border-2 border-white shadow-md ${
+                          hs.level === 'Severe'
+                            ? 'bg-red-500'
+                            : hs.level === 'High'
+                            ? 'bg-orange-500'
+                            : hs.level === 'Moderate'
+                            ? 'bg-amber-500'
+                            : 'bg-emerald-500'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* HUD Overlay with District Info */}
+              <div className="absolute bottom-2 left-2 right-2 bg-slate-900/90 backdrop-blur-md border border-white/10 rounded-xl p-2.5 flex items-center justify-between text-xs text-slate-300">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-cyan-400 text-[18px]">explore</span>
+                  <span className="font-semibold text-white font-display">
+                    {hoveredZone
+                      ? mapHotspots.find((h) => h.id === hoveredZone)?.name
+                      : 'Karachi Division'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 font-mono-val text-[11px]">
+                  <span>PITCH 40°</span>
+                  <Link to="/risk-map" className="text-cyan-400 font-semibold hover:underline flex items-center gap-0.5">
+                    Full 3D View →
+                  </Link>
                 </div>
               </div>
             </div>
-
-            {/* Scrollable Items List on Desktop / Natural Flow on Mobile */}
-            <div className="p-space-md flex flex-col gap-2 flex-1 lg:overflow-y-auto">
-              {isPrioritiesLoading ? (
-                <div className="py-8 text-center font-label-mono-sm text-on-surface-variant">
-                  Computing priority directives...
-                </div>
-              ) : visiblePriorities.length === 0 ? (
-                <div className="py-8 text-center font-label-mono-sm text-on-surface-variant">
-                  No priority interventions match active filters.
-                </div>
-              ) : (
-                <>
-                  {visiblePriorities.map((item) => (
-                    <Link
-                      to={`/risk-map?zone=${item.zone_id}`}
-                      key={`${item.zone_id}-${item.hazard_type}-${item.rank}`}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-surface-container-low hover:bg-surface-container border border-outline-variant/15 transition-all min-h-[56px] group text-left focus:outline-none focus:ring-2 focus:ring-primary/40"
-                    >
-                      {/* Rank number on the left */}
-                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-surface-container-highest flex items-center justify-center font-label-mono-sm text-xs font-bold text-secondary">
-                        #{item.rank}
-                      </div>
-
-                      {/* Zone name (bold) with one-line reason below it */}
-                      <div className="flex-1 min-w-0 flex flex-col justify-center">
-                        <div className="font-bold text-sm text-on-surface truncate group-hover:text-primary transition-colors">
-                          {item.zone_name || item.zone_id}
-                        </div>
-                        <div
-                          className="text-xs text-on-surface-variant truncate"
-                          title={item.reason}
-                        >
-                          {item.reason}
-                        </div>
-                      </div>
-
-                      {/* Risk badge on the right that never shrinks */}
-                      <div className="flex-shrink-0 whitespace-nowrap">
-                        <RiskBadge level={item.risk_level} />
-                      </div>
-                    </Link>
-                  ))}
-
-                  {/* Toggle Button for Top 5 / Show all */}
-                  {priorities.length > 5 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowAllPriorities(!showAllPriorities)}
-                      className="mt-1 w-full py-2 px-3 rounded-lg border border-outline-variant/30 bg-surface-container/60 hover:bg-surface-container text-xs font-semibold text-secondary flex items-center justify-center gap-1.5 transition-colors shrink-0"
-                    >
-                      <span>{showAllPriorities ? 'Show top 5' : `Show all ${priorities.length}`}</span>
-                      <span className="material-symbols-outlined text-[16px]">
-                        {showAllPriorities ? 'expand_less' : 'expand_more'}
-                      </span>
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-
-            {/* Quick Dispatch Actions Footer Bar */}
-            <div className="p-space-sm bg-surface-container border-t border-outline-variant/20 shrink-0">
-              <button
-                type="button"
-                onClick={() => alert(`Directives dispatched to KMC Command Cell for ${priorities.length} priority zones.`)}
-                className="w-full py-2 px-4 bg-primary text-on-primary rounded-lg font-title-md text-sm hover:bg-primary-container transition-colors shadow-sm flex items-center justify-center gap-2"
-              >
-                <span className="material-symbols-outlined text-[18px]">send_time_extension</span>
-                <span>Broadcast Directives to KMC Cell</span>
-              </button>
-            </div>
-          </div>
+          </Card>
         </div>
       </div>
-    </motion.div>
+
+      {/* Ranked Priority Intervention Panel (Internal scroll with sticky header, top 5 by default) */}
+      <ErrorBoundary fallbackTitle="Priority Interventions Error">
+        <Card className="flex flex-col">
+          <CardHeader
+            action={
+              <div className="flex items-center gap-2">
+                {/* Filter by hazard */}
+                <div className="flex items-center bg-slate-900/80 p-1 rounded-xl border border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setPriorityHazardFilter('all')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-mono-val transition-colors ${
+                      priorityHazardFilter === 'all' ? 'bg-cyan-500/20 text-cyan-300 font-bold border border-cyan-400/40' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    All Hazards
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPriorityHazardFilter('heat')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-mono-val transition-colors ${
+                      priorityHazardFilter === 'heat' ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Heat Only
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPriorityHazardFilter('heavy_rain')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-mono-val transition-colors ${
+                      priorityHazardFilter === 'heavy_rain' ? 'bg-sky-500/20 text-sky-300 font-bold border border-sky-500/40' : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    Rain Only
+                  </button>
+                </div>
+
+                {/* Show All / Show Top 5 Toggle */}
+                {allPrioritiesCount > 5 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowAllPriorities((prev) => !prev)}
+                  >
+                    {showAllPriorities ? 'Show Top 5' : `Show all (${allPrioritiesCount})`}
+                  </Button>
+                )}
+              </div>
+            }
+          >
+            <CardTitle icon="warning">Ranked Priority Municipal Interventions</CardTitle>
+            <CardDescription>
+              Sorted by composite exposure index and vulnerability score from DuckDB exposure_index
+            </CardDescription>
+          </CardHeader>
+
+          {isPrioritiesLoading ? (
+            <div className="space-y-3 p-2">
+              <div className="h-14 bg-white/5 rounded-xl skeleton-shimmer" />
+              <div className="h-14 bg-white/5 rounded-xl skeleton-shimmer" />
+              <div className="h-14 bg-white/5 rounded-xl skeleton-shimmer" />
+            </div>
+          ) : visiblePriorities.length === 0 ? (
+            <EmptyState
+              title="No Priority Interventions"
+              reason="No districts currently breach moderate or severe intervention triggers for this hazard filter."
+              pipelineSource="Table contract: exposure_index"
+            />
+          ) : (
+            <div className="overflow-x-auto max-h-96 custom-scrollbar rounded-xl border border-white/10">
+              <table className="w-full text-left border-collapse text-xs sm:text-sm">
+                <thead className="sticky top-0 z-10 bg-slate-900/95 backdrop-blur-md text-slate-400 font-mono-val border-b border-white/10 uppercase tracking-wider text-[11px]">
+                  <tr>
+                    <th className="px-4 py-3">Rank / Zone</th>
+                    <th className="px-4 py-3">Hazard &amp; Risk</th>
+                    <th className="px-4 py-3 text-right">Risk Score &amp; Vuln</th>
+                    <th className="px-4 py-3 text-right">Exposed Pop</th>
+                    <th className="px-4 py-3">Recommended Municipal Action</th>
+                    <th className="px-4 py-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5 bg-slate-950/40 font-body">
+                  {visiblePriorities.map((item, idx) => {
+                    return (
+                      <tr
+                        key={item.zone_id || idx}
+                        className="hover:bg-white/[0.04] transition-colors"
+                      >
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-2.5">
+                            <span className="w-6 h-6 rounded-lg bg-white/5 border border-white/10 text-cyan-400 font-mono-val font-bold text-xs flex items-center justify-center shrink-0">
+                              #{item.rank || idx + 1}
+                            </span>
+                            <div className="flex flex-col min-w-0">
+                              <span className="font-semibold text-white truncate font-display">
+                                {item.zone_name || item.zone_id}
+                              </span>
+                              <span className="font-mono-val text-[11px] text-slate-500">
+                                {item.zone_id}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-2">
+                            <RiskBadge level={item.risk_level} size="sm" />
+                            <span className="text-xs text-slate-400 capitalize">
+                              {item.hazard_type === 'heavy_rain' ? 'Rain' : item.hazard_type}
+                            </span>
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3.5 text-right font-mono-val">
+                          <div className="flex flex-col items-end">
+                            <span className="font-bold text-white text-sm">
+                              {item.score ?? 0} / 100
+                            </span>
+                            <span className="text-[10px] text-slate-500">
+                              Vuln: {item.vulnerability_score ?? '—'}
+                            </span>
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3.5 text-right font-mono-val">
+                          <span className="font-semibold text-slate-200">
+                            {item.exposed_population ? Number(item.exposed_population).toLocaleString() : '—'}
+                          </span>
+                        </td>
+
+                        <td className="px-4 py-3.5">
+                          <p className="text-xs text-slate-300 max-w-sm line-clamp-2">
+                            {item.action_title || item.reason || 'Deploy field inspection team and clear stormwater outlets.'}
+                          </p>
+                        </td>
+
+                        <td className="px-4 py-3.5 text-right">
+                          <Link to={`/risk-map?zone=${item.zone_id}`}>
+                            <Button variant="ghost" size="sm" icon="radar">
+                              Inspect
+                            </Button>
+                          </Link>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      </ErrorBoundary>
+    </PageContainer>
   );
 };
+
+export default Overview;

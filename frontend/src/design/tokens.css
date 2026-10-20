@@ -1,0 +1,336 @@
+@import '@fontsource/space-grotesk/500.css';
+@import '@fontsource/space-grotesk/600.css';
+@import '@fontsource/space-grotesk/700.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/600.css';
+
+:root,
+.dark {
+  /* Color Palette - Dark First (Default Command Centre) */
+  --bg-base: #070d18;
+  --bg-surface: #0d1726;
+  --bg-elevated: #132238;
+  --bg-glass: rgba(13, 23, 38, 0.78);
+  --bg-glass-elevated: rgba(19, 34, 56, 0.88);
+  --bg-glass-card: rgba(15, 27, 46, 0.72);
+  --bg-tooltip: rgba(9, 16, 28, 0.95);
+  --bg-input: rgba(10, 18, 32, 0.85);
+
+  /* Borders */
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-default: rgba(255, 255, 255, 0.14);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --border-highlight: rgba(6, 182, 212, 0.35);
+
+  /* Typography Colors */
+  --text-primary: #f1f5f9;
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+  --text-inverse: #090f1d;
+
+  /* Brand Accents (Cool Cyan to Teal) */
+  --brand-cyan: #06b6d4;
+  --brand-teal: #14b8a6;
+  --brand-gradient: linear-gradient(135deg, #06b6d4 0%, #14b8a6 100%);
+  --brand-gradient-hover: linear-gradient(135deg, #22d3ee 0%, #2dd4bf 100%);
+  --brand-glow: 0 0 24px rgba(6, 182, 212, 0.22);
+  --brand-glow-sm: 0 0 12px rgba(6, 182, 212, 0.18);
+
+  /* Hazard Accents */
+  --heat-accent: #f59e0b;
+  --heat-surface: rgba(245, 158, 11, 0.12);
+  --heat-border: rgba(245, 158, 11, 0.35);
+  --heat-glow: 0 0 18px rgba(245, 158, 11, 0.2);
+
+  --rain-accent: #38bdf8;
+  --rain-surface: rgba(56, 189, 248, 0.12);
+  --rain-border: rgba(56, 189, 248, 0.35);
+  --rain-glow: 0 0 18px rgba(56, 189, 248, 0.2);
+
+  /* Risk Scale (WCAG AA Compliant in dark mode, always paired with text) */
+  --risk-low: #10b981;
+  --risk-low-surface: rgba(16, 185, 129, 0.14);
+  --risk-low-border: rgba(16, 185, 129, 0.38);
+  --risk-low-text: #34d399;
+
+  --risk-moderate: #f59e0b;
+  --risk-moderate-surface: rgba(245, 158, 11, 0.14);
+  --risk-moderate-border: rgba(245, 158, 11, 0.38);
+  --risk-moderate-text: #fbbf24;
+
+  --risk-high: #f97316;
+  --risk-high-surface: rgba(249, 115, 22, 0.14);
+  --risk-high-border: rgba(249, 115, 22, 0.42);
+  --risk-high-text: #fb923c;
+
+  --risk-severe: #ef4444;
+  --risk-severe-surface: rgba(239, 68, 68, 0.16);
+  --risk-severe-border: rgba(239, 68, 68, 0.48);
+  --risk-severe-text: #f87171;
+  --risk-severe-glow: 0 0 16px rgba(239, 68, 68, 0.4);
+
+  /* Status Colors */
+  --status-ok: #10b981;
+  --status-late: #f59e0b;
+  --status-failed: #ef4444;
+
+  /* Card Shadows and Inner Highlights */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 4px 14px -2px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 10px 28px -4px rgba(0, 0, 0, 0.55);
+  --shadow-inner-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+
+  /* Texture & Background Grid */
+  --grid-line: rgba(255, 255, 255, 0.025);
+  --header-gradient: radial-gradient(ellipse at 50% -20%, rgba(6, 182, 212, 0.15), transparent 70%);
+}
+
+.light {
+  /* Color Palette - Light Theme */
+  --bg-base: #f4f6fa;
+  --bg-surface: #ffffff;
+  --bg-elevated: #ebf0f7;
+  --bg-glass: rgba(255, 255, 255, 0.88);
+  --bg-glass-elevated: rgba(244, 247, 251, 0.94);
+  --bg-glass-card: rgba(255, 255, 255, 0.92);
+  --bg-tooltip: rgba(15, 23, 42, 0.92);
+  --bg-input: #ffffff;
+
+  /* Borders */
+  --border-subtle: rgba(15, 23, 42, 0.08);
+  --border-default: rgba(15, 23, 42, 0.14);
+  --border-strong: rgba(15, 23, 42, 0.22);
+  --border-highlight: rgba(8, 145, 178, 0.4);
+
+  /* Typography Colors */
+  --text-primary: #0f172a;
+  --text-muted: #475569;
+  --text-subtle: #64748b;
+  --text-inverse: #ffffff;
+
+  /* Brand Accents */
+  --brand-cyan: #0891b2;
+  --brand-teal: #0d9488;
+  --brand-gradient: linear-gradient(135deg, #0891b2 0%, #0d9488 100%);
+  --brand-gradient-hover: linear-gradient(135deg, #06b6d4 0%, #14b8a6 100%);
+  --brand-glow: 0 0 20px rgba(8, 145, 178, 0.16);
+  --brand-glow-sm: 0 0 10px rgba(8, 145, 178, 0.12);
+
+  /* Hazard Accents */
+  --heat-accent: #d97706;
+  --heat-surface: rgba(217, 119, 6, 0.1);
+  --heat-border: rgba(217, 119, 6, 0.3);
+  --heat-glow: 0 0 16px rgba(217, 119, 6, 0.15);
+
+  --rain-accent: #0284c7;
+  --rain-surface: rgba(2, 132, 199, 0.1);
+  --rain-border: rgba(2, 132, 199, 0.3);
+  --rain-glow: 0 0 16px rgba(2, 132, 199, 0.15);
+
+  /* Risk Scale (WCAG AA Compliant in light mode) */
+  --risk-low: #059669;
+  --risk-low-surface: #ecfdf5;
+  --risk-low-border: #a7f3d0;
+  --risk-low-text: #065f46;
+
+  --risk-moderate: #d97706;
+  --risk-moderate-surface: #fffbeb;
+  --risk-moderate-border: #fde68a;
+  --risk-moderate-text: #92400e;
+
+  --risk-high: #ea580c;
+  --risk-high-surface: #fff7ed;
+  --risk-high-border: #fed7aa;
+  --risk-high-text: #9a3412;
+
+  --risk-severe: #dc2626;
+  --risk-severe-surface: #fef2f2;
+  --risk-severe-border: #fecaca;
+  --risk-severe-text: #991b1b;
+  --risk-severe-glow: 0 0 12px rgba(220, 38, 38, 0.25);
+
+  /* Status Colors */
+  --status-ok: #059669;
+  --status-late: #d97706;
+  --status-failed: #dc2626;
+
+  /* Card Shadows and Inner Highlights */
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 4px 14px -2px rgba(15, 23, 42, 0.1);
+  --shadow-lg: 0 10px 28px -4px rgba(15, 23, 42, 0.14);
+  --shadow-inner-highlight: inset 0 1px 0 0 rgba(255, 255, 255, 0.8);
+
+  /* Texture & Background Grid */
+  --grid-line: rgba(15, 23, 42, 0.035);
+  --header-gradient: radial-gradient(ellipse at 50% -20%, rgba(8, 145, 178, 0.12), transparent 70%);
+}
+
+/* Font Families */
+:root {
+  --font-display: 'Space Grotesk', system-ui, -apple-system, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+/* Utility & Glass Classes */
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+.font-mono-val {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Background grid noise pattern */
+.bg-command-grid {
+  background-image: 
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Glass Card */
+.command-card {
+  background: var(--bg-glass-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  box-shadow: var(--shadow-md), var(--shadow-inner-highlight);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.command-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg), var(--shadow-inner-highlight);
+  border-color: var(--border-default);
+}
+
+/* Key Card Hairline Gradient Border */
+.command-card-key {
+  position: relative;
+  background: var(--bg-glass-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg), var(--shadow-inner-highlight);
+}
+
+.command-card-key::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 15px;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.6) 0%, rgba(20, 184, 166, 0.25) 50%, rgba(255, 255, 255, 0.05) 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Animated header aura */
+.header-aura {
+  background: var(--header-gradient);
+  background-size: 100% 100%;
+  animation: auraGlow 8s ease-in-out infinite alternate;
+}
+
+@keyframes auraGlow {
+  0% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* Pulsing red dot for Severe risk */
+.pulsing-severe {
+  position: relative;
+  display: inline-block;
+}
+
+.pulsing-severe::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 9999px;
+  background: rgba(239, 68, 68, 0.6);
+  animation: severePulse 1.8s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+  z-index: 0;
+}
+
+@keyframes severePulse {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.9;
+  }
+  70% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
+}
+
+/* Skeleton shimmer */
+.skeleton-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.light .skeleton-shimmer {
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.skeleton-shimmer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.08) 20%,
+    rgba(255, 255, 255, 0.16) 60%,
+    rgba(255, 255, 255, 0)
+  );
+  animation: shimmer 1.8s infinite;
+}
+
+.light .skeleton-shimmer::after {
+  background-image: linear-gradient(
+    90deg,
+    rgba(15, 23, 42, 0) 0,
+    rgba(15, 23, 42, 0.04) 20%,
+    rgba(15, 23, 42, 0.08) 60%,
+    rgba(15, 23, 42, 0)
+  );
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}

@@ -797,7 +797,7 @@ export const InsightAgent: React.FC<InsightAgentProps> = ({ isSample = true }) =
         </div>
 
         {/* Message Thread (16px vertical gap between messages) */}
-        <div className="flex-1 flex flex-col space-y-4 py-3 w-full">
+        <div role="log" aria-live="polite" aria-label="Conversation thread" className="flex-1 flex flex-col space-y-4 py-3 w-full">
           {messages.length === 0 && (
             <div className="py-10 sm:py-16 flex flex-col items-center justify-center text-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-secondary/15 text-secondary flex items-center justify-center shadow-xs">
@@ -1064,7 +1064,7 @@ export const InsightAgent: React.FC<InsightAgentProps> = ({ isSample = true }) =
                           </span>
                           <span>Sources &amp; Citations:</span>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 w-full">
                           {msg.citations.map((cit, idx) => {
                             const key = `${msg.id}-${idx}`;
                             const isHovered = hoveredCitationKey === key;
@@ -1255,43 +1255,59 @@ export const InsightAgent: React.FC<InsightAgentProps> = ({ isSample = true }) =
         )}
 
         {/* 7. FIXED / STICKY BOTTOM INPUT BAR (without overlapping mobile nav or footer) */}
-        <div className="sticky bottom-14 sm:bottom-0 z-30 pt-2 pb-3 bg-background/95 backdrop-blur-md border-t border-outline-variant/30 w-full">
+        <div className="sticky bottom-14 sm:bottom-0 z-30 pt-2 pb-3 bg-slate-950/95 dark:bg-slate-950/95 bg-white/95 backdrop-blur-md border-t border-white/10 dark:border-white/10 border-slate-200/80 w-full">
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              handleSend(input);
+              const trimmed = input.trim();
+              if (trimmed && trimmed.length <= 500) {
+                handleSend(trimmed);
+              }
             }}
-            className="flex items-end gap-2 bg-surface-container-lowest dark:bg-surface-container rounded-2xl p-2 sm:p-2.5 border border-outline-variant/40 shadow-sm focus-within:ring-2 focus-within:ring-primary/40 focus-within:border-primary transition-all w-full"
+            className="flex items-end gap-2 bg-slate-900/80 dark:bg-slate-900/80 bg-slate-100 rounded-2xl p-2 sm:p-2.5 border border-white/15 dark:border-white/15 border-slate-300 shadow-sm focus-within:ring-2 focus-within:ring-cyan-400 focus-within:border-cyan-400 transition-all w-full"
           >
             {/* Controlled Auto-Growing Textarea */}
             <textarea
               ref={textareaRef}
               id="chat-input-textarea"
               value={input}
+              maxLength={500}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               disabled={isLoading}
               rows={1}
               aria-label="Ask about heat, rain, risk areas, or data sources"
               placeholder="Ask about heat, rain, risk areas, or data sources..."
-              className="flex-1 bg-transparent border-0 outline-none resize-none px-2 py-2 text-on-surface font-body-md text-sm sm:text-base placeholder:text-on-surface-variant/60 min-h-[44px] max-h-[140px] focus:ring-0"
+              className="flex-1 bg-transparent border-0 outline-none resize-none px-2 py-2 text-white dark:text-white text-slate-900 font-body text-xs sm:text-sm placeholder:text-slate-500 min-h-[44px] max-h-[140px] focus:ring-0"
             />
+
+            {/* Character counter near limit (>= 400 chars) */}
+            {input.length >= 400 && (
+              <span
+                className={`font-mono-val text-[11px] px-1.5 py-0.5 rounded ${
+                  input.length >= 490 ? 'text-red-400 font-bold bg-red-500/10' : 'text-slate-400'
+                }`}
+                aria-live="polite"
+              >
+                {input.length}/500
+              </span>
+            )}
 
             {/* Send Button / Loading Spinner */}
             <button
               type="submit"
-              disabled={isLoading || input.trim() === ''}
-              className="shrink-0 min-h-[44px] min-w-[44px] px-3 sm:px-4 py-2 rounded-xl bg-primary text-on-primary font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs transition-opacity hover:opacity-95"
+              disabled={isLoading || input.trim() === '' || input.length > 500}
+              className="shrink-0 min-h-[44px] min-w-[44px] px-3 sm:px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-400 hover:to-teal-400 text-slate-950 font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs transition-opacity cursor-pointer"
               aria-label={isLoading ? 'Thinking…' : 'Send question'}
             >
               {isLoading ? (
                 <span
-                  className="w-4 h-4 border-2 border-on-primary border-t-transparent rounded-full animate-spin inline-block"
+                  className="w-4 h-4 border-2 border-slate-950 border-t-transparent rounded-full animate-spin inline-block"
                   aria-hidden="true"
                 />
               ) : (
                 <>
-                  <span className="hidden sm:inline">Ask</span>
+                  <span className="hidden sm:inline font-bold">Ask</span>
                   <span className="material-symbols-outlined text-[18px]">send</span>
                 </>
               )}
@@ -1329,14 +1345,14 @@ export const InsightAgent: React.FC<InsightAgentProps> = ({ isSample = true }) =
             >
               <div className="p-4 sm:p-5 border-b border-outline-variant/30 flex items-start justify-between gap-3 bg-surface-container-low dark:bg-surface-container">
                 <div>
-                  <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-secondary/15 text-secondary font-bold uppercase tracking-wider">
-                    Official Document Source
+                  <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 font-bold uppercase tracking-wider">
+                    Verified Document Source
                   </span>
                   <h3 className="font-bold text-base sm:text-lg text-on-surface mt-1.5 leading-snug">
                     {sectionData?.document_title || activeCitation.document}
                   </h3>
                   <p className="font-mono text-xs text-on-surface-variant mt-0.5">
-                    {sectionData?.publisher || 'Official Library'} · Section: {activeCitation.section}
+                    {sectionData?.publisher || 'Ground Truth Library'} · Section: {activeCitation.section}
                   </p>
                 </div>
                 <button
