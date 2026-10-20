@@ -6,7 +6,7 @@ import maplibregl from 'maplibre-gl';
 import { api } from '../api/client';
 import { RiskBadge } from '../components/RiskBadge';
 import { EmptyState } from '../components/EmptyState';
-import { Badge, Button, ErrorState, PageHeader, useToast } from '../components/ui';
+import { Badge, Button, ErrorState, PageHeader, Spinner, useToast } from '../components/ui';
 import { BasemapTier, nextBasemapTier, styleForTier } from '../lib/mapBasemap';
 import { boundsFromFeatures, KARACHI_BOUNDS, sanitizeZones } from '../lib/mapGeojson';
 import { extrusionHeight, heightLegend, HeightMetric, preferFlatMap, supportsWebGL } from '../lib/mapHeight';
@@ -169,7 +169,7 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const mapLoadedRef = useRef(false);
-  const basemapTierRef = useRef<BasemapTier>('openfreemap');
+  const basemapTierRef = useRef<BasemapTier>('carto');
   const use3dRef = useRef(use3d);
   const hoveredIdRef = useRef<string | number | null>(null);
   const interactionsBoundRef = useRef(false);
@@ -243,12 +243,17 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
     const features =
       severityFilter === 'all'
         ? sanitized.collection.features
-        : sanitized.collection.features.filter((f) => f.properties.risk_level === severityFilter);
+        : sanitized.collection.features.filter((f: any) => f.properties.risk_level === severityFilter);
     return structuredClone({
       type: 'FeatureCollection' as const,
       features,
     });
   }, [sanitized.collection, severityFilter]);
+
+  // True while the API hasn't delivered real zone features yet (initial empty
+  // response or an in-flight refetch). Keeps the loading spinner visible instead
+  // of flashing the misleading "No District Polygons" empty state.
+  const zonesStillArriving = isZonesLoading || (isZonesSuccess && filteredZones.features.length === 0);
 
   // Snapshot for MapLibre only — never hand React-owned objects to setData.
   zonesDataRef.current = structuredClone(filteredZones) as unknown as GeoJSON.FeatureCollection;
@@ -432,7 +437,7 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
 
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
-      style: styleForTier('openfreemap') as any,
+      style: styleForTier('carto') as any,
       bounds: KARACHI_BOUNDS,
       fitBoundsOptions: { padding: 40 },
       minZoom: 5,
@@ -448,13 +453,16 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
 
     map.on('error', (event) => {
       const message = String(event.error?.message || event.error || 'Map error');
-      console.error('[RiskMap]', message, event.error);
       const lower = message.toLowerCase();
-      // Only fall back on hard style/tile load failures — not transient render noise
-      // (broad "failed" matching previously blanked the map during hover/interaction).
+      // Guard against transient tile 404s/network drops resetting the whole map.
+      // Individual tile failures are normal in web mapping and should NOT destroy layers.
+      if (lower.includes('tile') || lower.includes('glyph') || lower.includes('sprite')) {
+        console.warn('[RiskMap] Transient tile asset warning (ignored):', message);
+        return;
+      }
+      console.error('[RiskMap]', message, event.error);
       const isBasemapFailure =
         (lower.includes('style') && (lower.includes('load') || lower.includes('fetch') || lower.includes('ajax'))) ||
-        (lower.includes('tile') && (lower.includes('404') || lower.includes('403') || lower.includes('failed'))) ||
         lower.includes('failed to fetch') ||
         lower.includes('ajaxerror');
       if (isBasemapFailure) {
@@ -528,7 +536,7 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
 
   useEffect(() => {
     if (!mapRef.current || !mapLoadedRef.current || !selectedZoneId) return;
-    const feat = filteredZones.features.find((f) => f.properties.zone_id === selectedZoneId);
+    const feat = filteredZones.features.find((f: any) => f.properties.zone_id === selectedZoneId);
     if (!feat?.geometry) return;
     try {
       const coords =
@@ -578,7 +586,7 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
 
   const zoneDetail = zoneDetailResponse?.data;
   const selectedProps =
-    filteredZones.features.find((f) => f.properties.zone_id === selectedZoneId)?.properties || null;
+    filteredZones.features.find((f: any) => f.properties.zone_id === selectedZoneId)?.properties || null;
 
   const drawerTitle = selectedProps?.name || zoneDetail?.name || 'Selected district';
   const drawerSubtitle = [
@@ -798,7 +806,7 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredZones.features.map((f) => (
+                    {filteredZones.features.map((f: any) => (
                       <tr
                         key={f.properties.zone_id}
                         className="border-t border-outline-variant/20 hover:bg-surface-container/40 cursor-pointer"
@@ -822,9 +830,12 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
             </div>
           )}
 
-          {isZonesLoading && !mapReady && !useTableFallback && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="cs-skeleton h-10 w-48 rounded-xl" />
+          {zonesStillArriving && !useTableFallback && (
+            <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+              <div className="flex items-center gap-2 rounded-xl bg-surface-container-lowest/90 border border-outline-variant/40 px-4 py-2 shadow-lg">
+                <Spinner size="sm" />
+                <span className="text-sm font-medium text-on-surface">Loading risk data…</span>
+              </div>
             </div>
           )}
 
@@ -835,6 +846,7 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
           )}
 
           {isZonesSuccess &&
+            !zonesStillArriving &&
             (zonesResponse?.data?.features?.length ?? 0) === 0 &&
             filteredZones.features.length === 0 &&
             !isZonesError && (
