@@ -14,6 +14,8 @@ from typing import Any, Dict, List, Literal, Optional
 from fastapi import APIRouter, Query
 
 from db import is_sample_database, safe_query
+from forecasting.coverage import impact_forecast_coverage
+from forecasting.live_forecast import upcoming_hours
 from schemas import (
     APIResponse,
     BaselineInfo,
@@ -68,6 +70,31 @@ def format_pkt(dt: Any) -> str:
         pkt_time = dt.astimezone(PKT_OFFSET)
         return pkt_time.strftime("%d %b %H:%M PKT")
     return str(dt)
+
+
+def _external_hours(city: str, range_key: str, kind: str, baseline: Optional[float]):
+    """Open-Meteo hours for this city and window. Empty when the city is unknown."""
+    window = 24 if range_key == "24h" else 48 if range_key == "48h" else 168
+    hours, issued, source = upcoming_hours(city, window)
+    points: List[PredictedPoint] = []
+    for hour in hours:
+        raw = hour.temperature_c if kind == "heat" else hour.precipitation_mm
+        if raw is None:
+            continue
+        value = round(float(raw), 1 if kind == "heat" else 3)
+        points.append(
+            PredictedPoint(
+                forecast_time_utc=hour.time_utc,
+                forecast_time_pkt=format_pkt(hour.time_utc),
+                probability=0.0 if kind == "heat" else (1.0 if value >= 2.5 else 0.0),
+                interval_low=value,
+                interval_high=value,
+                median=value,
+                baseline_value=0.0 if baseline is None else round(float(baseline), 3),
+                unit="°C" if kind == "heat" else "mm/hr",
+            )
+        )
+    return points, issued, source, window
 
 
 @router.get("", response_model=APIResponse[ForecastResponseData])
@@ -130,12 +157,17 @@ def get_forecast(
         ts_pkt = format_pkt(ts_utc)
 
         if hazard == "heat":
-            val = float(r.get("temperature_2m_c") or 0.0)
+            raw_value = r.get("temperature_2m_c")
+            if raw_value is None:
+                continue
+            val = float(raw_value)
             unit = "°C"
         else:
             precip = r.get("precipitation_mm")
             rain = r.get("rain_mm")
-            val = float(precip if precip is not None else (rain or 0.0))
+            if precip is None and rain is None:
+                continue
+            val = float(precip if precip is not None else rain)
             unit = "mm"
 
         historical_values.append(val)
@@ -153,6 +185,12 @@ def get_forecast(
                 weather_condition=condition,
             )
         )
+
+    issued_at = None
+    horizon_hours = None
+    forecast_origin = "none"
+    is_stale = False
+    stale_reason = None
 
     # 2. Configure hazard-specific baseline, thresholds, and predictions
     if hazard == "heat":
@@ -174,9 +212,24 @@ def get_forecast(
             description="Temperature observed 24 hours prior (y_hat_t = y_{t-24h})",
             value=round(baseline_val, 2) if baseline_val is not None else None,
         )
-        predicted_series = None
-        note = "heat is observed against thresholds and is not ML-predicted"
-        model_version = None
+        live_points, live_issued, live_source, live_window = _external_hours(
+            city, range, "heat", baseline_val
+        )
+        if live_points:
+            predicted_series = live_points
+            issued_at = live_issued
+            horizon_hours = live_window
+            forecast_origin = "external"
+            model_version = None
+            note = (
+                "Open-Meteo hourly temperature forecast. Not a trained heat model. "
+                f"{len(live_points)} hours. Each hour is one value, so the interval equals that hour. "
+                f"Source: {live_source}."
+            )
+        else:
+            predicted_series = None
+            note = "heat is observed against thresholds and is not ML-predicted"
+            model_version = None
 
     else:
         # Heavy rain: ML predicted series with uncertainty bounds
@@ -191,9 +244,30 @@ def get_forecast(
             ],
         )
         declared_target = "20% improvement in MAE over 24h persistence baseline; threshold = 2.5 mm/hr for heavy rain"
+        rain_baseline = historical_values[-24] if len(historical_values) >= 24 else (
+            historical_values[-1] if historical_values else None
+        )
+        live_points, live_issued, live_source, live_window = _external_hours(
+            city, range, "heavy_rain", rain_baseline
+        )
 
-        # Query predictions from DuckDB
-        pred_query = """
+        predicted_series: List[PredictedPoint] = []
+        model_version = None
+        baseline_val = rain_baseline
+
+        if live_points:
+            predicted_series = live_points
+            issued_at = live_issued
+            horizon_hours = live_window
+            forecast_origin = "external"
+            note = (
+                "Open-Meteo hourly precipitation. A value of 0 mm/h means that hour is forecast dry. "
+                f"{len(live_points)} hours. The stored 1-hour LightGBM row is not used on this chart. "
+                f"Source: {live_source}."
+            )
+            pred_rows = []
+        else:
+            pred_query = """
             SELECT 
                 city,
                 forecast_time,
@@ -209,16 +283,17 @@ def get_forecast(
             WHERE (lower(city) = lower(?) OR lower(zone_id) = lower(?))
               AND hazard_type = 'heavy_rain'
             ORDER BY forecast_time ASC;
-        """
-        pred_rows = safe_query(pred_query, [city.strip(), city.strip()])
-
-        predicted_series: List[PredictedPoint] = []
-        model_version = "lightgbm_quantile_v1.0"
-        baseline_val = None
+            """
+            pred_rows = safe_query(pred_query, [city.strip(), city.strip()])
 
         if pred_rows:
             model_version = pred_rows[0].get("model_version") or "lightgbm_quantile_v1.0"
-            baseline_val = float(pred_rows[0].get("baseline_value") or 0.0)
+            raw_baseline = pred_rows[0].get("baseline_value")
+            baseline_val = float(raw_baseline) if raw_baseline is not None else None
+
+            def _stored_number(value: Any) -> float:
+                return 0.0 if value is None else float(value)
+
             for pr in pred_rows:
                 f_time = pr.get("forecast_time")
                 if isinstance(f_time, str):
@@ -235,19 +310,36 @@ def get_forecast(
                     PredictedPoint(
                         forecast_time_utc=f_time,
                         forecast_time_pkt=format_pkt(f_time),
-                        probability=round(float(pr.get("probability") or 0.0), 4),
-                        interval_low=round(float(pr.get("interval_low") or 0.0), 3),
-                        interval_high=round(float(pr.get("interval_high") or 0.0), 3),
-                        median=round(float(pr.get("median") or pr.get("probability") or 0.0), 3),
-                        baseline_value=round(float(pr.get("baseline_value") or 0.0), 3),
+                        probability=round(_stored_number(pr.get("probability")), 4),
+                        interval_low=round(_stored_number(pr.get("interval_low")), 3),
+                        interval_high=round(_stored_number(pr.get("interval_high")), 3),
+                        median=round(_stored_number(pr.get("median")), 3),
+                        baseline_value=round(_stored_number(pr.get("baseline_value")), 3),
                         unit="mm/hr",
                     )
                 )
-            note = None
-        else:
+            issued_raw = pred_rows[0].get("generated_at")
+            if isinstance(issued_raw, datetime):
+                issued_at = issued_raw if issued_raw.tzinfo else issued_raw.replace(tzinfo=timezone.utc)
+            horizon_hours = 1
+            forecast_origin = "model"
+            newest = max(point.forecast_time_utc for point in predicted_series)
+            if newest < now_utc:
+                is_stale = True
+                stale_reason = (
+                    "The stored model forecast time is already in the past. "
+                    "The trained model issues one hour ahead and has not been refreshed."
+                )
+            note = (
+                "Model horizon is 1 hour. The 24h, 48h, and 7d controls change how much "
+                "observed history is shown. They do not create a longer model forecast."
+            )
+            if stale_reason:
+                note = f"{stale_reason} {note}"
+        elif not live_points:
             predicted_series = []
             note = "No active ML predictions recorded for this city in the warehouse."
-            baseline_val = historical_values[-24] if len(historical_values) >= 24 else 0.0
+            baseline_val = historical_values[-24] if len(historical_values) >= 24 else None
 
         baseline = BaselineInfo(
             name="24h Persistence Baseline",
@@ -267,6 +359,11 @@ def get_forecast(
         note=note,
         model_version=model_version,
         generated_at=now_utc,
+        issued_at=issued_at,
+        horizon_hours=horizon_hours,
+        forecast_origin=forecast_origin,
+        is_stale=is_stale,
+        stale_reason=stale_reason,
     )
 
     return APIResponse(
@@ -274,3 +371,14 @@ def get_forecast(
         generated_at=now_utc,
         is_sample=is_sample,
     )
+
+
+@router.get("/coverage")
+def get_forecast_coverage() -> dict:
+    """Which impact areas have a real forecast. This route does not create predictions."""
+    now_utc = datetime.now(timezone.utc)
+    return {
+        "data": impact_forecast_coverage(),
+        "generated_at": now_utc.isoformat(),
+        "is_sample": is_sample_database(),
+    }

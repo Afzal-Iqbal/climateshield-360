@@ -47,21 +47,37 @@ router = APIRouter(prefix="/methodology", tags=["Methodology & Data Governance"]
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
+def _read_manifest(path: Path) -> List[Dict[str, str]]:
+    with open(path, "r", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
+
+
 def _load_manifest_csv() -> List[Dict[str, str]]:
-    """Reads manifest.csv from pipeline/data or fallback locations."""
-    candidates = [
+    """Read the collected-data manifest and the separate hourly ingest manifest."""
+    rows: List[Dict[str, str]] = []
+    collected = [
         PROJECT_ROOT / "pipeline" / "data" / "manifest.csv",
         PROJECT_ROOT / "data" / "manifest.csv",
     ]
-    for c in candidates:
-        if c.is_file():
+    hourly = [
+        PROJECT_ROOT / "pipeline" / "data" / "hourly_manifest.csv",
+        PROJECT_ROOT / "data" / "hourly_manifest.csv",
+    ]
+    for path in collected:
+        if path.is_file():
             try:
-                with open(c, "r", encoding="utf-8") as f:
-                    reader = csv.DictReader(f)
-                    return list(reader)
-            except Exception as e:
-                print(f"[_load_manifest_csv warning] {e}")
-    return []
+                rows.extend(_read_manifest(path))
+            except OSError as exc:
+                print(f"[_load_manifest_csv warning] {exc}")
+            break
+    for path in hourly:
+        if path.is_file():
+            try:
+                rows.extend(_read_manifest(path))
+            except OSError as exc:
+                print(f"[_load_manifest_csv warning] {exc}")
+            break
+    return rows
 
 
 def _load_dataset_declaration_md() -> str:
@@ -441,7 +457,7 @@ def get_methodology() -> APIResponse[MethodologyResponseData]:
             "Urban Wet-Bulb Globe Temperature Heat Stress Index (°C)",
         ],
         units="Precipitation in millimeters per hour (mm/h); Inundation depth in meters (m); Heat in Celsius (°C)",
-        prediction_horizon="1 to 24 hours ahead (rolling hourly forecast window)",
+        prediction_horizon="1 hour ahead. The saved inference script does not emit a 24-hour or 7-day series. Heat is not model-forecast.",
         training_split=metrics.get("train_period", "2021-01-01 to 2024-12-31") + f" ({metrics.get('train_rows', 403188):,} rows)",
         test_split=metrics.get("test_period", "2025-01-01 to 2026-10-18") + f" ({metrics.get('test_rows', 189168):,} rows)",
         architecture=metrics.get("model_architecture", "LightGBM Regressor + Multi-Quantile (Q10, Q50, Q90) + LightGBM Classifier"),

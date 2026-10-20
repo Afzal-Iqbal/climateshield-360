@@ -450,26 +450,27 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
           <div className="h-48 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dailyData} margin={{ top: 10, right: 20, left: 0, bottom: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e0e3e5" />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgb(var(--cs-outline-variant))" />
                 <XAxis
                   dataKey="date"
-                  tick={{ fontSize: 11, fontFamily: 'JetBrains Mono' }}
+                  tick={{ fontSize: 11, fontFamily: 'JetBrains Mono', fill: 'rgb(var(--cs-on-surface-variant))' }}
                   tickFormatter={(val) => {
                     const parts = val.split('-');
                     return parts.length === 3 ? `${parts[1]}/${parts[2]}` : val;
                   }}
                 />
-                <YAxis tick={{ fontSize: 11, fontFamily: 'JetBrains Mono' }} />
+                <YAxis tick={{ fontSize: 11, fontFamily: 'JetBrains Mono', fill: 'rgb(var(--cs-on-surface-variant))' }} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: '#ffffff',
-                    border: '1px solid #c3c6ce',
+                    backgroundColor: 'rgb(var(--cs-surface-container-lowest))',
+                    color: 'rgb(var(--cs-on-surface))',
+                    border: '1px solid rgb(var(--cs-outline-variant))',
                     borderRadius: '8px',
                     fontFamily: 'JetBrains Mono',
                     fontSize: '12px',
                   }}
                 />
-                <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'JetBrains Mono' }} />
+                <Legend wrapperStyle={{ fontSize: '11px', fontFamily: 'JetBrains Mono', color: 'rgb(var(--cs-on-surface-variant))' }} />
                 <Bar dataKey="fix" name="Auto-Fixed" stackId="a" fill="#006398" />
                 <Bar dataKey="fill" name="Imputed (Fill)" stackId="a" fill="#5bb8fe" />
                 <Bar dataKey="flag" name="Quarantined (Flag)" stackId="a" fill="#ba1a1a" />

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { api } from '../api/client';
+import { api, formatPKT } from '../api/client';
 import { RiskBadge } from '../components/RiskBadge';
 import { Skeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
@@ -175,7 +175,7 @@ export const EmergencyPlanner: React.FC<EmergencyPlannerProps> = ({ isSample = f
               Met Forecast Horizon ({selectedHazard === 'heat' ? 'Heatwave Warning' : 'Precipitation Inundation'})
             </span>
             <span className="text-[11px] font-mono text-on-surface-variant">
-              Cutoff: {cityForecast?.cutoff_time_pkt || '—'}
+              Issued: {cityForecast?.issued_at ? formatPKT(cityForecast.issued_at) : '—'}
             </span>
           </div>
 
@@ -184,50 +184,68 @@ export const EmergencyPlanner: React.FC<EmergencyPlannerProps> = ({ isSample = f
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
               <div className="p-3 rounded-xl bg-surface border border-outline-variant/20">
-                <span className="text-[11px] text-on-surface-variant font-medium">City Forecast Probability</span>
+                <span className="text-[11px] text-on-surface-variant font-medium">
+                  {cityForecast?.display_label || (selectedHazard === 'heat' ? 'Forecast high' : 'Forecast precipitation')}
+                </span>
                 <div className="mt-1 flex items-baseline gap-1.5">
                   <span className="text-2xl font-bold font-mono text-on-surface">
-                    {cityForecast ? `${Math.round(cityForecast.avg_probability * 100)}%` : '—'}
+                    {cityForecast?.display_value == null
+                      ? '—'
+                      : cityForecast.display_value}
                   </span>
-                  <span className="text-[11px] font-mono text-on-surface-variant">avg</span>
+                  <span className="text-[11px] font-mono text-on-surface-variant">
+                    {cityForecast?.display_unit || ''}
+                  </span>
                 </div>
                 <p className="text-[10px] text-on-surface-variant mt-1 font-mono">
-                  Ensemble likelihood
+                  {selectedHazard === 'heat'
+                    ? 'Hottest hour in the Open-Meteo window'
+                    : cityForecast?.avg_probability == null
+                      ? 'Hourly precipitation total'
+                      : `${(cityForecast.avg_probability * 100).toFixed(1)}% of hours reach 2.5 mm/h`}
                 </p>
               </div>
 
               <div className="p-3 rounded-xl bg-surface border border-outline-variant/20">
-                <span className="text-[11px] text-on-surface-variant font-medium">Uncertainty Interval [P10–P90]</span>
+                <span className="text-[11px] text-on-surface-variant font-medium">Hourly range</span>
                 <div className="mt-1 flex items-baseline gap-1.5">
                   <span className="text-xl font-bold font-mono text-primary">
-                    {cityForecast
-                      ? `[${Math.round(cityForecast.interval_low * 100)}% – ${Math.round(cityForecast.interval_high * 100)}%]`
-                      : '—'}
+                    {cityForecast?.interval_low == null || cityForecast?.interval_high == null
+                      ? 'Forecast unavailable'
+                      : `${cityForecast.interval_low}–${cityForecast.interval_high} ${cityForecast.interval_unit || ''}`}
                   </span>
                 </div>
                 <p className="text-[10px] text-on-surface-variant mt-1 font-mono">
-                  Multi-quantile interval coverage
+                  Lowest to highest forecast hour
                 </p>
               </div>
 
               <div className="p-3 rounded-xl bg-surface border border-outline-variant/20">
-                <span className="text-[11px] text-on-surface-variant font-medium">24h Persistence Baseline</span>
+                <span className="text-[11px] text-on-surface-variant font-medium">
+                  {selectedHazard === 'heat' ? 'Temperature 24h ago' : 'Observed precipitation'}
+                </span>
                 <div className="mt-1 flex items-baseline gap-1.5">
                   <span className="text-2xl font-bold font-mono text-secondary">
-                    {cityForecast ? `${Math.round(cityForecast.baseline_value * 100)}%` : '—'}
+                    {cityForecast?.baseline_value == null
+                      ? '—'
+                      : `${cityForecast.baseline_value}`}
                   </span>
-                  <span className="text-[11px] font-mono text-on-surface-variant">baseline</span>
+                  <span className="text-[11px] font-mono text-on-surface-variant">
+                    {selectedHazard === 'heat' ? '°C' : 'mm'}
+                  </span>
                 </div>
                 <p className="text-[10px] text-on-surface-variant mt-1 font-mono">
-                  Official benchmark reference
+                  {selectedHazard === 'heat'
+                    ? 'Same Karachi point, 24 hours earlier'
+                    : 'Observed total over the same length window'}
                 </p>
               </div>
             </div>
           )}
 
-          <div className="mt-2 text-[11px] text-on-surface-variant flex items-center justify-between">
-            <span>Rule-based mapping: {selectedHazard === 'heat' ? 'Heat Warning & Cooling Support' : 'Drainage Inspection & Flood Preparedness'}</span>
-            <span className="font-mono text-primary">Model: LightGBM Multi-Quantile v1.0</span>
+          <div className="mt-2 text-[11px] text-on-surface-variant flex items-center justify-between gap-3">
+            <span className="min-w-0">{cityForecast?.note || 'Waiting for the hourly forecast.'}</span>
+            <span className="font-mono text-primary shrink-0">Open-Meteo hourly</span>
           </div>
         </div>
       </div>
@@ -574,14 +592,18 @@ export const EmergencyPlanner: React.FC<EmergencyPlannerProps> = ({ isSample = f
                                   </span>
                                   <div className="mt-1 flex items-baseline gap-1">
                                     <span className="text-lg font-bold font-mono text-on-surface">
-                                      {Math.round(district.forecast_probability * 100)}%
+                                      {district.forecast_probability == null
+                                        ? '—'
+                                        : `${(district.forecast_probability * 100).toFixed(1)}%`}
                                     </span>
                                     <span className="text-xs font-mono text-primary font-semibold">
-                                      [{Math.round(district.forecast_interval_low * 100)}% – {Math.round(district.forecast_interval_high * 100)}%]
+                                      {district.forecast_interval_low == null
+                                        ? 'No model interval'
+                                        : `${district.forecast_interval_low}–${district.forecast_interval_high} ${district.interval_unit || ''}`}
                                     </span>
                                   </div>
                                   <span className="text-[10px] text-on-surface-variant font-mono block mt-0.5">
-                                    Baseline ref: {Math.round(district.baseline_value * 100)}%
+                                    Baseline: {district.baseline_value ?? '—'} {district.interval_unit || ''}
                                   </span>
                                 </div>
 

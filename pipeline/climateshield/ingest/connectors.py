@@ -114,7 +114,7 @@ def fetch_open_meteo_weather_with_raw(limiter: RateLimiter | None = None) -> tup
             "hourly": OPEN_METEO_HOURLY_VARS,
             "timezone": "GMT",
             "past_days": 2,
-            "forecast_days": 1,
+            "forecast_days": 7,
         }
         query = f"{OPEN_METEO_FORECAST_URL}?{urlencode(params)}"
         query_example = query

@@ -299,17 +299,19 @@ class PredictionPoint(BaseModel):
     interval_high: float
     baseline_value: float
     hazard_type: str
+    median: Optional[float] = None
 
 
 class HazardMetricSummary(BaseModel):
     hazard_type: str
     hazard_level: str  # Severe, High, Moderate, Low
-    headline_value: float
+    headline_value: Optional[float] = None
     unit: str
-    interval_low: float
-    interval_high: float
+    interval_low: Optional[float] = None
+    interval_high: Optional[float] = None
     source: str
     label: str
+    kind: str = "observed"
 
 
 class FreshnessMetricSummary(BaseModel):
@@ -415,11 +417,11 @@ class FacilityGeoJSONFeatureCollection(BaseModel):
 
 class ZoneHazardDetail(BaseModel):
     hazard_type: str
-    probability: float
-    interval_low: float
-    interval_high: float
-    interval: List[float]
-    baseline_value: float
+    probability: Optional[float] = None
+    interval_low: Optional[float] = None
+    interval_high: Optional[float] = None
+    interval: List[float] = []
+    baseline_value: Optional[float] = None
     heat_probability: Optional[float] = None
     heat_interval: Optional[List[float]] = None
     rain_probability: Optional[float] = None
@@ -532,6 +534,11 @@ class ForecastResponseData(BaseModel):
     note: Optional[str] = None
     model_version: Optional[str] = None
     generated_at: datetime
+    issued_at: Optional[datetime] = None
+    horizon_hours: Optional[int] = None
+    forecast_origin: Literal["model", "external", "none"] = "none"
+    is_stale: bool = False
+    stale_reason: Optional[str] = None
 
 
 # --- Model Summary and Evaluation Models ---
@@ -660,10 +667,11 @@ class PlannerDistrictItem(BaseModel):
     facilities_count: int
     evidence_strength: str
     # Reason fields
-    forecast_probability: float
-    forecast_interval_low: float
-    forecast_interval_high: float
-    baseline_value: float
+    forecast_probability: Optional[float] = None
+    forecast_interval_low: Optional[float] = None
+    forecast_interval_high: Optional[float] = None
+    baseline_value: Optional[float] = None
+    interval_unit: str = "unavailable"
     reason_summary: str
     # Suggested measures from fixed mapping in code
     suggested_measures: List[PlannerMeasureItem]
@@ -677,12 +685,19 @@ class PlannerDistrictItem(BaseModel):
 class CityForecastSummary(BaseModel):
     hazard_type: str
     time_range: str
-    avg_probability: float
-    interval_low: float
-    interval_high: float
-    baseline_value: float
+    avg_probability: Optional[float] = None
+    interval_low: Optional[float] = None
+    interval_high: Optional[float] = None
+    baseline_value: Optional[float] = None
+    interval_unit: str = "unavailable"
     cutoff_time_utc: datetime
     cutoff_time_pkt: str
+    note: Optional[str] = None
+    display_value: Optional[float] = None
+    display_unit: str = ""
+    display_label: str = ""
+    origin: str = "none"
+    issued_at: Optional[datetime] = None
 
 
 class ResourceGapSummary(BaseModel):
@@ -879,5 +894,22 @@ class MethodologyResponseData(BaseModel):
     risk_score_definitions: RiskScoreDefinitions
     known_gaps: List[KnownGapItem]
     responsible_use: ResponsibleUseNotes
+
+
+class InsightQuestion(BaseModel):
+    question: str = ""
+
+
+class InsightCitation(BaseModel):
+    source: str
+    detail: str
+
+
+class InsightAnswer(BaseModel):
+    question: str
+    status: Literal["answered", "unknown", "unavailable"]
+    answer: str
+    citations: List[InsightCitation] = []
+    limitations: Optional[str] = None
 
 

@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Literal, Optional
 from fastapi import APIRouter, Query
 
 from db import is_sample_database, safe_query
+from forecasting.live_forecast import upcoming_hours
 from schemas import (
     APIResponse,
     CityForecastSummary,
@@ -180,69 +181,96 @@ def get_planner(
     """
     district_rows = safe_query(ranked_sql, [db_hazard])
 
-    # 4. Query city-wide forecast and zone-level predictions within horizon
-    pred_zone_sql = """
-    SELECT 
-        zone_id,
-        ROUND(AVG(probability), 3) AS avg_prob,
-        ROUND(AVG(interval_low), 3) AS avg_low,
-        ROUND(AVG(interval_high), 3) AS avg_high,
-        ROUND(AVG(baseline_value), 3) AS avg_base
-    FROM predictions
-    WHERE hazard_type = ? AND forecast_time <= ?
-    GROUP BY zone_id;
-    """
-    pred_zone_rows = safe_query(pred_zone_sql, [db_hazard, cutoff_utc])
+    # District rows do not have their own weather forecast. The horizon below is
+    # the Karachi Open-Meteo hourly forecast, not the stored LightGBM row.
+    pred_by_zone: Dict[str, Any] = {}
+    city_prob = None
+    has_model_forecast = False
+    interval_unit = "unavailable"
+    city_interval_unit = "unavailable"
+    window_hours = 24 if range == "24h" else 48 if range == "48h" else 168
+    live_hours, issued_at, live_source = upcoming_hours("Karachi", window_hours)
+    display_value = None
+    display_unit = ""
+    display_label = ""
+    origin = "none"
+    city_low = None
+    city_high = None
+    city_base = None
+    live_clause = ""
 
-    # Fallback if horizon query yields 0 rows due to timestamp offsets
-    if not pred_zone_rows:
-        pred_zone_sql_fallback = """
-        SELECT 
-            zone_id,
-            ROUND(AVG(probability), 3) AS avg_prob,
-            ROUND(AVG(interval_low), 3) AS avg_low,
-            ROUND(AVG(interval_high), 3) AS avg_high,
-            ROUND(AVG(baseline_value), 3) AS avg_base
-        FROM predictions
-        WHERE hazard_type = ?
-        GROUP BY zone_id;
-        """
-        pred_zone_rows = safe_query(pred_zone_sql_fallback, [db_hazard])
-
-    pred_by_zone = {r["zone_id"]: r for r in pred_zone_rows}
-
-    # City-level aggregate forecast
-    city_forecast_sql = """
-    SELECT 
-        ROUND(AVG(probability), 3) AS city_prob,
-        ROUND(AVG(interval_low), 3) AS city_low,
-        ROUND(AVG(interval_high), 3) AS city_high,
-        ROUND(AVG(baseline_value), 3) AS city_base
-    FROM predictions
-    WHERE hazard_type = ? AND forecast_time <= ?;
-    """
-    city_forecast_rows = safe_query(city_forecast_sql, [db_hazard, cutoff_utc])
-    if not city_forecast_rows or city_forecast_rows[0].get("city_prob") is None:
-        city_forecast_rows = safe_query(
+    if db_hazard == "heat":
+        temps = [hour.temperature_c for hour in live_hours if hour.temperature_c is not None]
+        base_rows = safe_query(
             """
-            SELECT 
-                ROUND(AVG(probability), 3) AS city_prob,
-                ROUND(AVG(interval_low), 3) AS city_low,
-                ROUND(AVG(interval_high), 3) AS city_high,
-                ROUND(AVG(baseline_value), 3) AS city_base
-            FROM predictions
-            WHERE hazard_type = ?;
+            SELECT temperature_2m_c AS value
+            FROM weather_hourly
+            WHERE lower(city) = 'karachi' AND temperature_2m_c IS NOT NULL
+              AND timestamp_utc <= ?
+            ORDER BY timestamp_utc DESC
+            LIMIT 1
             """,
-            [db_hazard],
+            [now_utc - timedelta(hours=24)],
         )
-
-    city_f = city_forecast_rows[0] if city_forecast_rows else {}
-    city_prob = float(city_f["city_prob"]) if city_f.get("city_prob") is not None else (0.76 if db_hazard == "heat" else 0.65)
-    city_low = float(city_f["city_low"]) if city_f.get("city_low") is not None else max(0.0, city_prob - 0.10)
-    city_high = float(city_f["city_high"]) if city_f.get("city_high") is not None else min(0.99, city_prob + 0.10)
-    city_base = float(city_f["city_base"]) if city_f.get("city_base") is not None else (0.22 if db_hazard == "heat" else 0.15)
-    if city_low > city_high:
-        city_low, city_high = city_high, city_low
+        if base_rows and base_rows[0].get("value") is not None:
+            city_base = round(float(base_rows[0]["value"]), 1)
+        if temps:
+            city_low = round(min(temps), 1)
+            city_high = round(max(temps), 1)
+            display_value = city_high
+            display_unit = "°C"
+            display_label = "Forecast high"
+            origin = "open_meteo"
+            city_interval_unit = "°C"
+            live_clause = (
+                f" Karachi Open-Meteo forecast high is {display_value}°C "
+                f"(hourly range {city_low}–{city_high}°C)."
+            )
+            forecast_note = (
+                f"Open-Meteo hourly temperature for the Karachi grid point, "
+                f"{len(temps)} hours in this window. The range is the coolest and "
+                f"hottest forecast hour, not a quantile interval. "
+                f"Source: {live_source}. District ranks below are the exposure table, "
+                f"not a district temperature forecast."
+            )
+        else:
+            forecast_note = "The Open-Meteo hourly temperature forecast could not be loaded."
+    else:
+        precips = [hour.precipitation_mm for hour in live_hours if hour.precipitation_mm is not None]
+        base_rows = safe_query(
+            """
+            SELECT SUM(precipitation_mm) AS value
+            FROM weather_hourly
+            WHERE lower(city) = 'karachi'
+              AND timestamp_utc >= ? AND timestamp_utc < ?
+            """,
+            [now_utc - timedelta(hours=window_hours), now_utc],
+        )
+        if base_rows and base_rows[0].get("value") is not None:
+            city_base = round(float(base_rows[0]["value"]), 2)
+        if precips:
+            city_low = round(min(precips), 3)
+            city_high = round(max(precips), 3)
+            display_value = round(sum(precips), 2)
+            display_unit = "mm"
+            display_label = "Forecast precipitation"
+            origin = "open_meteo"
+            city_interval_unit = "mm/h"
+            heavy_hours = sum(1 for amount in precips if amount >= 2.5)
+            city_prob = round(heavy_hours / len(precips), 4)
+            live_clause = (
+                f" Karachi Open-Meteo forecast total is {display_value} mm, "
+                f"wettest hour {city_high} mm/h."
+            )
+            forecast_note = (
+                f"Open-Meteo hourly precipitation for the Karachi grid point, "
+                f"{len(precips)} hours. Total {display_value} mm. "
+                f"Wettest hour {city_high} mm/h. Hours at or above 2.5 mm/h: {heavy_hours}. "
+                f"A total of 0 mm means this forecast does not include rain. "
+                f"The stored LightGBM row is not used here. Source: {live_source}."
+            )
+        else:
+            forecast_note = "The Open-Meteo hourly precipitation forecast could not be loaded."
 
     # 5. Query facilities for breakdown and provenance row IDs
     facilities_rows = safe_query("SELECT facility_id, name, type, zone_id FROM facilities;")
@@ -294,7 +322,7 @@ def get_planner(
         low = float(pred_item["avg_low"]) if pred_item.get("avg_low") is not None else city_low
         high = float(pred_item["avg_high"]) if pred_item.get("avg_high") is not None else city_high
         base = float(pred_item["avg_base"]) if pred_item.get("avg_base") is not None else city_base
-        if low > high:
+        if low is not None and high is not None and low > high:
             low, high = high, low
 
         # Resource gap calculation:
@@ -343,8 +371,8 @@ def get_planner(
         reason_summary = (
             f"Ranked #{idx} under {h_label} conditions with {risk_lvl} risk level. "
             f"Vulnerability score is {vuln_score:.2f} with {pop:,} residents exposed and "
-            f"{fac} critical facilities. Forecast probability is {round(prob * 100, 1)}% "
-            f"[{round(low * 100, 1)}%–{round(high * 100, 1)}%] against {round(base * 100, 1)}% 24h baseline."
+            f"{fac} critical facilities. No separate district forecast is stored."
+            f"{live_clause}"
         )
         if is_gap:
             reason_summary += f" Critical resource gap flagged ({ratio:,} residents per facility)."
@@ -394,10 +422,11 @@ def get_planner(
                 exposed_population=pop,
                 facilities_count=fac,
                 evidence_strength=ev_strength,
-                forecast_probability=prob,
-                forecast_interval_low=low,
-                forecast_interval_high=high,
-                baseline_value=base,
+                forecast_probability=prob if has_model_forecast else None,
+                forecast_interval_low=low if has_model_forecast else None,
+                forecast_interval_high=high if has_model_forecast else None,
+                baseline_value=base if has_model_forecast else None,
+                interval_unit=interval_unit,
                 reason_summary=reason_summary,
                 suggested_measures=district_measures,
                 row_ids=zone_row_ids,
@@ -410,12 +439,19 @@ def get_planner(
     city_forecast = CityForecastSummary(
         hazard_type=db_hazard,
         time_range=range,
-        avg_probability=city_prob,
+        avg_probability=city_prob if origin == "open_meteo" and db_hazard == "heavy_rain" else None,
         interval_low=city_low,
         interval_high=city_high,
         baseline_value=city_base,
+        interval_unit=city_interval_unit,
         cutoff_time_utc=cutoff_utc.replace(tzinfo=timezone.utc),
         cutoff_time_pkt=_format_pkt(cutoff_utc),
+        note=forecast_note,
+        display_value=display_value,
+        display_unit=display_unit,
+        display_label=display_label,
+        origin=origin,
+        issued_at=issued_at,
     )
 
     # 8. Build resource gap summary

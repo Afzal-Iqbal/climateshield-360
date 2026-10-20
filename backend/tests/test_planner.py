@@ -70,6 +70,9 @@ def test_get_planner_heavy_rain_ranking():
 
     assert data["hazard"] == "heavy_rain"
     assert data["range"] == "48h"
+    assert data["city_forecast"]["origin"] == "open_meteo"
+    assert data["city_forecast"]["display_unit"] == "mm"
+    assert "LightGBM row is not used" in (data["city_forecast"]["note"] or "")
 
     districts = data["districts"]
     assert len(districts) > 0
@@ -97,13 +100,9 @@ def test_planner_reason_fields():
     districts = response.json()["data"]["districts"]
 
     for d in districts:
-        # 1. Forecast probability and interval of city/zone forecast
-        assert isinstance(d["forecast_probability"], float)
-        assert 0.0 <= d["forecast_probability"] <= 1.0
-        assert isinstance(d["forecast_interval_low"], float)
-        assert isinstance(d["forecast_interval_high"], float)
-        assert d["forecast_interval_low"] <= d["forecast_interval_high"]
-        assert isinstance(d["baseline_value"], float)
+        # Heat has no trained forecast. Do not accept a filled-in probability.
+        assert d["forecast_probability"] is None
+        assert d["interval_unit"] == "unavailable"
 
         # 2. Population, facilities count, vulnerability score
         assert isinstance(d["exposed_population"], int)
@@ -116,6 +115,12 @@ def test_planner_reason_fields():
         # 3. Deterministic rule-based reason summary
         assert d["reason_summary"]
         assert str(d["exposed_population"]) in d["reason_summary"].replace(",", "")
+
+    city = response.json()["data"]["city_forecast"]
+    assert city["origin"] == "open_meteo"
+    assert city["display_value"] is not None
+    assert city["display_unit"] == "°C"
+    assert "Open-Meteo" in (city["note"] or "")
 
 
 def test_planner_suggested_measures_heat():

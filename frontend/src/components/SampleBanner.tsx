@@ -5,7 +5,7 @@ interface SampleBannerProps {
   isSample?: boolean;
 }
 
-export const SampleBanner: React.FC<SampleBannerProps> = ({ isSample = true }) => {
+export const SampleBanner: React.FC<SampleBannerProps> = ({ isSample = false }) => {
   const [dismissed, setDismissed] = useState(false);
   const shouldReduceMotion = useReducedMotion();
 

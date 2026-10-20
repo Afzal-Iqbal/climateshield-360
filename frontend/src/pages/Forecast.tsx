@@ -12,7 +12,7 @@ import {
   Legend,
   ReferenceLine,
 } from 'recharts';
-import { api } from '../api/client';
+import { api, formatPKT } from '../api/client';
 import { EmptyState } from '../components/EmptyState';
 import { Skeleton } from '../components/Skeleton';
 import { RiskBadge } from '../components/RiskBadge';
@@ -203,8 +203,16 @@ export const Forecast: React.FC<ForecastPageProps> = ({ isSample = false }) => {
             )}
           </div>
           <p className="text-sm text-on-surface-variant mt-1">
-            Continuous observed meteorological time-series and LightGBM quantile regression with uncertainty intervals.
+            Observed history plus the Open-Meteo hourly forecast for the selected window.
           </p>
+          {forecast && (
+            <p className="text-xs text-on-surface-variant mt-1">
+              Origin: {forecast.forecast_origin || 'none'}
+              {forecast.horizon_hours ? ` · horizon ${forecast.horizon_hours}h` : ''}
+              {forecast.issued_at ? ` · issued ${formatPKT(forecast.issued_at)}` : ''}
+              {forecast.is_stale ? ' · stale' : ''}
+            </p>
+          )}
         </div>
 
         {/* Global Controls: Hazard, City, Range, and Granularity */}
@@ -352,7 +360,13 @@ export const Forecast: React.FC<ForecastPageProps> = ({ isSample = false }) => {
           <div className="p-4 rounded-2xl bg-surface-container border border-outline-variant/30 flex flex-col justify-between shadow-xs">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-on-surface-variant uppercase tracking-wider">
-                {selectedHazard === 'heavy_rain' ? 'Next-Hour ML Quantile' : 'Heat Monitoring'}
+                {forecast?.forecast_origin === 'external'
+                  ? selectedHazard === 'heavy_rain'
+                    ? 'Hourly precipitation'
+                    : 'Forecast high'
+                  : selectedHazard === 'heavy_rain'
+                    ? 'Next-Hour ML Quantile'
+                    : 'Heat Monitoring'}
               </span>
               <span className="material-symbols-outlined text-primary text-[20px]">
                 {selectedHazard === 'heavy_rain' ? 'online_prediction' : 'wb_sunny'}
@@ -367,11 +381,19 @@ export const Forecast: React.FC<ForecastPageProps> = ({ isSample = false }) => {
                     </span>
                     <span className="text-sm font-semibold text-on-surface-variant">mm/hr</span>
                     <span className="text-xs font-mono ml-auto text-amber-600 dark:text-amber-400 font-bold">
-                      P(≥2.5mm): {(latestPredicted.probability * 100).toFixed(1)}%
+                      {forecast?.forecast_origin === 'external'
+                        ? latestPredicted.median >= 2.5
+                          ? 'At or above 2.5 mm/h'
+                          : 'Below 2.5 mm/h'
+                        : `P(≥2.5mm): ${(latestPredicted.probability * 100).toFixed(1)}%`}
                     </span>
                   </div>
                   <div className="mt-2 text-[11px] text-on-surface-variant font-mono flex items-center justify-between">
-                    <span>80% CI: [{latestPredicted.interval_low}, {latestPredicted.interval_high}]</span>
+                    <span>
+                      {forecast?.forecast_origin === 'external'
+                        ? 'Open-Meteo hour'
+                        : `80% CI: [${latestPredicted.interval_low}, ${latestPredicted.interval_high}]`}
+                    </span>
                     <span>{latestPredicted.forecast_time_pkt}</span>
                   </div>
                 </div>
@@ -386,12 +408,19 @@ export const Forecast: React.FC<ForecastPageProps> = ({ isSample = false }) => {
               <div>
                 <div className="mt-2 flex items-baseline gap-2">
                   <span className="text-3xl font-bold font-headline-lg text-amber-600 dark:text-amber-400">
-                    {latestObserved?.value ?? '—'}°C
+                    {forecast?.predicted && forecast.predicted.length > 0
+                      ? Math.max(...forecast.predicted.map((point) => point.median))
+                      : latestObserved?.value ?? '—'}
+                    °C
                   </span>
-                  <span className="text-xs text-on-surface-variant">vs 40.0°C Danger</span>
+                  <span className="text-xs text-on-surface-variant">
+                    {forecast?.forecast_origin === 'external' ? 'forecast high' : 'vs 40.0°C Danger'}
+                  </span>
                 </div>
                 <div className="mt-2 text-[11px] text-on-surface-variant italic truncate">
-                  Heat is observed against thresholds and is not ML-predicted
+                  {forecast?.forecast_origin === 'external'
+                    ? 'Open-Meteo hourly temperature. Not a trained heat model.'
+                    : 'Heat is observed against thresholds and is not ML-predicted'}
                 </div>
               </div>
             )}
@@ -454,8 +483,7 @@ export const Forecast: React.FC<ForecastPageProps> = ({ isSample = false }) => {
           <div>
             <span className="font-bold">METHODOLOGY NOTE: </span>
             <span>
-              Heat is observed against official thresholds (35°C Caution, 40°C Danger, 45°C Severe) and is not ML-predicted.
-              Chart displays solid observed series against physical health action thresholds.
+              Heat thresholds stay 35°C Caution, 40°C Danger, and 45°C Severe. The dashed line is the Open-Meteo hourly temperature forecast, not a trained heat model.
             </span>
           </div>
         </div>
@@ -557,7 +585,7 @@ export const Forecast: React.FC<ForecastPageProps> = ({ isSample = false }) => {
                 <Legend verticalAlign="top" height={36} />
 
                 {/* Shaded Uncertainty Band (Heavy Rain only) */}
-                {selectedHazard === 'heavy_rain' && (
+                {selectedHazard === 'heavy_rain' && forecast?.forecast_origin === 'model' && (
                   <Area
                     type="monotone"
                     dataKey="interval_band"
@@ -582,15 +610,15 @@ export const Forecast: React.FC<ForecastPageProps> = ({ isSample = false }) => {
                 />
 
                 {/* Predicted Series: Dashed Line */}
-                {selectedHazard === 'heavy_rain' && (
+                {(selectedHazard === 'heavy_rain' || forecast?.forecast_origin === 'external') && (
                   <Line
                     type="monotone"
                     dataKey="predicted"
-                    name="Predicted"
+                    name={forecast?.forecast_origin === 'external' ? 'Open-Meteo forecast' : 'Predicted'}
                     stroke="#ba1a1a"
                     strokeWidth={2}
                     strokeDasharray="5 5"
-                    dot={{ r: 4, stroke: '#ba1a1a', strokeWidth: 1.5, fill: '#fff' }}
+                    dot={{ r: 3, stroke: '#ba1a1a', strokeWidth: 1.5, fill: '#fff' }}
                     isAnimationActive={true}
                   />
                 )}

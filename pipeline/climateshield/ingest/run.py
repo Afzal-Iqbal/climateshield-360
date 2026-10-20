@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -150,17 +151,48 @@ def _replace_warehouse_table(table: str, parquet_path: Path) -> None:
     except ImportError:
         return
     source = parquet_path.resolve().as_posix().replace("'", "''")
-    con = duckdb.connect(str(WAREHOUSE_PATH))
-    try:
-        con.execute(f'CREATE OR REPLACE TABLE "{table}" AS SELECT * FROM read_parquet(\'{source}\')')
-        n_rows = int(con.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0])
-        con.execute(
-            "CREATE TABLE IF NOT EXISTS warehouse_catalog (table_name VARCHAR, n_rows BIGINT)"
-        )
-        con.execute("DELETE FROM warehouse_catalog WHERE table_name = ?", [table])
-        con.execute("INSERT INTO warehouse_catalog VALUES (?, ?)", [table, n_rows])
-    finally:
-        con.close()
+    last_error: Exception | None = None
+    for _attempt in range(8):
+        try:
+            con = duckdb.connect(str(WAREHOUSE_PATH))
+            try:
+                con.execute(f'CREATE OR REPLACE TABLE "{table}" AS SELECT * FROM read_parquet(\'{source}\')')
+                n_rows = int(con.execute(f'SELECT COUNT(*) FROM "{table}"').fetchone()[0])
+                con.execute(
+                    "CREATE TABLE IF NOT EXISTS warehouse_catalog (table_name VARCHAR, n_rows BIGINT)"
+                )
+                con.execute("DELETE FROM warehouse_catalog WHERE table_name = ?", [table])
+                con.execute("INSERT INTO warehouse_catalog VALUES (?, ?)", [table, n_rows])
+            finally:
+                con.close()
+            return
+        except Exception as exc:
+            last_error = exc
+            time.sleep(2)
+    if last_error is not None:
+        raise last_error
+
+
+def _refresh_contract_tables() -> None:
+    """Copy the hourly log into run_status so the dashboard sees this run."""
+    from climateshield.pipeline.warehouse import restore_contract_tables
+    import duckdb
+
+    if not WAREHOUSE_PATH.exists():
+        return
+    last_error: Exception | None = None
+    for _attempt in range(8):
+        try:
+            con = duckdb.connect(str(WAREHOUSE_PATH))
+            try:
+                restore_contract_tables(con)
+            finally:
+                con.close()
+            return
+        except Exception as exc:
+            last_error = exc
+            time.sleep(2)
+    print(f"Could not refresh run_status: {last_error}")
 
 
 def _previous_hash(source_id: str) -> str:
@@ -400,6 +432,7 @@ def run_ingest(*, limiter: RateLimiter | None = None) -> dict:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     write_json(HOURLY_STATUS_PATH, status)
     write_json(run_dir / "run_summary.json", status)
+    _refresh_contract_tables()
     print(f"Hourly ingest run {run_id}")
     for item in results:
         print(

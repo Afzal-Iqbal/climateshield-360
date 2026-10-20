@@ -301,24 +301,6 @@ def update_status_task(
             [finished_at],
         )
 
-        # Ensure standard baseline sources exist for dashboard SLA monitoring
-        from datetime import timedelta
-        default_sources = [
-            ("Regional Doppler Weather Radar", "Pakistan Meteorological Dept (PMD)", "Gov MoA / Level-1 Feed", finished_at - timedelta(minutes=4), 10, "fresh"),
-            ("ECMWF Integrated Forecasting System (IFS)", "European Centre for Medium-Range Weather", "WMO GTS Exchange", finished_at - timedelta(minutes=102), 360, "fresh"),
-            ("NOAA GFS 0.25 Gridded Atmosphere", "NOAA NCEP", "Public Domain (US Gov)", finished_at - timedelta(minutes=130), 360, "fresh"),
-            ("K-Electric Distribution Feeder SCADA", "K-Electric Grid Operating Centre", "Critical Infra SLA", finished_at - timedelta(minutes=35), 15, "delayed"),
-            ("SBCA Active Excavation Permits", "Sindh Building Control Authority", "Provincial Public Record", finished_at - timedelta(hours=74), 1440, "stale"),
-            ("Sentinel-2 Surface Reflectance (UHI)", "ESA Copernicus Open Access Hub", "CC-BY-SA 3.0 IGO", finished_at - timedelta(hours=28), 7200, "fresh"),
-        ]
-        for src_name, pub, lic, f_time, exp_min, st in default_sources:
-            con.execute(
-                """
-                INSERT OR REPLACE INTO source_freshness VALUES (?, ?, ?, ?, ?, ?);
-                """,
-                [src_name, pub, lic, f_time, exp_min, st],
-            )
-
         logger.info("Committed run_status (%s, %s) and updated source_freshness.", run_id, status)
     finally:
         con.close()

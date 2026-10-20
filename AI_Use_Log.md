@@ -118,5 +118,21 @@ In compliance with HackInsight 2026 regulations (Chapter 4: Permitted AI Use & D
   - Validated frontend production build (`npm run build`) passing with zero TypeScript or bundling errors.
   - Verified live endpoint `http://127.0.0.1:8000/api/methodology` and Vite proxy `http://localhost:5173/api/methodology`.
 
+---
+
+## Log Entry 7: Audit repair of warehouse contract tables, status text, and zero-value forecast handling
+
+- **Date & Time (UTC):** 2026-10-20
+- **AI Tool / Agent:** Cursor Grok 4.7, used in the local ClimateShield 360 workspace
+- **Scope:** Inspection and repair of existing modules. No new RAG implementation was added.
+- **Activities:**
+  - Compared the running API with the warehouse. Found `run_status`, `source_freshness`, `predictions`, and `model_eval` missing after `build_warehouse()` deletes the DuckDB file.
+  - Added `restore_contract_tables()` so a later warehouse build reloads run history, source freshness, and city MAE from the existing ingest log and fairness CSV.
+  - Ran the existing `src/models/predict.py` once. It wrote 12 prediction rows. Exit code 0.
+  - Removed the hard-coded "30y Baseline" status sentence, the 2.05 flood-population scale, the fake freshness sources in `flows/hourly_flow.py`, and the forecast bug that replaced a 0.0 median with the probability.
+- **Verification:** Backend tests listed in `FIX_LOG.md` passed. Live `/api/status`, `/api/freshness`, `/api/model-eval`, and Karachi `/api/forecast` were read after the API restart. No browser click-through was available.
+- **Not changed:** Historical log entries above. Entry 2's 93.26% MAE claim and Gilgit weakest-group claim disagree with `pipeline/reports/model_vs_baseline_metrics.json` (35.1%, Islamabad). The JSON file is the checked artifact.
+- **Human review:** The person who asked for this audit still needs to review the diff. No team-member name was assigned by the repository.
+
 
 

@@ -47,14 +47,22 @@ def test_overview_endpoint_default():
     # Verify hazard levels are valid
     assert data["heat_hazard_level"] in ("Severe", "High", "Moderate", "Low")
     assert data["rain_hazard_level"] in ("Severe", "High", "Moderate", "Low")
-    assert data["severe_zones_count"] >= 1
+    assert data["severe_zones_count"] >= 0
     assert data["total_zones_count"] >= 7
+    heat_value = data["heat_summary"]["headline_value"]
+    rain_value = data["rain_summary"]["headline_value"]
+    if heat_value is not None and heat_value < 35:
+        assert data["heat_hazard_level"] == "Low"
+    if rain_value == 0:
+        assert data["rain_hazard_level"] == "Low"
+    assert "exposure table" in data["rain_summary"]["source"]
 
     # Verify prediction series per hazard
     series = data["predictions_series"]
     assert "heat" in series
     assert "heavy_rain" in series
-    assert len(series["heat"]) > 0 or len(series["heavy_rain"]) > 0
+    assert len(series["heavy_rain"]) >= 1
+    assert series["heavy_rain"][0]["probability"] <= 1
 
     # Verify prediction point contract on whichever hazard has data
     pts = series["heavy_rain"] if len(series["heavy_rain"]) > 0 else series["heat"]
@@ -63,7 +71,12 @@ def test_overview_endpoint_default():
     assert "interval_low" in first_pt
     assert "interval_high" in first_pt
     assert "baseline_value" in first_pt
-    assert first_pt["interval_low"] <= first_pt["probability"] <= first_pt["interval_high"]
+    assert first_pt["interval_low"] <= first_pt["interval_high"]
+    assert data["heat_summary"]["kind"] == "observed"
+    assert "WBGT" not in data["heat_summary"]["label"]
+    assert "Open-Meteo" in data["heat_summary"]["source"]
+    assert "Not an ECMWF" in data["rain_summary"]["source"]
+    assert data["rain_summary"]["kind"] == "observed"
 
 
 def test_overview_time_ranges():

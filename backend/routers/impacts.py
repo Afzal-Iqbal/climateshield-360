@@ -172,10 +172,9 @@ def get_impact_domain_data(
             """)
         flood_data = flood_res[0] if flood_res else {}
 
-        # Demographics multiplier to estimate total population from female pop (approx 2.05x in Pakistan census)
-        rp10_pop = int((flood_data.get("rp10_female") or 0) * 2.05)
-        rp50_pop = int((flood_data.get("rp50_female") or 0) * 2.05)
-        rp100_pop = int((flood_data.get("rp100_female") or 0) * 2.05)
+        # Use the source female-population fields. Do not scale them to a total population.
+        rp10_pop = flood_data.get("rp10_female")
+        rp50_pop = flood_data.get("rp50_female")
 
         indicators = [
             ImpactIndicatorMetric(
@@ -206,19 +205,19 @@ def get_impact_domain_data(
                 row_ids=[stats.get("row_id")] if stats.get("row_id") else [],
             ),
             ImpactIndicatorMetric(
-                name="10-Year Return Flood Exposed Population (RP10)",
-                value=float(rp10_pop),
+                name="10-Year Return Flood Exposed Female Population (RP10)",
+                value=float(rp10_pop or 0),
                 unit="persons",
-                description="Estimated population exposed to >30cm water depth during a 1-in-10-year flood event.",
+                description="Source field RP10_female_pop_30cm. Female population in the flood-exposure table at >30cm depth for a 1-in-10-year event. Not scaled to total population.",
                 evidence_strength="medium",
                 source="OpenStreetMap / HeiGIT HDX Flood Exposure",
                 row_ids=[flood_data.get("row_ids")] if flood_data.get("row_ids") else [],
             ),
             ImpactIndicatorMetric(
-                name="50-Year Return Flood Exposed Population (RP50)",
-                value=float(rp50_pop),
+                name="50-Year Return Flood Exposed Female Population (RP50)",
+                value=float(rp50_pop or 0),
                 unit="persons",
-                description="Estimated population exposed to >30cm water depth during a 1-in-50-year severe flood.",
+                description="Source field RP50_female_pop_30cm. Not scaled to total population.",
                 evidence_strength="medium",
                 source="OpenStreetMap / HeiGIT HDX Flood Exposure",
                 row_ids=[],
@@ -297,7 +296,9 @@ def get_impact_domain_data(
             row_ids=row_ids_list,
             limitations=(
                 "Flood return period inundation maps are derived from global hydrological simulations "
-                "(HeiGIT/HDX 30cm flood layer) downscaled to district boundaries. The model does not resolve "
+                "(HeiGIT/HDX 30cm flood layer) downscaled to district boundaries. Population figures are the "
+                "source female-population columns and are not multiplied into a total-population estimate. "
+                "The model does not resolve "
                 "localized stormwater drain silting, nullah encroachments, or temporary mobile de-watering pump deployments. "
                 "Weather extremes are measured at 2m reference height and may underestimate microclimate urban heat island canyon hotspots."
             ),

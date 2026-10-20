@@ -5,19 +5,57 @@
 
 @layer base {
   :root {
+    color-scheme: light;
     --bg-page: #f7f9fb;
     --text-page: #191c1e;
     --card-bg: #ffffff;
     --card-glass: rgba(255, 255, 255, 0.85);
     --border-subtle: rgba(116, 119, 126, 0.2);
+    --cs-surface: 247 249 251;
+    --cs-surface-dim: 216 218 220;
+    --cs-surface-bright: 247 249 251;
+    --cs-surface-container-lowest: 255 255 255;
+    --cs-surface-container-low: 242 244 246;
+    --cs-surface-container: 236 238 240;
+    --cs-surface-container-high: 230 232 234;
+    --cs-surface-container-highest: 224 227 229;
+    --cs-surface-variant: 224 227 229;
+    --cs-surface-tint: 73 96 124;
+    --cs-on-surface: 25 28 30;
+    --cs-on-surface-variant: 67 71 77;
+    --cs-background: 247 249 251;
+    --cs-on-background: 25 28 30;
+    --cs-outline: 116 119 126;
+    --cs-outline-variant: 195 198 206;
+    --cs-error-container: 255 218 214;
+    --cs-on-error-container: 147 0 10;
   }
 
   .dark {
+    color-scheme: dark;
     --bg-page: #0a1124;
-    --text-page: #f1f5f9;
+    --text-page: #e8eef6;
     --card-bg: #0f1933;
     --card-glass: rgba(15, 25, 51, 0.85);
     --border-subtle: rgba(255, 255, 255, 0.1);
+    --cs-surface: 15 25 51;
+    --cs-surface-dim: 8 12 22;
+    --cs-surface-bright: 26 39 68;
+    --cs-surface-container-lowest: 10 17 36;
+    --cs-surface-container-low: 16 26 48;
+    --cs-surface-container: 21 32 56;
+    --cs-surface-container-high: 27 40 68;
+    --cs-surface-container-highest: 34 48 80;
+    --cs-surface-variant: 34 48 80;
+    --cs-surface-tint: 176 201 232;
+    --cs-on-surface: 232 238 246;
+    --cs-on-surface-variant: 168 180 196;
+    --cs-background: 10 17 36;
+    --cs-on-background: 232 238 246;
+    --cs-outline: 139 151 168;
+    --cs-outline-variant: 58 74 99;
+    --cs-error-container: 69 16 16;
+    --cs-on-error-container: 254 202 202;
   }
 
   html, body {
@@ -27,6 +65,11 @@
     color: var(--text-page);
     min-width: 360px;
     overflow-x: hidden;
+  }
+
+  /* Primary stays navy for the sidebar. On dark content surfaces, primary text would disappear. */
+  .dark .text-primary {
+    color: #b0c9e8;
   }
 
   .tabular-nums {

@@ -1,15 +1,15 @@
 {
-  "generated_at_utc": "2026-10-19T17:08:12.620393+00:00",
+  "generated_at_utc": "2026-10-20T13:55:35.531254+00:00",
   "archive": "Pakistan_MultiSource_Datasets_Collection.zip",
-  "extracted_to": "data/raw/collected_datasets",
+  "extracted_to": "data\\raw\\collected_datasets",
   "n_files": 40,
   "files": [
     {
       "relative_path": "01_open_meteo_heat_rainfall/pakistan_cities_heat_and_rainfall_stats.csv",
       "filename": "pakistan_cities_heat_and_rainfall_stats.csv",
       "folder": "01_open_meteo_heat_rainfall",
-      "bytes": 517,
-      "sha256": "60ebbeaa505952c0db10d9c61c4c156bf8439f83cb5db0fb4bfd60bdddcf66d3",
+      "bytes": 530,
+      "sha256": "b7de56440d3b3fee0f18dd336f1121013b6bf3df02f847b54ce4ace010f32cd1",
       "source": "Open-Meteo",
       "licence": "CC-BY-4.0",
       "source_url": "https://open-meteo.com/",
@@ -25,7 +25,7 @@
           "extreme_heat_hours_ge_40c"
         ],
         "dtypes": {
-          "city": "str",
+          "city": "object",
           "total_hours": "int64",
           "max_temperature_c": "float64",
           "total_rainfall_mm": "float64",
@@ -91,8 +91,8 @@
       "relative_path": "01_open_meteo_heat_rainfall/pakistan_cities_hourly_heat_rainfall_sample.csv",
       "filename": "pakistan_cities_hourly_heat_rainfall_sample.csv",
       "folder": "01_open_meteo_heat_rainfall",
-      "bytes": 4750005,
-      "sha256": "ef592d09ab5b9ed284e06b3c5363d986624712d2a9d98dc75a5b98a4ea4703c4",
+      "bytes": 4848702,
+      "sha256": "85a95e5cd7b361a752481da40d6d4565ebcd08b166b52e1370833428424d422d",
       "source": "Open-Meteo",
       "licence": "CC-BY-4.0",
       "source_url": "https://open-meteo.com/",
@@ -110,8 +110,8 @@
           "weather_code"
         ],
         "dtypes": {
-          "timestamp_utc": "str",
-          "city": "str",
+          "timestamp_utc": "object",
+          "city": "object",
           "temperature_2m_c": "float64",
           "relative_humidity_pct": "int64",
           "dew_point_c": "float64",
@@ -1056,26 +1056,11 @@
       }
     },
     {
-      "relative_path": "02_openstreetmap_geofabrik/README.txt",
-      "filename": "README.txt",
-      "folder": "02_openstreetmap_geofabrik",
-      "bytes": 1024,
-      "sha256": "5ea011f5b85efa638ed77063280b608ff5aad0dd624d79b5f90e96a9d60d4a78",
-      "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
-      "licence": "ODbL-1.0",
-      "source_url": "https://www.openstreetmap.org/",
-      "profile": {
-        "format": "txt",
-        "rows": null,
-        "columns": []
-      }
-    },
-    {
       "relative_path": "02_openstreetmap_geofabrik/config.yaml",
       "filename": "config.yaml",
       "folder": "02_openstreetmap_geofabrik",
-      "bytes": 2141,
-      "sha256": "d1a3446094c6a42ac3f48913955b79f759af22a40c260f23dfd6ebde8aea5cf2",
+      "bytes": 2226,
+      "sha256": "5e06ddefb02f7ae3bbb2465a974dd52bd51f330ace024d2532dfc3aeba7224b6",
       "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
       "licence": "ODbL-1.0",
       "source_url": "https://www.openstreetmap.org/",
@@ -1089,8 +1074,8 @@
       "relative_path": "02_openstreetmap_geofabrik/geofabrik_pakistan_latest.osm.pbf.md5",
       "filename": "geofabrik_pakistan_latest.osm.pbf.md5",
       "folder": "02_openstreetmap_geofabrik",
-      "bytes": 58,
-      "sha256": "623371af193352d79b0c9ed3eda1078fbdb24f927aedb941a9bc935934d7cc66",
+      "bytes": 59,
+      "sha256": "91d0cdd3a5da41875fbcfd72438b671e8e27cb8ce3d056fab510546f6087846a",
       "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
       "licence": "ODbL-1.0",
       "source_url": "https://www.openstreetmap.org/",
@@ -1104,8 +1089,8 @@
       "relative_path": "02_openstreetmap_geofabrik/health_facilities.geojson",
       "filename": "health_facilities.geojson",
       "folder": "02_openstreetmap_geofabrik",
-      "bytes": 3701516,
-      "sha256": "9fc62b0dcc92c5af2f8f50169f70cbe1b8f8408e8cad06f9b3cfbcf6c15c3645",
+      "bytes": 3706667,
+      "sha256": "d9ecebe44d5b6f603adbc839c142ad57ca28a517283588b73e5aa9b1254eb961",
       "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
       "licence": "ODbL-1.0",
       "source_url": "https://www.openstreetmap.org/",
@@ -1189,8 +1174,8 @@
       "relative_path": "02_openstreetmap_geofabrik/metadata.json",
       "filename": "metadata.json",
       "folder": "02_openstreetmap_geofabrik",
-      "bytes": 10599,
-      "sha256": "547ba86b4e66ac8333e6ea23a48ae2a9c8cd54aec140128c896f0934a2ca3392",
+      "bytes": 11064,
+      "sha256": "55738719232190f1bc852b67e9e5baf051aa0f5182f8f475b696858b4315f4b4",
       "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
       "licence": "ODbL-1.0",
       "source_url": "https://www.openstreetmap.org/",
@@ -1204,8 +1189,8 @@
       "relative_path": "02_openstreetmap_geofabrik/osm_pak_emergency_facilities_infrastructure.csv",
       "filename": "osm_pak_emergency_facilities_infrastructure.csv",
       "folder": "02_openstreetmap_geofabrik",
-      "bytes": 3105,
-      "sha256": "57918360f14c76f7991b1b1e4ee9d025c0a9b5ac155d4920c185f072652af551",
+      "bytes": 3266,
+      "sha256": "0288ebfe67363e0b6973e7d3fe359da5d9f018e8dcd60eb78e065c2429e21a98",
       "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
       "licence": "ODbL-1.0",
       "source_url": "https://www.openstreetmap.org/",
@@ -1220,8 +1205,8 @@
           "primary_healthcare_count"
         ],
         "dtypes": {
-          "ADM2_PCODE": "str",
-          "ADM_PCODE": "str",
+          "ADM2_PCODE": "object",
+          "ADM_PCODE": "object",
           "education_count": "int64",
           "hospitals_count": "int64",
           "primary_healthcare_count": "int64"
@@ -1271,8 +1256,8 @@
       "relative_path": "02_openstreetmap_geofabrik/osm_pak_hospital_travel_access_times.csv",
       "filename": "osm_pak_hospital_travel_access_times.csv",
       "folder": "02_openstreetmap_geofabrik",
-      "bytes": 10371,
-      "sha256": "a96b4a7b2af7c6241a985d6f87f6839e5b7194663358c1842204928c19a55f21",
+      "bytes": 10532,
+      "sha256": "88184ad452cab3d92402cd25106d990c76e2159b20e07148a62f2fbd497e7162",
       "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
       "licence": "ODbL-1.0",
       "source_url": "https://www.openstreetmap.org/",
@@ -1293,8 +1278,8 @@
           "access_pop_primary_healthcare_2h"
         ],
         "dtypes": {
-          "ADM2_PCODE": "str",
-          "ADM_PCODE": "str",
+          "ADM2_PCODE": "object",
+          "ADM_PCODE": "object",
           "access_pop_education_5km": "int64",
           "access_pop_education_10km": "int64",
           "access_pop_education_20km": "int64",
@@ -1386,8 +1371,8 @@
       "relative_path": "02_openstreetmap_geofabrik/osm_pak_road_network_flood_exposure.csv",
       "filename": "osm_pak_road_network_flood_exposure.csv",
       "folder": "02_openstreetmap_geofabrik",
-      "bytes": 46832,
-      "sha256": "bf8877f121b70cc099815a3b5b57a0b43d860cc280511b3be1373f40de6fa631",
+      "bytes": 46993,
+      "sha256": "fe28c47dfdd7a11934459e65334d1cc067653e49d7a30f558d1a34ec55911426",
       "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
       "licence": "ODbL-1.0",
       "source_url": "https://www.openstreetmap.org/",
@@ -1466,7 +1451,7 @@
           "RP500_primary_healthcare_30cm_count"
         ],
         "dtypes": {
-          "ADM2_PCODE": "str",
+          "ADM2_PCODE": "object",
           "RP10_crops_30cm_km2": "float64",
           "RP10_crops_30cm_areapct": "float64",
           "RP10_crops_30cm_croppct": "float64",
@@ -1970,8 +1955,8 @@
       "relative_path": "02_openstreetmap_geofabrik/osm_pak_rural_access_index_roads.csv",
       "filename": "osm_pak_rural_access_index_roads.csv",
       "folder": "02_openstreetmap_geofabrik",
-      "bytes": 17662,
-      "sha256": "807e24eb4f98c88d302cfed690aee1d609e26657f668342c400cdef20862fe3b",
+      "bytes": 17823,
+      "sha256": "ad9b119ac1c21ded03f4c940e5796dffef6d1f9f61994ce17c5dcf4522f99121",
       "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
       "licence": "ODbL-1.0",
       "source_url": "https://www.openstreetmap.org/",
@@ -2001,7 +1986,7 @@
           "RAI_wra_pop"
         ],
         "dtypes": {
-          "ADM2_PCODE": "str",
+          "ADM2_PCODE": "object",
           "rural_access_children_u5": "int64",
           "rural_access_dependents": "int64",
           "rural_access_working": "int64",
@@ -2162,8 +2147,8 @@
       "relative_path": "02_openstreetmap_geofabrik/populated_places.geojson",
       "filename": "populated_places.geojson",
       "folder": "02_openstreetmap_geofabrik",
-      "bytes": 54316291,
-      "sha256": "1b770058066d0b7c71c41d17baae8ceb99d771fac08333636265c48f55eee5bb",
+      "bytes": 54384079,
+      "sha256": "3d7c1b0d8564f7969f68bdc26bc9852b627cfebc95c1c2a503ea9460d61aac0a",
       "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
       "licence": "ODbL-1.0",
       "source_url": "https://www.openstreetmap.org/",
@@ -2236,6 +2221,21 @@
           }
         },
         "date_coverage": "OSM snapshot 2026-10-12 (see folder README/metadata)"
+      }
+    },
+    {
+      "relative_path": "02_openstreetmap_geofabrik/README.txt",
+      "filename": "README.txt",
+      "folder": "02_openstreetmap_geofabrik",
+      "bytes": 1055,
+      "sha256": "bd47a5820afc2ff1bd4b09b5b86848bd62d036810887b591480b2d98b00aebe2",
+      "source": "OpenStreetMap contributors / Geofabrik / oex (HOT-style export)",
+      "licence": "ODbL-1.0",
+      "source_url": "https://www.openstreetmap.org/",
+      "profile": {
+        "format": "txt",
+        "rows": null,
+        "columns": []
       }
     },
     {
@@ -2338,8 +2338,8 @@
       "relative_path": "03_ndma_pmd_hazards_warnings/pmd_river_danger_levels_thresholds.csv",
       "filename": "pmd_river_danger_levels_thresholds.csv",
       "folder": "03_ndma_pmd_hazards_warnings",
-      "bytes": 1187,
-      "sha256": "751d1ffa98509caf38caf176860302018eb5e732c8f0f14fc6a350776d480d79",
+      "bytes": 1207,
+      "sha256": "7316dce5e2b2df94a85629a0cd2f72169f7a001e96d4d19bc723a250854e8c62",
       "source": "NDMA and Pakistan Meteorological Department",
       "licence": "licence_unspecified_official_publication",
       "source_url": "https://ndma.gov.pk/ ; https://www.pmd.gov.pk/",
@@ -2357,9 +2357,9 @@
           "exceptionally_high_cusecs"
         ],
         "dtypes": {
-          "river_basin": "str",
-          "station_name": "str",
-          "province": "str",
+          "river_basin": "object",
+          "station_name": "object",
+          "province": "object",
           "low_flood_cusecs": "int64",
           "medium_flood_cusecs": "int64",
           "high_flood_cusecs": "int64",
@@ -2496,8 +2496,8 @@
       "relative_path": "04_pakistan_bureau_of_statistics/pbs_district_population_demographics_160_districts.csv",
       "filename": "pbs_district_population_demographics_160_districts.csv",
       "folder": "04_pakistan_bureau_of_statistics",
-      "bytes": 11643,
-      "sha256": "4a087684f4c817efa98802506afbdd2047f56b742a1262e314036eeb51c5f5f2",
+      "bytes": 11804,
+      "sha256": "868190bf035cd8c3a828822e9a766c77083324a53c8c9ac43cc0e93cf359c79c",
       "source": "Pakistan Bureau of Statistics",
       "licence": "licence_unspecified_official_statistics",
       "source_url": "https://www.pbs.gov.pk/",
@@ -2518,8 +2518,8 @@
           "dependency_ratio"
         ],
         "dtypes": {
-          "ADM2_PCODE": "str",
-          "ADM_PCODE": "str",
+          "ADM2_PCODE": "object",
+          "ADM_PCODE": "object",
           "total_pop": "int64",
           "female_pop": "int64",
           "children_u5": "int64",
@@ -2611,8 +2611,8 @@
       "relative_path": "04_pakistan_bureau_of_statistics/pbs_district_rural_urban_population.csv",
       "filename": "pbs_district_rural_urban_population.csv",
       "folder": "04_pakistan_bureau_of_statistics",
-      "bytes": 11803,
-      "sha256": "7c7b76fd96129857ab5e9a5046da11d13932ecfe73606a9695be2548e13b4838",
+      "bytes": 11964,
+      "sha256": "da430a5f197a7126149654563038c15bf412c4f5df242c5a2cc190a6810b7139",
       "source": "Pakistan Bureau of Statistics",
       "licence": "licence_unspecified_official_statistics",
       "source_url": "https://www.pbs.gov.pk/",
@@ -2634,8 +2634,8 @@
           "rural_pop_perc"
         ],
         "dtypes": {
-          "ADM2_PCODE": "str",
-          "ADM_PCODE": "str",
+          "ADM2_PCODE": "object",
+          "ADM_PCODE": "object",
           "total_pop_rural": "int64",
           "female_pop_rural": "int64",
           "children_u5_rural": "int64",
@@ -2734,8 +2734,8 @@
       "relative_path": "04_pakistan_bureau_of_statistics/pbs_district_vulnerability_dependency_ratios.csv",
       "filename": "pbs_district_vulnerability_dependency_ratios.csv",
       "folder": "04_pakistan_bureau_of_statistics",
-      "bytes": 21509,
-      "sha256": "60f6cf746134a999073e5f38b75cb9a82fc415b0dc34388feda89c492b155bd6",
+      "bytes": 21670,
+      "sha256": "90752e90f33e3409dfb1725356c742edcd13cfdd5c2bbc8effe79f741430ea3a",
       "source": "Pakistan Bureau of Statistics",
       "licence": "licence_unspecified_official_statistics",
       "source_url": "https://www.pbs.gov.pk/",
@@ -2766,7 +2766,7 @@
           "ADM_PCODE"
         ],
         "dtypes": {
-          "ADM2_PCODE": "str",
+          "ADM2_PCODE": "object",
           "total_pop": "int64",
           "female_pop": "int64",
           "children_u5": "int64",
@@ -2786,7 +2786,7 @@
           "wra_pop_rural": "int64",
           "dependency_ratio_rural": "float64",
           "rural_pop_perc": "float64",
-          "ADM_PCODE": "str"
+          "ADM_PCODE": "object"
         },
         "missing_null": {
           "ADM2_PCODE": 0,
@@ -2961,8 +2961,8 @@
       "relative_path": "README_DATASETS_CATALOG.md",
       "filename": "README_DATASETS_CATALOG.md",
       "folder": ".",
-      "bytes": 2378,
-      "sha256": "b06ef7d4334c18db32f857058fe13a435605b97ac04905ff0700a376bf067c82",
+      "bytes": 2431,
+      "sha256": "19e055d71957d864c8578c9da0baa8fa39ae3099b152c2f49ab5db3db5545316",
       "source": "collection",
       "licence": "see_readme",
       "source_url": "",

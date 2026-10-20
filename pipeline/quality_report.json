@@ -1,9 +1,9 @@
 {
-  "generated_at_utc": "2026-10-19T17:08:41.428563+00:00",
-  "started_at_utc": "2026-10-19T17:08:04.308167+00:00",
+  "generated_at_utc": "2026-10-20T13:56:05.547700+00:00",
+  "started_at_utc": "2026-10-20T13:55:27.199768+00:00",
   "pipeline": "climateshield.pipeline.run.make_data",
   "raw_files_unchanged": true,
-  "n_raw_files": 154,
+  "n_raw_files": 190,
   "n_inventory_files": 40,
   "decision_counts": {
     "keep": 13,
@@ -16,235 +16,235 @@
     "cleaned": [
       {
         "path": "data/cleaned/01_open_meteo_heat_rainfall/city_locations.csv",
-        "bytes": 1325
+        "bytes": 1338
       },
       {
         "path": "data/cleaned/01_open_meteo_heat_rainfall/city_locations.parquet",
-        "bytes": 5708
+        "bytes": 5679
       },
       {
         "path": "data/cleaned/01_open_meteo_heat_rainfall/weather_6h_sample.parquet",
-        "bytes": 1377996
+        "bytes": 1330268
       },
       {
         "path": "data/cleaned/01_open_meteo_heat_rainfall/weather_city_stats.csv",
-        "bytes": 862
+        "bytes": 875
       },
       {
         "path": "data/cleaned/01_open_meteo_heat_rainfall/weather_city_stats.parquet",
-        "bytes": 6167
+        "bytes": 6127
       },
       {
         "path": "data/cleaned/01_open_meteo_heat_rainfall/weather_hourly.parquet",
-        "bytes": 11241030
+        "bytes": 11242361
       },
       {
         "path": "data/cleaned/02_openstreetmap_geofabrik/district_name_lookup.csv",
-        "bytes": 8229
+        "bytes": 8366
       },
       {
         "path": "data/cleaned/02_openstreetmap_geofabrik/health_facilities.parquet",
-        "bytes": 416693
+        "bytes": 419735
       },
       {
         "path": "data/cleaned/02_openstreetmap_geofabrik/osm_emergency_facilities.csv",
-        "bytes": 8459
+        "bytes": 8620
       },
       {
         "path": "data/cleaned/02_openstreetmap_geofabrik/osm_emergency_facilities.parquet",
-        "bytes": 7669
+        "bytes": 7645
       },
       {
         "path": "data/cleaned/02_openstreetmap_geofabrik/osm_flood_exposure.csv",
-        "bytes": 58672
+        "bytes": 58833
       },
       {
         "path": "data/cleaned/02_openstreetmap_geofabrik/osm_flood_exposure.parquet",
-        "bytes": 84571
+        "bytes": 84222
       },
       {
         "path": "data/cleaned/02_openstreetmap_geofabrik/osm_hospital_access.csv",
-        "bytes": 14562
+        "bytes": 14723
       },
       {
         "path": "data/cleaned/02_openstreetmap_geofabrik/osm_hospital_access.parquet",
-        "bytes": 18457
+        "bytes": 18389
       },
       {
         "path": "data/cleaned/02_openstreetmap_geofabrik/osm_rural_access.csv",
-        "bytes": 22208
+        "bytes": 22369
       },
       {
         "path": "data/cleaned/02_openstreetmap_geofabrik/osm_rural_access.parquet",
-        "bytes": 33737
+        "bytes": 33633
       },
       {
         "path": "data/cleaned/02_openstreetmap_geofabrik/populated_places.parquet",
-        "bytes": 3718303
+        "bytes": 3752058
       },
       {
         "path": "data/cleaned/03_ndma_pmd_hazards_warnings/document_catalog.csv",
-        "bytes": 2992
+        "bytes": 3004
       },
       {
         "path": "data/cleaned/03_ndma_pmd_hazards_warnings/glofas_river_discharge.parquet",
-        "bytes": 10907
+        "bytes": 10849
       },
       {
         "path": "data/cleaned/03_ndma_pmd_hazards_warnings/pmd_river_danger_levels.csv",
-        "bytes": 4864
+        "bytes": 4884
       },
       {
         "path": "data/cleaned/03_ndma_pmd_hazards_warnings/pmd_river_danger_levels.parquet",
-        "bytes": 12752
+        "bytes": 12702
       },
       {
         "path": "data/cleaned/04_pakistan_bureau_of_statistics/pbs_district_demographics.csv",
-        "bytes": 17394
+        "bytes": 17555
       },
       {
         "path": "data/cleaned/04_pakistan_bureau_of_statistics/pbs_district_demographics.parquet",
-        "bytes": 21011
+        "bytes": 20957
       },
       {
         "path": "data/cleaned/04_pakistan_bureau_of_statistics/pbs_district_rural_urban.csv",
-        "bytes": 17798
+        "bytes": 17959
       },
       {
         "path": "data/cleaned/04_pakistan_bureau_of_statistics/pbs_district_rural_urban.parquet",
-        "bytes": 22767
+        "bytes": 22704
       }
     ],
     "processed": [
       {
         "path": "data/processed/city_locations.csv",
-        "bytes": 1325
+        "bytes": 1338
       },
       {
         "path": "data/processed/city_locations.parquet",
-        "bytes": 5708
+        "bytes": 5679
       },
       {
         "path": "data/processed/climateshield.duckdb",
-        "bytes": 25440256
+        "bytes": 26226688
       },
       {
         "path": "data/processed/district_name_lookup.csv",
-        "bytes": 8229
+        "bytes": 8366
       },
       {
         "path": "data/processed/district_snapshot.csv",
-        "bytes": 132333
+        "bytes": 132494
       },
       {
         "path": "data/processed/district_snapshot.parquet",
-        "bytes": 161022
+        "bytes": 160551
       },
       {
         "path": "data/processed/document_catalog.csv",
-        "bytes": 2992
+        "bytes": 3004
       },
       {
         "path": "data/processed/excluded_columns.csv",
-        "bytes": 1606
+        "bytes": 1619
       },
       {
         "path": "data/processed/glofas_river_discharge.parquet",
-        "bytes": 10907
+        "bytes": 10849
       },
       {
         "path": "data/processed/health_facilities.parquet",
-        "bytes": 416693
+        "bytes": 419735
       },
       {
         "path": "data/processed/osm_emergency_facilities.csv",
-        "bytes": 8459
+        "bytes": 8620
       },
       {
         "path": "data/processed/osm_emergency_facilities.parquet",
-        "bytes": 7669
+        "bytes": 7645
       },
       {
         "path": "data/processed/osm_flood_exposure.csv",
-        "bytes": 50714
+        "bytes": 50875
       },
       {
         "path": "data/processed/osm_flood_exposure.parquet",
-        "bytes": 76347
+        "bytes": 76047
       },
       {
         "path": "data/processed/osm_hospital_access.csv",
-        "bytes": 14562
+        "bytes": 14723
       },
       {
         "path": "data/processed/osm_hospital_access.parquet",
-        "bytes": 18457
+        "bytes": 18389
       },
       {
         "path": "data/processed/osm_rural_access.csv",
-        "bytes": 22208
+        "bytes": 22369
       },
       {
         "path": "data/processed/osm_rural_access.parquet",
-        "bytes": 33737
+        "bytes": 33633
       },
       {
         "path": "data/processed/pbs_district_demographics.csv",
-        "bytes": 17394
+        "bytes": 17555
       },
       {
         "path": "data/processed/pbs_district_demographics.parquet",
-        "bytes": 21011
+        "bytes": 20957
       },
       {
         "path": "data/processed/pbs_district_rural_urban.csv",
-        "bytes": 17798
+        "bytes": 17959
       },
       {
         "path": "data/processed/pbs_district_rural_urban.parquet",
-        "bytes": 22767
+        "bytes": 22704
       },
       {
         "path": "data/processed/pmd_river_danger_levels.csv",
-        "bytes": 4864
+        "bytes": 4884
       },
       {
         "path": "data/processed/pmd_river_danger_levels.parquet",
-        "bytes": 12752
+        "bytes": 12702
       },
       {
         "path": "data/processed/populated_places.parquet",
-        "bytes": 3718303
+        "bytes": 3752058
       },
       {
         "path": "data/processed/warehouse_catalog.csv",
-        "bytes": 483
+        "bytes": 504
       },
       {
         "path": "data/processed/weather_6h_sample.parquet",
-        "bytes": 1377996
+        "bytes": 1330268
       },
       {
         "path": "data/processed/weather_city_stats.csv",
-        "bytes": 862
+        "bytes": 875
       },
       {
         "path": "data/processed/weather_city_stats.parquet",
-        "bytes": 6167
+        "bytes": 6127
       },
       {
         "path": "data/processed/weather_hourly.parquet",
-        "bytes": 11241030
+        "bytes": 11242361
       }
     ],
     "reports": [
       {
         "path": "reports/cleaning_rules.json",
-        "bytes": 10574
+        "bytes": 10796
       },
       {
         "path": "reports/dataset_inventory.json",
-        "bytes": 95250
+        "bytes": 98410
       },
       {
         "path": "reports/fairness_by_group.csv",
@@ -268,7 +268,7 @@
       },
       {
         "path": "reports/initial_quality_report.json",
-        "bytes": 4084
+        "bytes": 4181
       },
       {
         "path": "reports/model_vs_baseline_metrics.json",
@@ -280,11 +280,11 @@
       },
       {
         "path": "reports/quality_logs.csv",
-        "bytes": 14815
+        "bytes": 14876
       },
       {
         "path": "reports/quality_report.json",
-        "bytes": 14645
+        "bytes": 15118
       }
     ]
   },

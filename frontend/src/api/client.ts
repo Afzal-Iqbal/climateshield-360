@@ -29,6 +29,7 @@ import {
   ImpactDomainData,
   PlannerResponseData,
   MethodologyResponseData,
+  InsightAnswer,
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -165,6 +166,11 @@ export const api = {
     return apiFetch<PlannerResponseData>(`/planner${qs ? `?${qs}` : ''}`);
   },
   getMethodology: () => apiFetch<MethodologyResponseData>('/methodology'),
+  askInsight: (question: string) =>
+    apiFetch<InsightAnswer>('/insight/ask', {
+      method: 'POST',
+      body: JSON.stringify({ question }),
+    }),
 };
 
 /**

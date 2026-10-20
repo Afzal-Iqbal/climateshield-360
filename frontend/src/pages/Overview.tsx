@@ -5,13 +5,11 @@ import { motion, useReducedMotion } from 'framer-motion';
 import {
   ResponsiveContainer,
   ComposedChart,
-  Area,
   Line,
   XAxis,
   YAxis,
   Tooltip,
   Legend,
-  ReferenceLine,
 } from 'recharts';
 
 import { api, formatPKT } from '../api/client';
@@ -76,36 +74,44 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
   const visiblePriorities = showAllPriorities ? priorities : priorities.slice(0, 5);
 
   // Build combined chart dataset from prediction points
-  const heatPoints = overview?.predictions_series?.heat || [];
   const rainPoints = overview?.predictions_series?.heavy_rain || [];
+  const heatPoints = overview?.predictions_series?.heat || [];
 
-  const chartData = heatPoints.map((hp, idx) => {
-    const rp = rainPoints[idx] || {};
-    const pktTime = formatPKT(hp.forecast_time, {
+  const chartRows = new Map<string, {
+    forecast_time: string;
+    short_time: string;
+    full_time: string;
+    hours_ahead: number;
+    heat_c: number | null;
+    rain_mm: number | null;
+  }>();
+  const putPoint = (
+    forecastTime: string,
+    hoursAhead: number,
+    field: 'heat_c' | 'rain_mm',
+    value: number | null,
+  ) => {
+    const pktTime = formatPKT(forecastTime, {
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
     });
-
-    return {
-      forecast_time: hp.forecast_time,
-      short_time: `+${hp.hours_ahead}h`,
-      full_time: `+${hp.hours_ahead}h (${pktTime.split(',')[1]?.trim() || pktTime})`,
-      display_time: `+${hp.hours_ahead}h`,
-      hours_ahead: hp.hours_ahead,
-      // Heat hazard metrics
-      heat_prob: Math.round(hp.probability * 100),
-      heat_ci_base: Math.round(hp.interval_low * 100),
-      heat_ci_range: Math.round(Math.max(0, hp.interval_high - hp.interval_low) * 100),
-      heat_baseline: Math.round(hp.baseline_value * 100),
-      // Rain hazard metrics
-      rain_prob: Math.round((rp.probability ?? 0) * 100),
-      rain_ci_base: Math.round((rp.interval_low ?? 0) * 100),
-      rain_ci_range: Math.round(Math.max(0, (rp.interval_high ?? 0) - (rp.interval_low ?? 0)) * 100),
-      rain_baseline: Math.round((rp.baseline_value ?? 0) * 100),
+    const row = chartRows.get(forecastTime) || {
+      forecast_time: forecastTime,
+      short_time: pktTime.replace(' PKT', ''),
+      full_time: pktTime,
+      hours_ahead: hoursAhead,
+      heat_c: null,
+      rain_mm: null,
     };
-  });
+    row[field] = value;
+    chartRows.set(forecastTime, row);
+  };
+  heatPoints.forEach((point) => putPoint(point.forecast_time, point.hours_ahead, 'heat_c', point.median ?? null));
+  rainPoints.forEach((point) => putPoint(point.forecast_time, point.hours_ahead, 'rain_mm', point.median ?? null));
+  const chartData = Array.from(chartRows.values()).sort((a, b) => a.forecast_time.localeCompare(b.forecast_time));
+  const rainAxisMax = Math.max(1, ...chartData.map((point) => point.rain_mm ?? 0));
 
   // Mini Map hotspots dynamically populated from API priorities (Requirement 6)
   const mapHotspots = useMemo(() => {
@@ -126,11 +132,11 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
         name: p?.zone_name || spot.defaultName,
         x: spot.x,
         y: spot.y,
-        level: (p?.risk_level || 'Moderate') as RiskLevel,
-        desc: p?.action_title || p?.reason || '',
+        level: (overview?.rain_hazard_level || 'Low') as RiskLevel,
+        desc: 'City rainfall badge, not a separate district rain gauge.',
       };
     });
-  }, [priorities]);
+  }, [overview?.rain_hazard_level, priorities]);
 
   if (isOverviewError || isPrioritiesError) {
     return (
@@ -239,7 +245,7 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                   <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">
                     Hazard Vector 01
                   </span>
-                  <RiskBadge level={overview?.heat_hazard_level || 'Severe'} />
+                  <RiskBadge level={overview?.heat_hazard_level || 'Low'} />
                 </div>
                 <div className="mt-1">
                   <span className="text-sm font-semibold text-on-surface block">
@@ -247,10 +253,15 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                   </span>
                   <div className="flex items-baseline gap-2 mt-1">
                     <span className="font-mono text-3xl sm:text-4xl font-bold tracking-tight text-on-surface">
-                      <AnimatedNumber value={overview?.heat_summary?.headline_value ?? 43.8} decimals={1} />°C
+                      {overview?.heat_summary?.headline_value == null ? (
+                        '—'
+                      ) : (
+                        <AnimatedNumber value={overview.heat_summary.headline_value} decimals={1} />
+                      )}
+                      °C
                     </span>
                     <span className="text-xs text-on-surface-variant font-medium">
-                      Feels Like (WBGT)
+                      {overview?.heat_summary?.label || 'Observed air temperature'}
                     </span>
                   </div>
                 </div>
@@ -259,9 +270,9 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
               {/* Uncertainty Range Line Box */}
               <div className="mt-4 pt-2 bg-surface-container-low dark:bg-surface-container-high/40 rounded-xl p-3 flex flex-col gap-1.5 border border-outline-variant/20">
                 <div className="flex items-center justify-between font-mono text-xs">
-                  <span className="text-on-surface-variant">Confidence Band (90%)</span>
+                  <span className="text-on-surface-variant">Kind</span>
                   <span className="font-semibold text-on-surface">
-                    {overview?.heat_summary?.interval_low ?? 41.5}°C — {overview?.heat_summary?.interval_high ?? 46.2}°C
+                    {overview?.heat_summary?.kind || 'observed'}
                   </span>
                 </div>
                 {/* Visual uncertainty bar */}
@@ -270,10 +281,12 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                   <div className="absolute left-[60%] top-0 bottom-0 w-1 bg-[#ba1a1a]" />
                 </div>
                 <div className="flex items-center justify-between font-mono text-[10px] text-on-surface-variant mt-0.5">
-                  <span className="truncate">{overview?.heat_summary?.source || 'PMD Karachi Met & GFS 0.25°'}</span>
-                  <span className="px-1.5 py-0.5 bg-surface-container dark:bg-surface-container-highest text-on-surface-variant rounded uppercase font-mono">
-                    [Sample Data]
-                  </span>
+                  <span className="truncate">{overview?.heat_summary?.source || 'Source unavailable'}</span>
+                  {isSample && (
+                    <span className="px-1.5 py-0.5 bg-surface-container dark:bg-surface-container-highest text-on-surface-variant rounded uppercase font-mono">
+                      Sample data
+                    </span>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -289,7 +302,7 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                   <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">
                     Hazard Vector 02
                   </span>
-                  <RiskBadge level={overview?.rain_hazard_level || 'Moderate'} />
+                  <RiskBadge level={overview?.rain_hazard_level || 'Low'} />
                 </div>
                 <div className="mt-1">
                   <span className="text-sm font-semibold text-on-surface block">
@@ -297,7 +310,11 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                   </span>
                   <div className="flex items-baseline gap-2 mt-1">
                     <span className="font-mono text-3xl sm:text-4xl font-bold tracking-tight text-on-surface">
-                      <AnimatedNumber value={overview?.rain_summary?.headline_value ?? 38} decimals={0} />
+                      {overview?.rain_summary?.headline_value == null ? (
+                        '—'
+                      ) : (
+                        <AnimatedNumber value={overview.rain_summary.headline_value} decimals={1} />
+                      )}
                     </span>
                     <span className="text-lg font-medium text-on-surface">mm</span>
                     <span className="text-xs text-on-surface-variant">/ {timeRange}</span>
@@ -310,7 +327,7 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                 <div className="flex items-center justify-between font-mono text-xs">
                   <span className="text-on-surface-variant">Ensemble Spread</span>
                   <span className="font-semibold text-on-surface">
-                    {overview?.rain_summary?.interval_low ?? 15}mm — {overview?.rain_summary?.interval_high ?? 65}mm
+                    {overview?.rain_summary?.kind || 'observed'}
                   </span>
                 </div>
                 {/* Visual uncertainty bar */}
@@ -319,10 +336,12 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                   <div className="absolute left-[45%] top-0 bottom-0 w-1 bg-primary" />
                 </div>
                 <div className="flex items-center justify-between font-mono text-[10px] text-on-surface-variant mt-0.5">
-                  <span className="truncate">{overview?.rain_summary?.source || 'PMD Radar (Badin) + ECMWF'}</span>
-                  <span className="px-1.5 py-0.5 bg-surface-container dark:bg-surface-container-highest text-on-surface-variant rounded uppercase font-mono">
-                    [Sample Data]
-                  </span>
+                  <span className="truncate">{overview?.rain_summary?.source || 'Source unavailable'}</span>
+                  {isSample && (
+                    <span className="px-1.5 py-0.5 bg-surface-container dark:bg-surface-container-highest text-on-surface-variant rounded uppercase font-mono">
+                      Sample data
+                    </span>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -340,7 +359,7 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                   </span>
                   <RiskBadge
                     level={overview && overview.severe_zones_count > 0 ? 'Severe' : 'Low'}
-                    label={`${overview?.severe_zones_count ?? 3} Critical`}
+                    label={`${overview?.severe_zones_count ?? 0} Critical`}
                   />
                 </div>
                 <div className="mt-1">
@@ -349,10 +368,10 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                   </span>
                   <div className="flex items-baseline gap-2 mt-1">
                     <span className="font-mono text-3xl sm:text-4xl font-bold tracking-tight text-on-surface">
-                      <AnimatedNumber value={overview?.severe_zones_count ?? 3} decimals={0} />
+                      <AnimatedNumber value={overview?.severe_zones_count ?? 0} decimals={0} />
                     </span>
                     <span className="text-base text-on-surface-variant font-normal">
-                      / {overview?.total_zones_count ?? 7}
+                      / {overview?.total_zones_count ?? 0}
                     </span>
                     <span className="text-xs text-on-surface-variant">Karachi Zones</span>
                   </div>
@@ -364,17 +383,19 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                 <div className="flex items-center justify-between font-mono text-xs">
                   <span className="text-on-surface-variant">Distress Hotspots</span>
                   <span className="font-semibold text-error truncate max-w-[150px]">
-                    {overview?.severe_zone_names?.slice(0, 2).join(', ') || 'Malir, Central'}
+                    {overview?.severe_zone_names?.slice(0, 2).join(', ') || '—'}
                   </span>
                 </div>
                 <p className="text-xs text-on-surface-variant truncate">
-                  Compound runoff &amp; extreme heat trapping
+                  District weather is not stored separately from the Karachi city series.
                 </p>
                 <div className="flex items-center justify-between font-mono text-[10px] text-on-surface-variant mt-0.5">
-                  <span className="truncate">Composite Index (NDMA 2023)</span>
-                  <span className="px-1.5 py-0.5 bg-surface-container dark:bg-surface-container-highest text-on-surface-variant rounded uppercase font-mono">
-                    [Sample Data]
-                  </span>
+                  <span className="truncate">Exposure index</span>
+                  {isSample && (
+                    <span className="px-1.5 py-0.5 bg-surface-container dark:bg-surface-container-highest text-on-surface-variant rounded uppercase font-mono">
+                      Sample data
+                    </span>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -450,7 +471,7 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                   </span>
                 </div>
                 <span className="font-label-mono-sm text-label-mono-sm text-on-surface-variant">
-                  Projections: Horizon {timeRange} | High Spatial Resolution (~500m Grid)
+                  Sketch of Karachi districts. Colors are not a live rainfall grid.
                 </span>
               </div>
 
@@ -486,29 +507,29 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                 {/* Malir Basin (East - Severe) */}
                 <path
                   d="M 640 130 L 880 110 L 870 300 L 670 290 L 670 210 Z"
-                  fill="#b91c1c"
-                  fillOpacity="0.45"
-                  stroke="#ef4444"
+                  fill="#1e3a5f"
+                  fillOpacity="0.55"
+                  stroke="#38bdf8"
                   strokeWidth="2"
                   className="cursor-pointer hover:fill-opacity-70 transition-all"
                   onClick={() => navigate('/risk-map?zone=KHI-MALIR')}
                 />
                 <text x="700" y="200" fill="#fecaca" fontFamily="JetBrains Mono" fontSize="11" fontWeight="bold">
-                  MALIR (CRITICAL)
+                  MALIR
                 </text>
 
                 {/* Central / Gulshan (Mid-East - Severe) */}
                 <path
                   d="M 420 120 L 640 130 L 670 210 L 490 220 L 410 170 Z"
-                  fill="#b91c1c"
-                  fillOpacity="0.4"
-                  stroke="#ef4444"
+                  fill="#1e3a5f"
+                  fillOpacity="0.45"
+                  stroke="#38bdf8"
                   strokeWidth="1.8"
                   className="cursor-pointer hover:fill-opacity-70 transition-all"
                   onClick={() => navigate('/risk-map?zone=KHI-CENTRAL')}
                 />
                 <text x="470" y="175" fill="#fee2e2" fontFamily="JetBrains Mono" fontSize="11" fontWeight="600">
-                  CENTRAL (HEAT ALERT)
+                  CENTRAL
                 </text>
 
                 {/* Orangi & West (North-West - High) */}
@@ -528,15 +549,15 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                 {/* Korangi Industrial & Creek (South-East - Severe Flood) */}
                 <path
                   d="M 490 220 L 670 210 L 670 320 L 480 330 Z"
-                  fill="#b91c1c"
-                  fillOpacity="0.5"
-                  stroke="#ef4444"
+                  fill="#16324f"
+                  fillOpacity="0.6"
+                  stroke="#38bdf8"
                   strokeWidth="2"
                   className="cursor-pointer hover:fill-opacity-70 transition-all"
                   onClick={() => navigate('/risk-map?zone=KHI-KORANGI')}
                 />
                 <text x="520" y="275" fill="#fee2e2" fontFamily="JetBrains Mono" fontSize="11" fontWeight="bold">
-                  KORANGI (FLOOD PRONE)
+                  KORANGI
                 </text>
 
                 {/* Lyari / South (Central Dense - Moderate) */}
@@ -588,12 +609,12 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                   <div className="relative flex items-center justify-center">
                     <span
                       className={`animate-ping absolute inline-flex h-6 w-6 rounded-full opacity-75 ${
-                        hs.level === 'Severe' ? 'bg-error' : hs.level === 'High' ? 'bg-[#f97316]' : 'bg-[#eab308]'
+                        hs.level === 'Severe' ? 'bg-error' : hs.level === 'High' ? 'bg-[#f97316]' : hs.level === 'Moderate' ? 'bg-[#eab308]' : 'bg-[#059669]'
                       }`}
                     />
                     <span
                       className={`relative inline-flex rounded-full h-3.5 w-3.5 border-2 border-white shadow-md ${
-                        hs.level === 'Severe' ? 'bg-error' : hs.level === 'High' ? 'bg-[#f97316]' : 'bg-[#eab308]'
+                        hs.level === 'Severe' ? 'bg-error' : hs.level === 'High' ? 'bg-[#f97316]' : hs.level === 'Moderate' ? 'bg-[#eab308]' : 'bg-[#059669]'
                       }`}
                     />
                   </div>
@@ -613,8 +634,8 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                   <span className="font-label-mono-sm text-[10px] uppercase text-secondary font-bold">
                     Zone Inspector
                   </span>
-                  <span className="px-1.5 py-0.2 rounded bg-error font-label-mono-sm text-[9px] text-on-error font-bold">
-                    3 SEVERE ZONES
+                  <span className="px-1.5 py-0.2 rounded bg-secondary font-label-mono-sm text-[9px] text-on-secondary font-bold">
+                    {overview?.rain_hazard_level || 'Low'} RAIN
                   </span>
                 </div>
                 <div className="font-title-md text-title-md font-semibold text-on-primary mt-0.5">
@@ -628,8 +649,8 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                     <span className="text-on-primary font-bold">{timeRange}</span>
                   </div>
                   <div className="flex justify-between text-on-primary-container">
-                    <span>Compound Vulnerability:</span>
-                    <span className="text-error font-bold">Critical (Malir/Central)</span>
+                    <span>Rain reading:</span>
+                    <span className="text-on-primary font-bold">Karachi city point</span>
                   </div>
                 </div>
               </div>
@@ -663,16 +684,11 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                 <div className="flex items-center gap-space-xs">
                   <span className="material-symbols-outlined text-secondary text-[20px]">show_chart</span>
                   <span className="font-title-md text-title-md text-on-surface font-semibold">
-                    {timeRange === '24h'
-                      ? '24-Hour'
-                      : timeRange === '48h'
-                      ? '48-Hour'
-                      : '7-Day'}{' '}
-                    Ensemble Hazard Probability &amp; Uncertainty Timeline
+                    Karachi hourly forecast
                   </span>
                 </div>
                 <span className="font-label-mono-sm text-label-mono-sm text-on-surface-variant">
-                  Ensemble NWP Forecast vs 30-Year Climatological Norm (Karachi Met Office WMO 41780)
+                  Open-Meteo hourly forecast for this window. Heat is temperature. Rain is precipitation. A flat 0 mm line means no rain is forecast.
                 </span>
               </div>
 
@@ -718,11 +734,11 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
             <div className="w-full h-80 sm:h-72 bg-surface-container-low rounded-lg p-2 select-none">
               {isOverviewLoading ? (
                 <div className="h-full flex items-center justify-center font-label-mono-sm text-on-surface-variant">
-                  Loading ensemble projection series...
+                  Loading the hourly forecast...
                 </div>
               ) : chartData.length === 0 ? (
                 <div className="h-full flex items-center justify-center font-label-mono-sm text-on-surface-variant">
-                  No prediction data available for {timeRange}.
+                  The Open-Meteo hourly forecast is not available right now.
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height="100%">
@@ -736,14 +752,29 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                       interval="preserveStartEnd"
                       minTickGap={25}
                     />
-                    <YAxis
-                      stroke="#74777e"
-                      fontSize={11}
-                      tickFormatter={(v) => `${v}%`}
-                      domain={[0, 100]}
-                      tickLine={false}
-                      fontFamily="JetBrains Mono"
-                    />
+                    {activeHazardView !== 'heavy_rain' && (
+                      <YAxis
+                        yAxisId="heat"
+                        stroke="#d97706"
+                        fontSize={11}
+                        tickFormatter={(v) => `${v}°`}
+                        tickLine={false}
+                        fontFamily="JetBrains Mono"
+                        domain={['auto', 'auto']}
+                      />
+                    )}
+                    {activeHazardView !== 'heat' && (
+                      <YAxis
+                        yAxisId="rain"
+                        orientation={activeHazardView === 'both' ? 'right' : 'left'}
+                        stroke="#006398"
+                        fontSize={11}
+                        tickFormatter={(v) => `${v} mm`}
+                        domain={[0, rainAxisMax]}
+                        tickLine={false}
+                        fontFamily="JetBrains Mono"
+                      />
+                    )}
                     <Tooltip
                       content={({ active, payload }) => {
                         if (!active || !payload || !payload.length) return null;
@@ -751,32 +782,16 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                         return (
                           <div className="bg-primary-container text-on-primary p-space-sm rounded-lg shadow-xl text-xs font-mono space-y-1 border border-white/10">
                             <div className="font-bold text-secondary-container">
-                              {d.full_time || d.display_time}
+                              {d.full_time}
                             </div>
                             <div className="text-[11px] text-on-primary-container">
-                              Forecast: {formatPKT(d.forecast_time, { dateStyle: 'medium', timeStyle: 'short' })}
+                              {d.hours_ahead === 0 ? 'Current hour' : `${d.hours_ahead}h ahead`}
                             </div>
-                            {activeHazardView !== 'heavy_rain' && (
-                              <div className="border-t border-white/10 pt-1">
-                                <div className="text-[#ffb77d] font-bold">Heat Hazard Probability: {d.heat_prob}%</div>
-                                <div className="text-on-primary-container text-[11px]">
-                                  90% CI: {d.heat_ci_base}% — {d.heat_ci_base + d.heat_ci_range}%
-                                </div>
-                                <div className="text-on-surface-variant text-[10px]">
-                                  Climatology Baseline: {d.heat_baseline}%
-                                </div>
-                              </div>
+                            {d.heat_c != null && (
+                              <div className="text-amber-300">Temperature: {d.heat_c}°C</div>
                             )}
-                            {activeHazardView !== 'heat' && (
-                              <div className="border-t border-white/10 pt-1">
-                                <div className="text-[#38bdf8] font-bold">Rain Hazard Probability: {d.rain_prob}%</div>
-                                <div className="text-on-primary-container text-[11px]">
-                                  90% CI: {d.rain_ci_base}% — {d.rain_ci_base + d.rain_ci_range}%
-                                </div>
-                                <div className="text-on-surface-variant text-[10px]">
-                                  Climatology Baseline: {d.rain_baseline}%
-                                </div>
-                              </div>
+                            {d.rain_mm != null && (
+                              <div className="text-[#38bdf8]">Precipitation: {d.rain_mm} mm</div>
                             )}
                           </div>
                         );
@@ -788,171 +803,48 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                         if (!payload || !payload.length) return null;
                         return (
                           <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pb-2.5 px-1 text-xs select-none">
-                            {payload.map((entry, index) => {
-                              const isBaseline = entry.value?.toString().toLowerCase().includes('baseline');
-                              const isBand = entry.value?.toString().toLowerCase().includes('ci');
-                              return (
-                                <div key={`legend-${index}`} className="flex items-center gap-1.5 whitespace-nowrap">
-                                  {isBand ? (
-                                    <span
-                                      className="w-3 h-2 rounded-xs opacity-75 inline-block shrink-0"
-                                      style={{ backgroundColor: entry.color }}
-                                    />
-                                  ) : isBaseline ? (
-                                    <span className="w-3.5 h-0 border-t-2 border-dashed border-[#74777e] inline-block shrink-0" />
-                                  ) : (
-                                    <span
-                                      className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
-                                      style={{ backgroundColor: entry.color }}
-                                    />
-                                  )}
-                                  <span className="font-label-mono-sm text-[11px] text-on-surface">
-                                    {entry.value}
-                                  </span>
-                                </div>
-                              );
-                            })}
+                            {payload.map((entry, index) => (
+                              <div key={`legend-${index}`} className="flex items-center gap-1.5 whitespace-nowrap">
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+                                  style={{ backgroundColor: entry.color }}
+                                />
+                                <span className="font-label-mono-sm text-[11px] text-on-surface">
+                                  {entry.value}
+                                </span>
+                              </div>
+                            ))}
                           </div>
                         );
                       }}
                     />
-                    {/* Critical Alert Threshold line at 75% with collision-free pill label */}
-                    <ReferenceLine
-                      y={75}
-                      stroke="#ba1a1a"
-                      strokeDasharray="4 4"
-                      label={(props: any): React.ReactElement => {
-                        const viewBox = props?.viewBox;
-                        if (!viewBox) return <g />;
-                        const { x = 0, y = 0 } = viewBox;
-                        const badgeWidth = 175;
-                        const badgeHeight = 18;
-                        const posX = x + 8;
-                        const posY = y - badgeHeight - 2;
-                        return (
-                          <g className="select-none pointer-events-none">
-                            <rect
-                              x={posX}
-                              y={posY}
-                              width={badgeWidth}
-                              height={badgeHeight}
-                              rx={4}
-                              fill="#111c26"
-                              fillOpacity={0.92}
-                              stroke="#ba1a1a"
-                              strokeWidth={1}
-                            />
-                            <text
-                              x={posX + 8}
-                              y={posY + 12}
-                              fill="#f87171"
-                              fontSize={10}
-                              fontWeight="700"
-                              fontFamily="JetBrains Mono, monospace"
-                            >
-                              Critical Risk Threshold (75%)
-                            </text>
-                          </g>
-                        );
-                      }}
-                    />
-
-                    {/* Heat Hazard Series: Shaded Interval Band + Line */}
                     {activeHazardView !== 'heavy_rain' && (
-                      <>
-                        <Area
-                          type="monotone"
-                          dataKey="heat_ci_base"
-                          stackId="heat_ci"
-                          fill="transparent"
-                          stroke="none"
-                          legendType="none"
-                          isAnimationActive={!shouldReduceMotion}
-                          animationDuration={800}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="heat_ci_range"
-                          stackId="heat_ci"
-                          fill="#d97706"
-                          fillOpacity={0.16}
-                          stroke="none"
-                          name="Heat 90% CI"
-                          isAnimationActive={!shouldReduceMotion}
-                          animationDuration={800}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="heat_prob"
-                          stroke="#d97706"
-                          strokeWidth={2.5}
-                          dot={{ r: 3.5 }}
-                          activeDot={{ r: 5 }}
-                          name="Heat Forecast"
-                          isAnimationActive={!shouldReduceMotion}
-                          animationDuration={800}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="heat_baseline"
-                          stroke="#74777e"
-                          strokeDasharray="4 4"
-                          strokeWidth={1.5}
-                          dot={false}
-                          name="Heat Baseline"
-                          isAnimationActive={!shouldReduceMotion}
-                          animationDuration={800}
-                        />
-                      </>
+                      <Line
+                        yAxisId="heat"
+                        type="monotone"
+                        dataKey="heat_c"
+                        stroke="#d97706"
+                        strokeWidth={2.5}
+                        dot={false}
+                        name="Forecast temperature °C"
+                        connectNulls
+                        isAnimationActive={!shouldReduceMotion}
+                        animationDuration={800}
+                      />
                     )}
-
-                    {/* Rain Hazard Series: Shaded Interval Band + Line */}
                     {activeHazardView !== 'heat' && (
-                      <>
-                        <Area
-                          type="monotone"
-                          dataKey="rain_ci_base"
-                          stackId="rain_ci"
-                          fill="transparent"
-                          stroke="none"
-                          legendType="none"
-                          isAnimationActive={!shouldReduceMotion}
-                          animationDuration={800}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="rain_ci_range"
-                          stackId="rain_ci"
-                          fill="#006398"
-                          fillOpacity={0.18}
-                          stroke="none"
-                          name="Rain 90% CI"
-                          isAnimationActive={!shouldReduceMotion}
-                          animationDuration={800}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="rain_prob"
-                          stroke="#006398"
-                          strokeWidth={2.5}
-                          dot={{ r: 3.5 }}
-                          activeDot={{ r: 5 }}
-                          name="Rain Forecast"
-                          isAnimationActive={!shouldReduceMotion}
-                          animationDuration={800}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="rain_baseline"
-                          stroke="#74777e"
-                          strokeDasharray="6 6"
-                          strokeWidth={1.5}
-                          dot={false}
-                          name="Rain Baseline"
-                          isAnimationActive={!shouldReduceMotion}
-                          animationDuration={800}
-                        />
-                      </>
+                      <Line
+                        yAxisId="rain"
+                        type="monotone"
+                        dataKey="rain_mm"
+                        stroke="#006398"
+                        strokeWidth={2.5}
+                        dot={false}
+                        name="Forecast precipitation mm"
+                        connectNulls
+                        isAnimationActive={!shouldReduceMotion}
+                        animationDuration={800}
+                      />
                     )}
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -961,10 +853,10 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
 
             <div className="flex items-center justify-between text-on-surface-variant font-label-mono-sm text-label-mono-sm pt-1">
               <span className="truncate">
-                Shaded band represents 90% ensemble spread across GFS 0.25° and ECMWF IFS NWP runs.
+                Open-Meteo hourly forecast. The 24h / 48h / 7d buttons change this window. 0 mm means the forecast is dry.
               </span>
               <span className="px-1.5 py-0.5 bg-surface-container rounded text-[10px] uppercase font-mono shrink-0">
-                WMO Station 41780
+                Open-Meteo point
               </span>
             </div>
           </div>
@@ -980,15 +872,15 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                   <span className="font-label-mono-sm text-label-mono-sm uppercase text-secondary font-semibold tracking-wider">
                     Decision Support System
                   </span>
-                  <span className="px-2.5 py-0.5 rounded-full bg-error text-on-error font-label-mono-sm text-label-mono-sm font-semibold">
-                    {priorities.length} Actions Pinned
+                  <span className="px-2.5 py-0.5 rounded-full bg-surface-container text-on-surface font-label-mono-sm text-label-mono-sm font-semibold">
+                    {priorities.length} listed
                   </span>
                 </div>
                 <h2 className="font-headline-md text-headline-md text-on-surface font-bold">
                   Ranked Priority Actions
                 </h2>
                 <p className="font-body-sm text-body-sm text-on-surface-variant">
-                  Algorithmic risk ranking by severity level then exposed population from <code className="text-secondary font-mono">exposure_index</code>.
+                  Seeded district exposure table, not current rainfall. A dry Karachi hour does not clear these stored ranks.
                 </p>
 
                 {/* Filter Pills for Priorities */}

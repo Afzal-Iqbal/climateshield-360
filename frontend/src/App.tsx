@@ -32,7 +32,7 @@ const AppRoutes: React.FC = () => {
   });
 
   const meta = metaResponse?.data || null;
-  const isSample = metaResponse?.is_sample ?? true;
+  const isSample = metaResponse?.is_sample ?? false;
 
   return (
     <Routes>

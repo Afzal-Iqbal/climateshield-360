@@ -101,6 +101,33 @@ def _get_next_scheduled_run() -> Optional[NextScheduledRunInfo]:
     return None
 
 
+def _evaluation_status_text() -> str:
+    """Read the saved evaluation file. Do not substitute a hard-coded baseline."""
+    metrics_path = (
+        Path(__file__).resolve().parent.parent.parent
+        / "pipeline"
+        / "reports"
+        / "model_vs_baseline_metrics.json"
+    )
+    if not metrics_path.is_file():
+        return "Model evaluation report is not available."
+    try:
+        metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return "Model evaluation report could not be read."
+    baseline = metrics.get("baseline_declared") or "declared baseline"
+    parts = [f"Evaluated against {baseline}"]
+    if metrics.get("mae_improvement_pct") is not None:
+        parts.append(f"rainfall MAE change {metrics['mae_improvement_pct']}%")
+    if metrics.get("uncertainty_interval_80pct_coverage") is not None:
+        parts.append(
+            f"80% interval coverage {metrics['uncertainty_interval_80pct_coverage']}%"
+        )
+    if metrics.get("brier_improvement_pct") is not None:
+        parts.append(f"inundation Brier change {metrics['brier_improvement_pct']}%")
+    return " · ".join(parts)
+
+
 @router.get("/status", response_model=APIResponse[PipelineStatusData])
 def get_pipeline_status() -> APIResponse[PipelineStatusData]:
     """
@@ -239,9 +266,9 @@ def get_pipeline_status() -> APIResponse[PipelineStatusData]:
             )
         )
 
-    # 6. Model version and evaluation status
+    # 6. Model version and evaluation status from the saved metrics file.
     model_ver = "lightgbm_quantile_v1.0"
-    eval_stat = "Operational · 35.1% MAE Improvement vs 30y Baseline · Uncertainty Interval 97.4% Coverage"
+    eval_stat = _evaluation_status_text()
 
     # 7. Fetch quality summary counts from newest quality_log batch
     max_batch = safe_query("SELECT MAX(logged_at) as latest_time FROM quality_log;")
@@ -262,16 +289,19 @@ def get_pipeline_status() -> APIResponse[PipelineStatusData]:
             rows_aff = int(cr.get("total_rows") or 0)
             rules_cnt = int(cr.get("rule_count") or 0)
             total_rules += rules_cnt
-            total_actions += rows_aff
 
             if action == "fix":
                 quality_summary.fix = rows_aff
+                total_actions += rows_aff
             elif action == "fill":
                 quality_summary.fill = rows_aff
+                total_actions += rows_aff
             elif action == "flag":
                 quality_summary.flag = rows_aff
-            elif action in ("exclude", "keep"):
+                total_actions += rows_aff
+            elif action == "exclude":
                 quality_summary.exclude = rows_aff
+                total_actions += rows_aff
 
         quality_summary.total_actions = total_actions
         quality_summary.rules_audited = total_rules

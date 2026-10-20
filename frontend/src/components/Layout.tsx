@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { StatusBar } from './StatusBar';
+import { HourlyUpdateCountdown, StatusBar } from './StatusBar';
 import { SampleBanner } from './SampleBanner';
 import { ZoneSelector } from './ZoneSelector';
 import { useTheme } from '../context/ThemeContext';
@@ -148,8 +148,9 @@ export const Layout: React.FC<LayoutProps> = ({ meta, isLoadingMeta = false }) =
               <ZoneSelector className="shrink-0" />
             </div>
 
-            {/* Right: Controls & Toggles */}
+            {/* Right: hourly cycle, theme, language, profile */}
             <div className="flex items-center gap-2 shrink-0">
+              <HourlyUpdateCountdown />
               {/* Dark / Light Theme Toggle (Requirement 11) */}
               <button
                 type="button"

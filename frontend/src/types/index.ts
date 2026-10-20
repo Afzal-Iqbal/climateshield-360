@@ -265,17 +265,19 @@ export interface PredictionPoint {
   interval_high: number;
   baseline_value: number;
   hazard_type: string;
+  median?: number | null;
 }
 
 export interface HazardMetricSummary {
   hazard_type: string;
   hazard_level: RiskLevel;
-  headline_value: number;
+  headline_value: number | null;
   unit: string;
-  interval_low: number;
-  interval_high: number;
+  interval_low?: number | null;
+  interval_high?: number | null;
   source: string;
   label: string;
+  kind?: string;
 }
 
 export interface FreshnessMetricSummary {
@@ -496,6 +498,11 @@ export interface ForecastData {
   note?: string | null;
   model_version?: string | null;
   generated_at: string;
+  issued_at?: string | null;
+  horizon_hours?: number | null;
+  forecast_origin?: 'model' | 'none';
+  is_stale?: boolean;
+  stale_reason?: string | null;
 }
 
 export interface ModelVsBaselineMetrics {
@@ -622,10 +629,11 @@ export interface PlannerDistrictItem {
   facilities_count: number;
   evidence_strength: string;
   // Reason fields
-  forecast_probability: number;
-  forecast_interval_low: number;
-  forecast_interval_high: number;
-  baseline_value: number;
+  forecast_probability: number | null;
+  forecast_interval_low: number | null;
+  forecast_interval_high: number | null;
+  baseline_value: number | null;
+  interval_unit?: string;
   reason_summary: string;
   // Suggested measures
   suggested_measures: PlannerMeasureItem[];
@@ -639,12 +647,19 @@ export interface PlannerDistrictItem {
 export interface CityForecastSummary {
   hazard_type: string;
   time_range: string;
-  avg_probability: number;
-  interval_low: number;
-  interval_high: number;
-  baseline_value: number;
+  avg_probability: number | null;
+  interval_low: number | null;
+  interval_high: number | null;
+  baseline_value: number | null;
+  interval_unit?: string;
   cutoff_time_utc: string;
   cutoff_time_pkt: string;
+  note?: string | null;
+  display_value?: number | null;
+  display_unit?: string;
+  display_label?: string;
+  origin?: string;
+  issued_at?: string | null;
 }
 
 export interface ResourceGapSummary {
@@ -830,6 +845,19 @@ export interface ResponsibleUseNotes {
   crop_data_exclusion: string;
   safety_boundaries: SafetyBoundaryItem[];
   emergency_contacts: EmergencyContactItem[];
+}
+
+export interface InsightCitation {
+  source: string;
+  detail: string;
+}
+
+export interface InsightAnswer {
+  question: string;
+  status: 'answered' | 'unknown' | 'unavailable';
+  answer: string;
+  citations: InsightCitation[];
+  limitations?: string | null;
 }
 
 export interface MethodologyResponseData {

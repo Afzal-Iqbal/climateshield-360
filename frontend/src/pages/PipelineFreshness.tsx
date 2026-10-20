@@ -629,7 +629,7 @@ export const PipelineFreshness: React.FC<PipelineFreshnessProps> = ({ isSample =
                 No errors logged across recent ingestion cycles
               </span>
               <p className="font-body-sm text-xs text-[#047857]">
-                All micro-batches in the run_status warehouse completed with nominal return codes (0 exceptions, 0 failed retry tasks).
+                The run_status rows loaded for this view do not include a failed or error status. This does not report retry tasks unless they are stored in run_status.
               </p>
             </div>
           </div>

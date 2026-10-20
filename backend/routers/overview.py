@@ -13,6 +13,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Query
 
 from db import is_sample_database, safe_query
+from forecasting.live_forecast import upcoming_hours
 from schemas import (
     APIResponse,
     FreshnessMetricSummary,
@@ -24,6 +25,28 @@ from schemas import (
 )
 
 router = APIRouter(tags=["Overview"])
+
+
+def _heat_level(temp_c: Optional[float]) -> str:
+    """Match the forecast page thresholds. A missing reading is not Severe."""
+    if temp_c is None or temp_c < 35:
+        return "Low"
+    if temp_c < 40:
+        return "Moderate"
+    if temp_c < 45:
+        return "High"
+    return "Severe"
+
+
+def _rain_level(max_hour_mm: Optional[float]) -> str:
+    """Match the heavy-rain hourly thresholds. A dry window is Low."""
+    if max_hour_mm is None or max_hour_mm < 1:
+        return "Low"
+    if max_hour_mm < 2.5:
+        return "Moderate"
+    if max_hour_mm < 10:
+        return "High"
+    return "Severe"
 
 
 def _action_title_for(hazard: str, level: str) -> str:
@@ -70,41 +93,8 @@ def get_overview(
     else:  # 7d
         cutoff_utc = now_utc + timedelta(days=7, minutes=5)
 
-    # 2. Maximum risk levels per hazard from exposure_index
-    risk_rank_sql = """
-    SELECT hazard_type, risk_level
-    FROM exposure_index
-    ORDER BY 
-        CASE risk_level
-            WHEN 'Severe' THEN 1
-            WHEN 'High' THEN 2
-            WHEN 'Moderate' THEN 3
-            WHEN 'Low' THEN 4
-            ELSE 5
-        END ASC;
-    """
-    risk_rows = safe_query(risk_rank_sql)
-
-    heat_hazard_level = "Moderate"
-    rain_hazard_level = "Moderate"
-    for r in risk_rows:
-        htype = r.get("hazard_type")
-        rlvl = r.get("risk_level", "Moderate")
-        if htype == "heat" and heat_hazard_level == "Moderate":
-            heat_hazard_level = rlvl
-        elif htype == "heavy_rain" and rain_hazard_level == "Moderate":
-            rain_hazard_level = rlvl
-
-    # 3. Severe zones count and names
-    severe_zones_sql = """
-    SELECT DISTINCT e.zone_id, z.name
-    FROM exposure_index e
-    LEFT JOIN zones z ON e.zone_id = z.zone_id
-    WHERE e.risk_level = 'Severe';
-    """
-    severe_rows = safe_query(severe_zones_sql)
-    severe_count = len(severe_rows)
-    severe_names = [r["name"] for r in severe_rows if r.get("name")]
+    # Hazard badges follow the Karachi observation, not the seeded exposure_index.
+    # That table stores fixed demo ranks (Malir/Korangi "Severe") with no weather time.
 
     # Total zones count
     total_zones_rows = safe_query("SELECT COUNT(*) as count FROM zones;")
@@ -138,58 +128,88 @@ def get_overview(
     else:
         integrity_pct = 100.0
 
-    # 5. Prediction series per hazard
-    predictions_sql = """
-    SELECT 
-        forecast_time,
-        hazard_type,
-        ROUND(AVG(probability), 3) AS probability,
-        ROUND(AVG(interval_low), 3) AS interval_low,
-        ROUND(AVG(interval_high), 3) AS interval_high,
-        ROUND(AVG(baseline_value), 3) AS baseline_value
-    FROM predictions
-    WHERE forecast_time <= ?
-    GROUP BY forecast_time, hazard_type
-    ORDER BY forecast_time ASC;
-    """
-    pred_rows = safe_query(predictions_sql, [cutoff_utc])
-
+    # 5. Hourly Open-Meteo forecast for the selected window. The stored LightGBM
+    # row is one past hour and is not the horizon shown here.
+    window_hours = 24 if range == "24h" else 48 if range == "48h" else 168
+    live_hours, _, _ = upcoming_hours("Karachi", window_hours)
     pred_series: dict[str, List[PredictionPoint]] = {
         "heat": [],
         "heavy_rain": [],
     }
+    aware_now = datetime.now(timezone.utc)
+    for hour in live_hours:
+        hours_ahead = max(0, int(round((hour.time_utc - aware_now).total_seconds() / 3600.0)))
+        if hour.temperature_c is not None:
+            temp = round(float(hour.temperature_c), 1)
+            pred_series["heat"].append(
+                PredictionPoint(
+                    forecast_time=hour.time_utc,
+                    hours_ahead=hours_ahead,
+                    probability=0.0,
+                    interval_low=temp,
+                    interval_high=temp,
+                    baseline_value=0.0,
+                    hazard_type="heat",
+                    median=temp,
+                )
+            )
+        if hour.precipitation_mm is not None:
+            precip = round(float(hour.precipitation_mm), 3)
+            pred_series["heavy_rain"].append(
+                PredictionPoint(
+                    forecast_time=hour.time_utc,
+                    hours_ahead=hours_ahead,
+                    probability=1.0 if precip >= 2.5 else 0.0,
+                    interval_low=precip,
+                    interval_high=precip,
+                    baseline_value=0.0,
+                    hazard_type="heavy_rain",
+                    median=precip,
+                )
+            )
 
-    for p in pred_rows:
-        f_time = p["forecast_time"]
-        if isinstance(f_time, str):
-            try:
-                dt_obj = datetime.fromisoformat(f_time.replace("Z", "+00:00"))
-            except Exception:
-                dt_obj = datetime.now(timezone.utc)
-        elif isinstance(f_time, datetime):
-            dt_obj = f_time.replace(tzinfo=timezone.utc) if f_time.tzinfo is None else f_time
-        else:
-            dt_obj = datetime.now(timezone.utc)
-
-        # Calculate hours ahead relative to now
-        delta = dt_obj - datetime.now(timezone.utc)
-        hours_ahead = max(0, int(round(delta.total_seconds() / 3600.0)))
-
-        htype = p.get("hazard_type", "heat")
-        point = PredictionPoint(
-            forecast_time=dt_obj,
-            hours_ahead=hours_ahead,
-            probability=float(p.get("probability", 0.0)),
-            interval_low=float(p.get("interval_low", 0.0)),
-            interval_high=float(p.get("interval_high", 0.0)),
-            baseline_value=float(p.get("baseline_value", 0.0)),
-            hazard_type=htype,
-        )
-
-        if htype in pred_series:
-            pred_series[htype].append(point)
-        else:
-            pred_series[htype] = [point]
+    observed_since = now_utc - timedelta(hours=window_hours)
+    latest_temp_rows = safe_query(
+        """
+        SELECT temperature_2m_c, timestamp_utc
+        FROM weather_hourly
+        WHERE lower(city) = 'karachi' AND temperature_2m_c IS NOT NULL
+        ORDER BY timestamp_utc DESC
+        LIMIT 1
+        """
+    )
+    rain_rows = safe_query(
+        """
+        SELECT SUM(precipitation_mm) AS rain_mm, MAX(precipitation_mm) AS max_hour_mm
+        FROM weather_hourly
+        WHERE lower(city) = 'karachi' AND timestamp_utc >= ?
+        """,
+        [observed_since],
+    )
+    last_wet_rows = safe_query(
+        """
+        SELECT timestamp_utc, precipitation_mm
+        FROM weather_hourly
+        WHERE lower(city) = 'karachi' AND precipitation_mm > 0
+        ORDER BY timestamp_utc DESC
+        LIMIT 1
+        """
+    )
+    latest_temp = latest_temp_rows[0].get("temperature_2m_c") if latest_temp_rows else None
+    rain_total = rain_rows[0].get("rain_mm") if rain_rows else None
+    max_hour = rain_rows[0].get("max_hour_mm") if rain_rows else None
+    temp_time = latest_temp_rows[0].get("timestamp_utc") if latest_temp_rows else None
+    heat_hazard_level = _heat_level(None if latest_temp is None else float(latest_temp))
+    rain_hazard_level = _rain_level(None if max_hour is None else float(max_hour))
+    # Weather is stored for the city point, not for each district, so no district is marked severe from this series.
+    severe_count = 0
+    severe_names: List[str] = []
+    last_wet = ""
+    if last_wet_rows:
+        wet_mm = last_wet_rows[0].get("precipitation_mm")
+        wet_time = last_wet_rows[0].get("timestamp_utc")
+        if wet_mm is not None:
+            last_wet = f" Last stored hour above 0 mm was {wet_mm} mm at {wet_time}."
 
     overview_data = OverviewData(
         time_range=range,
@@ -202,22 +222,30 @@ def get_overview(
         heat_summary=HazardMetricSummary(
             hazard_type="heat",
             hazard_level=heat_hazard_level,
-            headline_value=43.8,
+            headline_value=float(latest_temp) if latest_temp is not None else None,
             unit="°C",
-            interval_low=41.5,
-            interval_high=46.2,
-            source="PMD Karachi Met & GFS 0.25°",
-            label="Feels Like (WBGT)",
+            source=(
+                "Open-Meteo observed 2m air temperature"
+                + (f" at {temp_time}." if temp_time is not None else ".")
+                + " Not WBGT and not a forecast."
+            ),
+            label="Latest observed air temperature, Karachi",
+            kind="observed",
         ),
         rain_summary=HazardMetricSummary(
             hazard_type="heavy_rain",
             hazard_level=rain_hazard_level,
-            headline_value=38.0,
-            unit="mm / 24h",
-            interval_low=15.0,
-            interval_high=65.0,
-            source="PMD Radar (Badin) + ECMWF",
-            label="Precipitation Accumulation",
+            headline_value=round(float(rain_total), 2) if rain_total is not None else None,
+            unit=f"mm / {range}",
+            source=(
+                "Open-Meteo hourly precipitation at the Karachi point (24.851°N, 66.992°E). "
+                "The badge uses the wettest hour in this window: below 1 mm is Low, "
+                "1 mm is Moderate, 2.5 mm is High, and 10 mm is Severe. "
+                "It is not the seeded district exposure table. Not an ECMWF or radar forecast."
+                + last_wet
+            ),
+            label="Observed precipitation, Karachi",
+            kind="observed",
         ),
         freshness_summary=FreshnessMetricSummary(
             status=freshness_status,
@@ -230,7 +258,7 @@ def get_overview(
             severe_count=severe_count,
             total_count=total_zones_count,
             hotspots=severe_names,
-            risk_level="Severe",
+            risk_level=rain_hazard_level,
         ),
         predictions_series=pred_series,
     )

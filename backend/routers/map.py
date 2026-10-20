@@ -420,30 +420,12 @@ def get_zone_detail(zone_id: str) -> APIResponse[ZoneDetailResponseData]:
         for i in ind_rows
     ]
 
-    # 6. Synthesize Hazard Detail
-    heat_p = float(heat_pred.get("avg_prob", 0.50))
-    rain_p = float(rain_pred.get("avg_prob", 0.45))
-    compound_prob = min(0.99, round(1.0 - (1.0 - heat_p) * (1.0 - rain_p), 3))
-
-    heat_low = float(heat_pred.get("avg_low", max(0.05, heat_p - 0.12)))
-    heat_high = float(heat_pred.get("avg_high", min(0.99, heat_p + 0.12)))
-
-    rain_low = float(rain_pred.get("avg_low", max(0.04, rain_p - 0.14)))
-    rain_high = float(rain_pred.get("avg_high", min(0.99, rain_p + 0.13)))
-
-    comb_low = round(min(heat_low, rain_low), 3)
-    comb_high = min(0.99, round(max(heat_high, rain_high), 3))
-
-    # Baseline comparison
-    heat_base = float(heat_pred.get("avg_base", 0.22))
-    rain_base = float(rain_pred.get("avg_base", 0.15))
-    comb_base = round((heat_base + rain_base) / 2.0, 3)
-
-    # Realistic physical hazard values matching design
-    # WBGT Celsius: ~26C to 36C
-    wbgt_c = round(26.0 + heat_p * 10.0, 1)
-    # 6h rainfall burst mm: ~15mm to 65mm
-    burst_mm = round(15.0 + rain_p * 45.0, 1)
+    # Hazard numbers come only from a prediction row for this zone.
+    # Do not invent WBGT, a 6-hour burst, or default probabilities.
+    rain_p = float(rain_pred["avg_prob"]) if rain_pred.get("avg_prob") is not None else None
+    rain_low = float(rain_pred["avg_low"]) if rain_pred.get("avg_low") is not None else None
+    rain_high = float(rain_pred["avg_high"]) if rain_pred.get("avg_high") is not None else None
+    rain_base = float(rain_pred["avg_base"]) if rain_pred.get("avg_base") is not None else None
 
     # Warning label
     heat_lvl = str(heat_exp.get("risk_level", "Moderate"))
@@ -463,18 +445,18 @@ def get_zone_detail(zone_id: str) -> APIResponse[ZoneDetailResponseData]:
 
     hazard_detail = ZoneHazardDetail(
         hazard_type="combined",
-        probability=compound_prob,
-        interval_low=comb_low,
-        interval_high=comb_high,
-        interval=[comb_low, comb_high],
-        baseline_value=comb_base,
-        heat_probability=heat_p,
-        heat_interval=[heat_low, heat_high],
+        probability=rain_p,
+        interval_low=rain_low,
+        interval_high=rain_high,
+        interval=[rain_low, rain_high] if rain_low is not None and rain_high is not None else [],
+        baseline_value=rain_base,
+        heat_probability=None,
+        heat_interval=None,
         rain_probability=rain_p,
-        rain_interval=[rain_low, rain_high],
-        wbgt_celsius=wbgt_c,
-        rainfall_6h_mm=burst_mm,
-        warning_label=warning_label,
+        rain_interval=[rain_low, rain_high] if rain_low is not None and rain_high is not None else None,
+        wbgt_celsius=None,
+        rainfall_6h_mm=None,
+        warning_label=warning_label + " Exposure index, not a model forecast." if rain_p is None else warning_label,
     )
 
     # 7. Synthesize Exposure Detail

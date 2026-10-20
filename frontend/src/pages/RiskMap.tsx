@@ -982,8 +982,8 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
                         <h3 className="font-bold text-sm text-on-surface uppercase tracking-wide">
                           Meteorological Hazard &amp; Forecast
                         </h3>
-                        <span className="font-mono text-[11px] text-error font-semibold flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-error animate-ping" /> Live Ensemble
+                        <span className="font-mono text-[11px] text-on-surface-variant font-semibold">
+                          Zone exposure index
                         </span>
                       </div>
 
@@ -997,26 +997,34 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
                         </div>
                         <div className="flex items-baseline gap-2">
                           <span className="font-mono text-3xl font-bold text-error">
-                            {Math.round(zoneDetail.hazard.probability * 100)}%
+                            {zoneDetail.hazard.probability == null
+                              ? '—'
+                              : `${Math.round(zoneDetail.hazard.probability * 100)}%`}
                           </span>
                           <span className="text-xs text-on-surface-variant">
-                            vs Historical Baseline: {Math.round(zoneDetail.hazard.baseline_value * 100)}%
+                            {zoneDetail.hazard.probability == null
+                              ? 'No model forecast for this zone'
+                              : `Baseline ${zoneDetail.hazard.baseline_value ?? '—'} mm/h`}
                           </span>
                         </div>
 
                         {/* Uncertainty Interval Range Bar (Rule 5) */}
                         <div className="flex flex-col gap-1 bg-surface-container p-2.5 rounded-lg border border-outline-variant/20">
                           <div className="flex items-center justify-between font-mono text-xs">
-                            <span className="text-on-surface-variant">P10 (Low): {Math.round(zoneDetail.hazard.interval_low * 100)}%</span>
-                            <span className="font-bold text-on-surface">Likely Range</span>
-                            <span className="text-on-surface-variant">P90 (High): {Math.round(zoneDetail.hazard.interval_high * 100)}%</span>
+                            <span className="text-on-surface-variant">
+                              P10: {zoneDetail.hazard.interval_low ?? '—'} mm/h
+                            </span>
+                            <span className="font-bold text-on-surface">Rain interval</span>
+                            <span className="text-on-surface-variant">
+                              P90: {zoneDetail.hazard.interval_high ?? '—'} mm/h
+                            </span>
                           </div>
                           <div className="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden relative">
                             <div
                               className="absolute top-0 bottom-0 bg-error rounded-full"
                               style={{
-                                left: `${Math.max(0, zoneDetail.hazard.interval_low * 100)}%`,
-                                width: `${Math.min(100, (zoneDetail.hazard.interval_high - zoneDetail.hazard.interval_low) * 100)}%`,
+                                left: '0%',
+                                width: zoneDetail.hazard.interval_high == null ? '0%' : '40%',
                               }}
                             />
                           </div>
@@ -1029,13 +1037,13 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
                         <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/30 flex flex-col gap-1">
                           <span className="text-xs text-on-surface-variant">Wet Bulb Globe Temp</span>
                           <div className="flex items-baseline gap-1">
-                            <span className="font-mono text-2xl font-bold text-error">
-                              {zoneDetail.hazard.wbgt_celsius}
+                            <span className="font-mono text-2xl font-bold text-on-surface-variant">
+                              {zoneDetail.hazard.wbgt_celsius ?? '—'}
                             </span>
                             <span className="text-xs text-on-surface-variant">°C</span>
                           </div>
-                          <span className="font-mono text-[10px] text-error">
-                            Exceeds safety threshold (&gt;32°C)
+                          <span className="font-mono text-[10px] text-on-surface-variant">
+                            WBGT is not calculated
                           </span>
                         </div>
 
@@ -1043,13 +1051,13 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
                         <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/30 flex flex-col gap-1">
                           <span className="text-xs text-on-surface-variant">Peak 6h Rain Burst</span>
                           <div className="flex items-baseline gap-1">
-                            <span className="font-mono text-2xl font-bold text-secondary">
-                              {zoneDetail.hazard.rainfall_6h_mm}
+                            <span className="font-mono text-2xl font-bold text-on-surface-variant">
+                              {zoneDetail.hazard.rainfall_6h_mm ?? '—'}
                             </span>
                             <span className="text-xs text-on-surface-variant">mm / 6h</span>
                           </div>
-                          <span className="font-mono text-[10px] text-secondary">
-                            Triggers street inundation
+                          <span className="font-mono text-[10px] text-on-surface-variant">
+                            No 6-hour burst forecast
                           </span>
                         </div>
                       </div>
