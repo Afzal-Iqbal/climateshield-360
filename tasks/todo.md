@@ -39,7 +39,7 @@
   - [x] `cd frontend && npm run build` completes in <10s with 0 errors
   - [x] `cd backend && PYTHONPATH=backend pytest backend/tests` passes 81/81 tests
 
-- [ ] **Task 4: Commit and Push to `Hunain` Branch**
+- [x] **Task 4: Commit and Push to `Hunain` Branch**
 
   **Description:** Stage the changes, commit with a descriptive message, and push directly to `origin/Hunain` using `git` and `gh` CLI.
 
