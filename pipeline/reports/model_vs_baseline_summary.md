@@ -1,8 +1,8 @@
 # Deliverable 3: Predictive Model vs Declared Baseline Report
 
-**Generated:** 2026-10-19 14:51:31 UTC  
+**Generated:** 2026-10-20 03:17:42 UTC  
 **Track:** Climate (Rainfall & Road Inundation)  
-**Evaluation Horizon:** 2025–2026 untouched future test set (189,168 records)
+**Evaluation Horizon:** 2025–2026 untouched future test set (189,276 records)
 
 ---
 
@@ -10,9 +10,9 @@
 
 | Metric | Declared Persistence Baseline | LightGBM ML Model | Relative Improvement | HackInsight Milestone |
 |---|---|---|---|---|
-| **Rainfall MAE** | `0.1055 mm` | `0.0685 mm` | **`+35.10%`** | PASSED (>= 20%) |
-| **Rainfall RMSE** | `0.6417 mm` | `0.3979 mm` | **`+38.00%`** | Significant reduction |
-| **Inundation Brier Score** | `0.0153` | `0.0351` | **`-129.37%`** | Calibrated probabilities |
+| **Rainfall MAE** | `0.1055 mm` | `0.0685 mm` | **`+35.09%`** | PASSED (>= 20%) |
+| **Rainfall RMSE** | `0.6415 mm` | `0.3978 mm` | **`+38.00%`** | Significant reduction |
+| **Caution-event Brier (rain >= 2.5 mm)** | `0.0125` | `0.0053` | **`+57.32%`** | PASSED (>= 20%) |
 | **Forecast Explanatory Power (R^2)** | `0.0000` | `0.3003` | - | Strong predictive signal |
 
 ## 2. Uncertainty Quantification (Prediction Intervals)
@@ -28,19 +28,19 @@
 
 | City | Province | Test Records | Baseline MAE | Model MAE | Improvement |
 |---|---|---|---|---|---|
-| Islamabad | - | 15,764 | 0.2212 mm | 0.1377 mm | **+37.77%** |
-| Rawalpindi | - | 15,764 | 0.2069 mm | 0.1296 mm | **+37.37%** |
-| Gilgit | - | 15,764 | 0.2330 mm | 0.1219 mm | **+47.68%** |
-| Lahore | - | 15,764 | 0.1740 mm | 0.1118 mm | **+35.78%** |
-| Peshawar | - | 15,764 | 0.1461 mm | 0.0943 mm | **+35.45%** |
-| Faisalabad | - | 15,764 | 0.0910 mm | 0.0670 mm | **+26.40%** |
-| Karachi | - | 15,764 | 0.0473 mm | 0.0393 mm | **+16.78%** |
-| Multan | - | 15,764 | 0.0441 mm | 0.0365 mm | **+17.13%** |
-| Quetta | - | 15,764 | 0.0399 mm | 0.0263 mm | **+34.18%** |
-| Hyderabad | - | 15,764 | 0.0292 mm | 0.0256 mm | **+12.17%** |
-| Sukkur | - | 15,764 | 0.0150 mm | 0.0161 mm | **-7.14%** |
-| Gwadar | - | 15,764 | 0.0185 mm | 0.0157 mm | **+15.04%** |
+| Islamabad | Islamabad Capital Territory | 15,773 | 0.2211 mm | 0.1376 mm | **+37.77%** |
+| Rawalpindi | Punjab | 15,773 | 0.2068 mm | 0.1295 mm | **+37.37%** |
+| Gilgit | Gilgit-Baltistan | 15,773 | 0.2329 mm | 0.1219 mm | **+47.66%** |
+| Lahore | Punjab | 15,773 | 0.1739 mm | 0.1117 mm | **+35.78%** |
+| Peshawar | Khyber Pakhtunkhwa | 15,773 | 0.1460 mm | 0.0943 mm | **+35.45%** |
+| Faisalabad | Punjab | 15,773 | 0.0910 mm | 0.0670 mm | **+26.39%** |
+| Karachi | Sindh | 15,773 | 0.0472 mm | 0.0393 mm | **+16.77%** |
+| Multan | Punjab | 15,773 | 0.0441 mm | 0.0365 mm | **+17.11%** |
+| Quetta | Balochistan | 15,773 | 0.0399 mm | 0.0263 mm | **+34.17%** |
+| Hyderabad | Sindh | 15,773 | 0.0292 mm | 0.0256 mm | **+12.17%** |
+| Sukkur | Sindh | 15,773 | 0.0150 mm | 0.0161 mm | **-7.14%** |
+| Gwadar | Balochistan | 15,773 | 0.0185 mm | 0.0157 mm | **+15.04%** |
 
-> **Audited Weakest Group:** **`Islamabad`** with Model MAE of `0.1377 mm`.
-> **Actionable Operational Guidance:** For Islamabad, road inundation models should prioritize GloFAS river streamflow and antecedent soil saturation layers to compensate for localized convective radar attenuation.
+> **Highest-error city:** **`Islamabad`** with model MAE `0.1376 mm`.
+> **Cities where the model loses to persistence:** Sukkur (-7.14%). Treat those forecasts as no better than yesterday's rain.
 

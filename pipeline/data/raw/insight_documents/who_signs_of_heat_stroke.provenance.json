@@ -1,0 +1,16 @@
+{
+  "doc_id": "who_signs_of_heat_stroke",
+  "title": "Signs of heat stroke",
+  "publisher": "WHO",
+  "url": "https://cdn.who.int/media/docs/default-source/environment-climate-change-and-health/signs-of-heat-stroke.pdf",
+  "listing_url": "https://www.who.int/news-room/fact-sheets/detail/climate-change-heat-and-health",
+  "fetched_at_utc": "2026-10-20T03:30:06.983439+00:00",
+  "http_status": 200,
+  "content_type": "application/pdf",
+  "robots": "robots.txt unread (HTTP 403: Forbidden); proceeding with GET and logging the failure",
+  "bytes": 84099,
+  "sha256": "e722065d0ce8ba97bf4328cc5ea89f383645f6f6d22816dbde2039079a183288",
+  "error": "",
+  "text_chars": 1033,
+  "status": "parsed"
+}

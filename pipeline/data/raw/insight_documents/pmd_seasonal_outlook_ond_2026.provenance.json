@@ -1,0 +1,16 @@
+{
+  "doc_id": "pmd_seasonal_outlook_ond_2026",
+  "title": "PMD seasonal outlook October to December 2026",
+  "publisher": "PMD",
+  "url": "https://weather.gov.pk/storage/files/91/OND_2026_outlook.pdf",
+  "listing_url": "https://weather.gov.pk/",
+  "fetched_at_utc": "2026-10-20T03:32:04.081426+00:00",
+  "http_status": 200,
+  "content_type": "application/pdf",
+  "robots": "robots.txt does not disallow this path",
+  "bytes": 805801,
+  "sha256": "8c69e52da5296174fa6a0f7c8aa91730d2135adbf5e1a2af46bc417ef17807b0",
+  "error": "",
+  "text_chars": 6335,
+  "status": "parsed"
+}

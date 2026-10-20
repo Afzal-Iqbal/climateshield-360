@@ -864,6 +864,25 @@ class ResponsibleUseNotes(BaseModel):
     emergency_contacts: List[EmergencyContactItem]
 
 
+class InsightCitation(BaseModel):
+    section_id: str
+    title: str
+    publisher: str
+    excerpt: str
+
+
+class InsightAnswerData(BaseModel):
+    knows: bool
+    question: str
+    answer: str
+    citations: List[InsightCitation]
+    row_ids: List[str]
+    numbers: List[str]
+    limits: str
+    retriever: str
+    index_sections: int
+
+
 class MethodologyResponseData(BaseModel):
     system_title: str
     system_version: str

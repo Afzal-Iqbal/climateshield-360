@@ -31,6 +31,40 @@ FIGURES_DIR = os.path.join(REPORTS_DIR, "figures")
 os.makedirs(MODELS_DIR, exist_ok=True)
 os.makedirs(FIGURES_DIR, exist_ok=True)
 
+class CalibratedCautionModel:
+    """Probability of the declared caution event, calibrated off the test set.
+
+    The base model is fit only on years through 2023. Isotonic regression is fit
+    on 2024. The 2025–2026 test set is scored once. ``class_weight='balanced'``
+    is not used: it pushed rare-event probabilities up and made Brier worse than
+    the 24-hour persistence heuristic.
+    """
+
+    def __init__(self, scorer, calibrator, kind: str, event: str):
+        self.scorer = scorer
+        self.calibrator = calibrator
+        self.kind = kind
+        self.event = event
+
+    def _raw_score(self, features):
+        import numpy as np
+
+        if self.kind == "classifier":
+            raw = self.scorer.predict_proba(features)[:, 1]
+        else:
+            raw = np.clip(self.scorer.predict(features), 0.0, None)
+        return raw
+
+    def predict_proba(self, features):
+        import numpy as np
+
+        probability = np.clip(self.calibrator.predict(self._raw_score(features)), 0.0, 1.0)
+        return np.column_stack([1.0 - probability, probability])
+
+    def predict(self, features):
+        return (self.predict_proba(features)[:, 1] >= 0.5).astype(int)
+
+
 CITY_PROVINCE_MAP = {
     'Karachi': 'Sindh',
     'Hyderabad': 'Sindh',
@@ -260,9 +294,10 @@ def train_and_evaluate(df):
     X_test = test_df[feature_cols]
     y_test = test_df['precipitation']
     
-    # Classification target: 0: Normal, 1: Caution/Hazardous
-    y_train_cls = (train_df['road_condition_code'] >= 1).astype(int)
-    y_test_cls = (test_df['road_condition_code'] >= 1).astype(int)
+    # Caution event is the rule written in the Dataset Declaration: rain >= 2.5 mm/h.
+    caution_mm = 2.5
+    y_train_cls = (train_df["precipitation"] >= caution_mm).astype(int)
+    y_test_cls = (test_df["precipitation"] >= caution_mm).astype(int)
     
     print("\n=== 2. Evaluating Declared Baselines on Test Set (2025-2026) ===")
     # Baseline 1: 24h persistence (ŷ_t = y_{t-24h})
@@ -270,8 +305,8 @@ def train_and_evaluate(df):
     baseline_mae = mean_absolute_error(y_test, y_baseline_pred)
     baseline_rmse = np.sqrt(mean_squared_error(y_test, y_baseline_pred))
     
-    # Baseline 2: Static Heuristic Rule (>= 2.5 mm/hr triggers caution)
-    y_baseline_cls_pred = (y_baseline_pred >= 2.5).astype(int)
+    # Baseline 2: the same 2.5 mm rule applied to yesterday's rain, scored as 0/1 probabilities.
+    y_baseline_cls_pred = (y_baseline_pred >= caution_mm).astype(int)
     baseline_brier = brier_score_loss(y_test_cls, y_baseline_cls_pred)
     
     print(f"Declared 24h Persistence Baseline MAE:  {baseline_mae:.4f} mm")
@@ -339,23 +374,79 @@ def train_and_evaluate(df):
     print(f"Uncertainty 80% Prediction Interval Coverage: {interval_coverage:.2f}%")
     print(f"Average Interval Width (Q90 - Q10): {avg_interval_width:.2f} mm")
 
-    print("\n=== 5. Training LightGBM Classifier (Road Inundation Caution/Hazard) ===")
-    lgb_cls = lgb.LGBMClassifier(
-        n_estimators=250,
+    print("\n=== 5. Calibrated caution probability (declared 2.5 mm/h event) ===")
+    from sklearn.isotonic import IsotonicRegression
+
+    fit_mask = train_df["year"] <= 2023
+    cal_mask = train_df["year"] == 2024
+    if int(cal_mask.sum()) < 100 or int(fit_mask.sum()) < 100:
+        raise RuntimeError("Training window is too small to hold out 2024 for calibration.")
+
+    def _isotonic(raw_scores, labels):
+        calibrator = IsotonicRegression(out_of_bounds="clip", y_min=0.0, y_max=1.0)
+        calibrator.fit(np.asarray(raw_scores, dtype=float), np.asarray(labels, dtype=float))
+        return calibrator
+
+    def _brier_on(calibrator, raw_scores, labels):
+        probability = np.clip(calibrator.predict(np.asarray(raw_scores, dtype=float)), 0.0, 1.0)
+        return brier_score_loss(labels, probability), probability
+
+    classifier = lgb.LGBMClassifier(
+        n_estimators=200,
         learning_rate=0.05,
         num_leaves=31,
-        class_weight='balanced',
         random_state=42,
-        n_jobs=-1
+        n_jobs=-1,
     )
-    lgb_cls.fit(X_train, y_train_cls)
-    y_cls_probs = lgb_cls.predict_proba(X_test)[:, 1]
-    y_cls_pred = (y_cls_probs >= 0.5).astype(int)
-    
+    classifier.fit(X_train.loc[fit_mask], y_train_cls.loc[fit_mask])
+    classifier_cal = _isotonic(
+        classifier.predict_proba(X_train.loc[cal_mask])[:, 1],
+        y_train_cls.loc[cal_mask],
+    )
+    classifier_val_brier, _ = _brier_on(
+        classifier_cal,
+        classifier.predict_proba(X_train.loc[cal_mask])[:, 1],
+        y_train_cls.loc[cal_mask],
+    )
+
+    rain_calibrator_model = lgb.LGBMRegressor(
+        n_estimators=200,
+        learning_rate=0.05,
+        num_leaves=31,
+        subsample=0.8,
+        colsample_bytree=0.8,
+        random_state=42,
+        n_jobs=-1,
+    )
+    rain_calibrator_model.fit(X_train.loc[fit_mask], y_train.loc[fit_mask])
+    regressor_cal = _isotonic(
+        np.clip(rain_calibrator_model.predict(X_train.loc[cal_mask]), 0.0, None),
+        y_train_cls.loc[cal_mask],
+    )
+    regressor_val_brier, _ = _brier_on(
+        regressor_cal,
+        np.clip(rain_calibrator_model.predict(X_train.loc[cal_mask]), 0.0, None),
+        y_train_cls.loc[cal_mask],
+    )
+
+    if regressor_val_brier <= classifier_val_brier:
+        caution_model = CalibratedCautionModel(
+            rain_calibrator_model, regressor_cal, "regressor", "precipitation >= 2.5 mm"
+        )
+        caution_source = "isotonic map from lagged rainfall regressor (fit <=2023, calibrated on 2024)"
+        print(f"Validation Brier: regressor map {regressor_val_brier:.4f} beat classifier {classifier_val_brier:.4f}")
+    else:
+        caution_model = CalibratedCautionModel(
+            classifier, classifier_cal, "classifier", "precipitation >= 2.5 mm"
+        )
+        caution_source = "isotonic-calibrated LightGBM classifier (fit <=2023, calibrated on 2024)"
+        print(f"Validation Brier: classifier {classifier_val_brier:.4f} beat regressor map {regressor_val_brier:.4f}")
+
+    y_cls_probs = caution_model.predict_proba(X_test)[:, 1]
     model_brier = brier_score_loss(y_test_cls, y_cls_probs)
     brier_improvement_pct = ((baseline_brier - model_brier) / baseline_brier) * 100.0
-    print(f"LightGBM Classifier Brier Score: {model_brier:.4f}")
-    print(f"--> Brier Score Improvement:     {brier_improvement_pct:+.2f}%")
+    print(f"Calibrated caution Brier Score: {model_brier:.4f}")
+    print(f"--> Brier Score Improvement:    {brier_improvement_pct:+.2f}%")
 
     print("\n=== 6. Disaggregated Group Fairness Analysis ===")
     test_eval_df = test_df.copy()
@@ -373,6 +464,7 @@ def train_and_evaluate(df):
         model_mae=('abs_err_model', 'mean')
     ).reset_index()
     city_fairness['gain_pct'] = ((city_fairness['baseline_mae'] - city_fairness['model_mae']) / city_fairness['baseline_mae']) * 100.0
+    city_fairness['province'] = city_fairness['city'].map(CITY_PROVINCE_MAP).fillna('Other')
     city_fairness = city_fairness.sort_values(by='model_mae', ascending=False)
     
     # 6B: Fairness by Province
@@ -405,7 +497,7 @@ def train_and_evaluate(df):
     # Save artifacts
     print("\n=== 7. Saving Trained Model Artifacts & Generating Reports ===")
     joblib.dump(lgb_reg, os.path.join(MODELS_DIR, "lightgbm_rainfall_regressor.joblib"))
-    joblib.dump(lgb_cls, os.path.join(MODELS_DIR, "lightgbm_inundation_classifier.joblib"))
+    joblib.dump(caution_model, os.path.join(MODELS_DIR, "lightgbm_inundation_classifier.joblib"))
     joblib.dump(quantile_models, os.path.join(MODELS_DIR, "quantile_regressors.joblib"))
     print(f"  [OK] Saved model binaries to {MODELS_DIR}")
     
@@ -425,7 +517,7 @@ def train_and_evaluate(df):
         "baseline_mae": round(baseline_mae, 4),
         "baseline_rmse": round(baseline_rmse, 4),
         "baseline_brier": round(baseline_brier, 4),
-        "model_architecture": "LightGBM Regressor + Multi-Quantile (Q10, Q50, Q90) + LightGBM Classifier",
+        "model_architecture": "LightGBM Regressor + Multi-Quantile (Q10, Q50, Q90) + " + caution_source,
         "model_mae": round(model_mae, 4),
         "model_rmse": round(model_rmse, 4),
         "model_r2": round(model_r2, 4),
@@ -434,6 +526,14 @@ def train_and_evaluate(df):
         "rmse_improvement_pct": round(rmse_improvement_pct, 2),
         "brier_improvement_pct": round(brier_improvement_pct, 2),
         "meets_20pct_target": bool(meets_target),
+        "meets_brier_20pct_target": bool(brier_improvement_pct >= 20.0),
+        "caution_event": "precipitation >= 2.5 mm at hour t",
+        "caution_model": caution_source,
+        "groups_below_baseline": [
+            {"city": str(row["city"]), "gain_pct": round(float(row["gain_pct"]), 2)}
+            for _, row in city_fairness.iterrows()
+            if float(row["gain_pct"]) < 0
+        ],
         "uncertainty_interval_80pct_coverage": round(interval_coverage, 2),
         "average_interval_width_mm": round(avg_interval_width, 2),
         "weakest_group": {
@@ -462,7 +562,8 @@ def train_and_evaluate(df):
         mf.write("|---|---|---|---|---|\n")
         mf.write(f"| **Rainfall MAE** | `{baseline_mae:.4f} mm` | `{model_mae:.4f} mm` | **`{mae_improvement_pct:+.2f}%`** | {'PASSED (>= 20%)' if meets_target else 'FAILED'} |\n")
         mf.write(f"| **Rainfall RMSE** | `{baseline_rmse:.4f} mm` | `{model_rmse:.4f} mm` | **`{rmse_improvement_pct:+.2f}%`** | Significant reduction |\n")
-        mf.write(f"| **Inundation Brier Score** | `{baseline_brier:.4f}` | `{model_brier:.4f}` | **`{brier_improvement_pct:+.2f}%`** | Calibrated probabilities |\n")
+        brier_status = "PASSED (>= 20%)" if brier_improvement_pct >= 20.0 else "BELOW 20% TARGET"
+        mf.write(f"| **Caution-event Brier (rain >= 2.5 mm)** | `{baseline_brier:.4f}` | `{model_brier:.4f}` | **`{brier_improvement_pct:+.2f}%`** | {brier_status} |\n")
         mf.write(f"| **Forecast Explanatory Power (R^2)** | `0.0000` | `{model_r2:.4f}` | - | Strong predictive signal |\n\n")
         
         mf.write("## 2. Uncertainty Quantification (Prediction Intervals)\n\n")
@@ -476,10 +577,15 @@ def train_and_evaluate(df):
         mf.write("| City | Province | Test Records | Baseline MAE | Model MAE | Improvement |\n")
         mf.write("|---|---|---|---|---|---|\n")
         for _, r in city_fairness.iterrows():
-            mf.write(f"| {r['city']} | - | {r['records']:,} | {r['baseline_mae']:.4f} mm | {r['model_mae']:.4f} mm | **{r['gain_pct']:+.2f}%** |\n")
-            
-        mf.write(f"\n> **Audited Weakest Group:** **`{weakest_city}`** with Model MAE of `{weakest_mae:.4f} mm`.\n")
-        mf.write(f"> **Actionable Operational Guidance:** For {weakest_city}, road inundation models should prioritize GloFAS river streamflow and antecedent soil saturation layers to compensate for localized convective radar attenuation.\n\n")
+            mf.write(f"| {r['city']} | {r['province']} | {r['records']:,} | {r['baseline_mae']:.4f} mm | {r['model_mae']:.4f} mm | **{r['gain_pct']:+.2f}%** |\n")
+
+        below = city_fairness[city_fairness["gain_pct"] < 0]
+        mf.write(f"\n> **Highest-error city:** **`{weakest_city}`** with model MAE `{weakest_mae:.4f} mm`.\n")
+        if below.empty:
+            mf.write("> Every city beat the 24-hour persistence baseline on MAE.\n\n")
+        else:
+            names = ", ".join(f"{row['city']} ({row['gain_pct']:+.2f}%)" for _, row in below.iterrows())
+            mf.write(f"> **Cities where the model loses to persistence:** {names}. Treat those forecasts as no better than yesterday's rain.\n\n")
         
     print(f"  [OK] Saved {summary_md_path}")
     

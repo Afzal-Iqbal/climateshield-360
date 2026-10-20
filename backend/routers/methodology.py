@@ -488,43 +488,46 @@ def get_methodology() -> APIResponse[MethodologyResponseData]:
         ),
     )
 
-    # Technical & Physical Limitations
+    weakest = metrics.get("weakest_group") or {}
+    weakest_name = str(weakest.get("name") or "the highest-error city")
+    weakest_mae = weakest.get("mae")
+    below = metrics.get("groups_below_baseline") or []
+    below_names = ", ".join(str(item.get("city")) for item in below if item.get("city"))
     limitations = [
         LimitationItem(
-            title="Weakest Group Error Performance in Sub-Himalayan Foothills",
-            category="Algorithmic Bias / Orographic",
-            description="The model achieves an overall MAE of 0.0685 mm across Pakistan, but exhibits elevated error in Islamabad (MAE 0.1377 mm) where Margalla foothill orographic lift triggers rapid localized cloudbursts that coarse boundary vectors fail to predict in advance.",
-            operational_impact="Municipal teams in northern foothill zones should calibrate radar rain thresholds lower by 15% and mandate manual spot verification before dispatching dewatering assets.",
+            title="Highest rainfall error is not uniform across cities",
+            category="Group error",
+            description=(
+                f"The holdout report names {weakest_name} as the highest-error city"
+                + (f" (model MAE {weakest_mae} mm)." if weakest_mae is not None else ".")
+                + " A single national MAE hides that difference. The figure is the stored evaluation, not a new estimate."
+            ),
+            operational_impact=str(
+                weakest.get("recommendation")
+                or "Compare that city with its 24-hour persistence baseline before treating the forecast as an improvement."
+            ),
         ),
         LimitationItem(
-            title="Coastal Breeze Microfront Inversions",
-            category="Micro-meteorological",
-            description="Rapid onshore wind shifts from the Arabian Sea create localized temperature drops of up to 3.2°C within 15 minutes across Clifton, DHA, and Kemari. Global numerical boundary sets (GFS) fail to resolve the exact timing of this sea-breeze penetration front, leading to temporary over-estimation of heat stress near coastal sectors between 13:00 and 15:30 PKT.",
-            operational_impact="Heat warnings along coastal corridors should incorporate real-time Manora Island sonic anemometer and automated weather station wind azimuth readings.",
+            title="Some cities do not beat persistence",
+            category="Group error",
+            description=(
+                "Cities where model MAE is worse than 24-hour persistence: "
+                + (below_names or "none in the current report")
+                + ". Those places should be briefed with yesterday's observed rain, not with a claim that the model is better there."
+            ),
+            operational_impact="Read the per-city table before using a city forecast.",
         ),
         LimitationItem(
-            title="Dynamic Nullah Sedimentation & Solid Waste Drift",
-            category="Hydraulic Structural",
-            description="The hydraulic carrying capacities of Gujjar Nullah, Orangi Nullah, and Nehr-e-Khayyam are not static hydraulic constants. Solid waste accumulation, temporary construction scaffolding, and localized sediment silting can reduce cross-sectional discharge rates by 25% to 55% without telemetry detection until physical backwater ponding occurs.",
-            operational_impact="Modelled flood inundation footprints represent unobstructed channel conditions; field dispatchers must account for documented choking points during heavy rainfall.",
+            title="Some older PDFs are catalogued and not parsed",
+            category="Evidence",
+            description="Files that arrived inside the original collection are still flagged document_not_parsed_no_invented_numbers. The Insight Agent quotes only documents it has fetched and extracted from the NDMA, WHO, and PMD pages, and it strips digits from those excerpts.",
+            operational_impact="A catalog title is not the advisory. Ask the publisher when the extracted text says the file could not be read.",
         ),
         LimitationItem(
-            title="High Spring Tide Backwater Stagnation",
-            category="Marine / Tidal",
-            description="During lunar spring tides (>3.4m KPT datum), Karachi South's coastal gravity drains experience hydraulic lock. Rainfall cannot discharge into Chinna Creek or the Lyari delta regardless of channel clearance, causing instantaneous ponding in Kharadar, Mithadar, and II Chundrigar road sectors that hydraulic models map as free-flowing.",
-            operational_impact="Tide tables must be cross-referenced with rain forecast horizons; when tide > 3.2m coincides with > 10mm/hr precipitation, mobile suction pumps must be pre-positioned.",
-        ),
-        LimitationItem(
-            title="Dense Convective Cloud Attenuation on Low-Earth Orbit Radar",
-            category="Sensor Physics",
-            description="Severe convective tropical storms introduce optical and microwave backscatter degradation. PMD S-band Doppler radar and Sentinel-1 SAR reflections can suffer from beam attenuation in rainfall exceeding 65mm/hr, creating temporary radar shadow zones across northern Gadap and Malir districts.",
-            operational_impact="In extreme cloudburst scenarios, radar-derived precipitation rates must be cross-verified against ground tipping-bucket rain gauges at PAF Faisal and Masroor.",
-        ),
-        LimitationItem(
-            title="Indoor Microclimates & High-Density Masonry Amplification",
-            category="Urban Thermal",
-            description="Projections represent outdoor ambient Wet-Bulb Globe Temperature (WBGT) in free-flowing shade. High-density residential settlements with uninsulated corrugated iron (tin) roofing, lack of cross-ventilation, and localized masonry thermal retention (e.g. densely packed quarters in Machar Colony, Lyari, or Korangi) routinely exceed modeled outdoor values by +4°C to +8°C.",
-            operational_impact="Public health and heat wave advisories must treat modeled WBGT values as minimum baseline exposures for informal settlement populations.",
+            title="No clinical, mortality, or loss figures",
+            category="Coverage",
+            description="The warehouse has weather, census, access, and river-stage tables. It does not have hospital admissions, deaths, or monetary damage, so those questions are refused.",
+            operational_impact="Information only, not professional advice. In an emergency contact Rescue 1122 or NDMA.",
         ),
     ]
 

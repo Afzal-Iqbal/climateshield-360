@@ -57,7 +57,7 @@
 ### Expected Volume
 * **Meteorological Heat & Rainfall Data:** Continuous hourly observations across **12 major Pakistani metropolitan areas and economic hubs** (Lahore, Karachi, Rawalpindi, Islamabad, Faisalabad, Multan, Peshawar, Quetta, Hyderabad, Sukkur, Gilgit, Gwadar) spanning nearly 6 full years (2021–2026), capturing the historic 2022 super floods:
   * **Total Ingested Volume:** **592,176 hourly records** *(Exceeds the 50,000-row requirement by over 11x).*
-* **Hydrological Streamflow Data:** **10,585 daily river discharge readings** across 5 critical river basins (Ravi, Indus, Kabul, Soan, Malir).
+* **Hydrological Streamflow Data:** The collected archive does **not** contain a historical 10,585-row GloFAS series. The gold table `glofas_river_discharge` currently holds the live Open-Meteo GloFAS daily series fetched during the event (72 city-day rows on the first stored ingest). PMD danger-level thresholds cover 19 river stations and are stage limits, not a discharge time series.
 * **Spatial & Road Infrastructure:** Full nationwide coverage across **160 administrative districts** (Rural Access Index, road inundation exposure, healthcare travel buffers, and GeoJSON hospital/settlement footprints).
 * **Official Hazard Reports & Census Baselines:** Multi-year NDMA anticipatory action triggers, PMD river danger limits, and 2023 Digital Census district demographic datasets.
 

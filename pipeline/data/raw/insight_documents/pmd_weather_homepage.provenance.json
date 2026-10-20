@@ -1,0 +1,15 @@
+{
+  "doc_id": "pmd_weather_homepage",
+  "title": "PMD live forecasts and warnings",
+  "publisher": "PMD",
+  "url": "https://weather.gov.pk/",
+  "fetched_at_utc": "2026-10-20T03:31:15.954012+00:00",
+  "http_status": 200,
+  "content_type": "text/html; charset=utf-8",
+  "robots": "robots.txt does not disallow this path",
+  "bytes": 197075,
+  "sha256": "7cdca307ba9487f0b7020db1e9e54aa7c349cdc251746fd8dfac6294fef8ebb1",
+  "error": "",
+  "text_chars": 6917,
+  "status": "parsed"
+}

@@ -1,0 +1,15 @@
+{
+  "doc_id": "pmd_homepage",
+  "title": "Pakistan Meteorological Department",
+  "publisher": "PMD",
+  "url": "https://pmd.gov.pk/",
+  "fetched_at_utc": "2026-10-20T03:30:13.151617+00:00",
+  "http_status": 200,
+  "content_type": "text/html",
+  "robots": "robots.txt empty or missing",
+  "bytes": 19998,
+  "sha256": "c68a822325a2233f77bfe8cd0eac76d08983e289ec6bac0de25fb8976937b989",
+  "error": "",
+  "text_chars": 910,
+  "status": "parsed"
+}

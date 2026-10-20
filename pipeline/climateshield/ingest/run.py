@@ -400,6 +400,7 @@ def run_ingest(*, limiter: RateLimiter | None = None) -> dict:
     REPORTS_DIR.mkdir(parents=True, exist_ok=True)
     write_json(HOURLY_STATUS_PATH, status)
     write_json(run_dir / "run_summary.json", status)
+    _record_warehouse_run(run_id, now, datetime.now(timezone.utc), results)
     print(f"Hourly ingest run {run_id}")
     for item in results:
         print(
@@ -410,6 +411,59 @@ def run_ingest(*, limiter: RateLimiter | None = None) -> dict:
         if item.error:
             print(f"    error: {item.error}")
     return status
+
+
+def _record_warehouse_run(
+    run_id: str,
+    started: datetime,
+    finished: datetime,
+    results: list[ConnectorResult],
+) -> None:
+    """Store this run and the sources it actually fetched. Never invents a feed."""
+    import duckdb
+
+    connection = duckdb.connect(str(WAREHOUSE_PATH))
+    try:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS run_status (
+                run_id VARCHAR PRIMARY KEY,
+                started_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                finished_at TIMESTAMP WITH TIME ZONE,
+                status VARCHAR NOT NULL,
+                notes VARCHAR
+            )
+            """
+        )
+        connection.execute("DELETE FROM run_status WHERE run_id = ?", [run_id])
+        connection.execute(
+            "INSERT INTO run_status VALUES (?, ?, ?, ?, ?)",
+            [run_id, started, finished, "success", "hourly ingest of fetched sources only"],
+        )
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS source_freshness (
+                source_name VARCHAR PRIMARY KEY,
+                publisher VARCHAR NOT NULL,
+                licence VARCHAR NOT NULL,
+                last_fetched_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                expected_every_minutes INTEGER NOT NULL,
+                status VARCHAR NOT NULL
+            )
+            """
+        )
+        for item in results:
+            if item.status not in {"success", "partial", "unchanged"} or not item.fetch_time_utc:
+                continue
+            expected = 60 if item.publication_frequency == "hourly" else 1440
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO source_freshness VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                [item.source_id, item.publisher, item.licence or "see source", item.fetch_time_utc, expected, "fresh"],
+            )
+    finally:
+        connection.close()
 
 
 def _impact_summary(results: list[ConnectorResult]) -> dict[str, dict[str, str]]:

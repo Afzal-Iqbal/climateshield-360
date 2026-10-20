@@ -1,0 +1,15 @@
+{
+  "doc_id": "who_heat_and_health_factsheet",
+  "title": "Heat and health",
+  "publisher": "WHO",
+  "url": "https://www.who.int/news-room/fact-sheets/detail/climate-change-heat-and-health",
+  "fetched_at_utc": "2026-10-20T03:30:12.541491+00:00",
+  "http_status": 200,
+  "content_type": "text/html; charset=utf-8",
+  "robots": "robots.txt does not disallow this path",
+  "bytes": 116551,
+  "sha256": "5cad846262775872918295f52864ab435f820601a9a714852aeac0e2dc406cda",
+  "error": "",
+  "text_chars": 14081,
+  "status": "parsed"
+}

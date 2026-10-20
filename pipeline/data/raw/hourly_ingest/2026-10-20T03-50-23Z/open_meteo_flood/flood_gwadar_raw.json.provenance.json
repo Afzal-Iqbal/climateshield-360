@@ -1,0 +1,9 @@
+{
+  "source_id": "open_meteo_flood_glofas",
+  "fetch_time_utc": "2026-10-20T03:50:59.797642+00:00",
+  "query": "https://flood-api.open-meteo.com/v1/flood?latitude=25.202108&longitude=62.300217&daily=river_discharge%2Criver_discharge_mean%2Criver_discharge_median%2Criver_discharge_max&past_days=5&forecast_days=1",
+  "licence": "CC-BY-4.0",
+  "source_url": "https://flood-api.open-meteo.com",
+  "sha256": "b439463016f94b4e4444cb0750a3ea89d9c227cd7a3385c8703d290add9ae65d",
+  "publication_frequency": "daily"
+}

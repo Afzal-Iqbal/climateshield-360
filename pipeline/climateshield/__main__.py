@@ -12,7 +12,7 @@ def main(argv: list[str] | None = None) -> int:
         "command",
         nargs="?",
         default="make-data",
-        choices=["make-data", "inventory", "train", "ingest-hourly"],
+        choices=["make-data", "inventory", "train", "ingest-hourly", "build-insight", "fetch-insight-docs"],
         help="make-data rebuilds cleaned and processed layers. inventory writes the file inventory. train runs Deliverable 3 ML modeling. ingest-hourly fetches supported sources.",
     )
     parser.add_argument("--once", action="store_true", help="Run hourly ingest a single time (default for ingest-hourly).")
@@ -26,6 +26,24 @@ def main(argv: list[str] | None = None) -> int:
         write_windows_task_script()
         once = not args.schedule
         run_hourly_loop(interval_seconds=args.interval_seconds, once=once)
+        return 0
+
+    if args.command == "fetch-insight-docs":
+        from climateshield.insight.corpus import build_index
+        from climateshield.insight.fetch_documents import download_documents, find_pmd_pdfs
+
+        extra_pdfs = find_pmd_pdfs()
+        print("PMD PDFs other than the ISO certificate:", extra_pdfs or "none")
+        download_documents()
+        destination = build_index()
+        print(f"Insight index: {destination}")
+        return 0
+
+    if args.command == "build-insight":
+        from climateshield.insight.corpus import build_index
+
+        destination = build_index()
+        print(f"Insight index: {destination}")
         return 0
 
     if args.command == "train":

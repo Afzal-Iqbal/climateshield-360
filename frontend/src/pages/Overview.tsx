@@ -19,6 +19,7 @@ import { RiskBadge } from '../components/RiskBadge';
 import { SampleBanner } from '../components/SampleBanner';
 import { EmptyState } from '../components/EmptyState';
 import { AnimatedNumber } from '../components/AnimatedNumber';
+import { ClimateGlobe } from '../components/ClimateGlobe';
 import { Skeleton } from '../components/Skeleton';
 import { RiskLevel } from '../types';
 
@@ -72,7 +73,7 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
 
   const overview = overviewResponse?.data;
   const priorities = prioritiesResponse?.data || [];
-  const allPrioritiesCount = allPrioritiesResponse?.data?.length || 14;
+  const allPrioritiesCount = allPrioritiesResponse?.data?.length ?? 0;
   const visiblePriorities = showAllPriorities ? priorities : priorities.slice(0, 5);
 
   // Build combined chart dataset from prediction points
@@ -126,11 +127,25 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
         name: p?.zone_name || spot.defaultName,
         x: spot.x,
         y: spot.y,
-        level: (p?.risk_level || 'Moderate') as RiskLevel,
+        level: (p?.risk_level || null) as RiskLevel | null,
         desc: p?.action_title || p?.reason || '',
       };
     });
   }, [priorities]);
+
+  const paintFor = (id: string) => {
+    const level = mapHotspots.find((spot) => spot.id === id)?.level;
+    if (level === 'Severe') return { fill: '#b91c1c', stroke: '#ef4444' };
+    if (level === 'High') return { fill: '#ea580c', stroke: '#f97316' };
+    if (level === 'Moderate') return { fill: '#d97706', stroke: '#f59e0b' };
+    if (level === 'Low') return { fill: '#047857', stroke: '#34d399' };
+    return { fill: '#334155', stroke: '#94a3b8' };
+  };
+  const labelFor = (id: string, fallback: string) => {
+    const spot = mapHotspots.find((item) => item.id === id);
+    return `${spot?.name || fallback}${spot?.level ? ` (${spot.level})` : ' (no score)'}`;
+  };
+  const severeOnMap = mapHotspots.filter((spot) => spot.level === 'Severe').length;
 
   if (isOverviewError || isPrioritiesError) {
     return (
@@ -217,6 +232,22 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
         </div>
       </div>
 
+      <ClimateGlobe
+        heatLabel={overview?.heat_summary?.label || 'Heat'}
+        heatValue={
+          overview?.heat_summary
+            ? `${overview.heat_summary.headline_value} ${overview.heat_summary.unit}`
+            : '—'
+        }
+        rainLabel={overview?.rain_summary?.label || 'Rain'}
+        rainValue={
+          overview?.rain_summary
+            ? `${overview.rain_summary.headline_value} ${overview.rain_summary.unit}`
+            : '—'
+        }
+        riskLevel={overview?.heat_hazard_level}
+      />
+
       {/* 4 Key Metric Telemetry Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {isOverviewLoading ? (
@@ -239,7 +270,11 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                   <span className="font-mono text-[11px] text-on-surface-variant uppercase tracking-wider">
                     Hazard Vector 01
                   </span>
-                  <RiskBadge level={overview?.heat_hazard_level || 'Severe'} />
+                  {overview?.heat_hazard_level ? (
+                    <RiskBadge level={overview.heat_hazard_level} />
+                  ) : (
+                    <span className="font-mono text-[10px] text-on-surface-variant">No level</span>
+                  )}
                 </div>
                 <div className="mt-1">
                   <span className="text-sm font-semibold text-on-surface block">
@@ -450,7 +485,7 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                   </span>
                 </div>
                 <span className="font-label-mono-sm text-label-mono-sm text-on-surface-variant">
-                  Projections: Horizon {timeRange} | High Spatial Resolution (~500m Grid)
+                  Horizon {timeRange}. Colors follow the priority list, not a separate map model.
                 </span>
               </div>
 
@@ -486,37 +521,37 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                 {/* Malir Basin (East - Severe) */}
                 <path
                   d="M 640 130 L 880 110 L 870 300 L 670 290 L 670 210 Z"
-                  fill="#b91c1c"
+                  fill={paintFor('KHI-MALIR').fill}
                   fillOpacity="0.45"
-                  stroke="#ef4444"
+                  stroke={paintFor('KHI-MALIR').stroke}
                   strokeWidth="2"
                   className="cursor-pointer hover:fill-opacity-70 transition-all"
                   onClick={() => navigate('/risk-map?zone=KHI-MALIR')}
                 />
-                <text x="700" y="200" fill="#fecaca" fontFamily="JetBrains Mono" fontSize="11" fontWeight="bold">
-                  MALIR (CRITICAL)
+                <text x="690" y="200" fill="#e2e8f0" fontFamily="JetBrains Mono" fontSize="11" fontWeight="bold">
+                  {labelFor('KHI-MALIR', 'Malir')}
                 </text>
 
                 {/* Central / Gulshan (Mid-East - Severe) */}
                 <path
                   d="M 420 120 L 640 130 L 670 210 L 490 220 L 410 170 Z"
-                  fill="#b91c1c"
+                  fill={paintFor('KHI-CENTRAL').fill}
                   fillOpacity="0.4"
-                  stroke="#ef4444"
+                  stroke={paintFor('KHI-CENTRAL').stroke}
                   strokeWidth="1.8"
                   className="cursor-pointer hover:fill-opacity-70 transition-all"
                   onClick={() => navigate('/risk-map?zone=KHI-CENTRAL')}
                 />
-                <text x="470" y="175" fill="#fee2e2" fontFamily="JetBrains Mono" fontSize="11" fontWeight="600">
-                  CENTRAL (HEAT ALERT)
+                <text x="450" y="175" fill="#e2e8f0" fontFamily="JetBrains Mono" fontSize="11" fontWeight="600">
+                  {labelFor('KHI-CENTRAL', 'Central')}
                 </text>
 
                 {/* Orangi & West (North-West - High) */}
                 <path
                   d="M 190 70 L 290 60 L 410 120 L 350 190 L 190 160 Z"
-                  fill="#ea580c"
+                  fill={paintFor('KHI-WEST').fill}
                   fillOpacity="0.4"
-                  stroke="#f97316"
+                  stroke={paintFor('KHI-WEST').stroke}
                   strokeWidth="1.5"
                   className="cursor-pointer hover:fill-opacity-70 transition-all"
                   onClick={() => navigate('/risk-map?zone=KHI-WEST')}
@@ -528,23 +563,23 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                 {/* Korangi Industrial & Creek (South-East - Severe Flood) */}
                 <path
                   d="M 490 220 L 670 210 L 670 320 L 480 330 Z"
-                  fill="#b91c1c"
+                  fill={paintFor('KHI-KORANGI').fill}
                   fillOpacity="0.5"
-                  stroke="#ef4444"
+                  stroke={paintFor('KHI-KORANGI').stroke}
                   strokeWidth="2"
                   className="cursor-pointer hover:fill-opacity-70 transition-all"
                   onClick={() => navigate('/risk-map?zone=KHI-KORANGI')}
                 />
-                <text x="520" y="275" fill="#fee2e2" fontFamily="JetBrains Mono" fontSize="11" fontWeight="bold">
-                  KORANGI (FLOOD PRONE)
+                <text x="510" y="275" fill="#e2e8f0" fontFamily="JetBrains Mono" fontSize="11" fontWeight="bold">
+                  {labelFor('KHI-KORANGI', 'Korangi')}
                 </text>
 
                 {/* Lyari / South (Central Dense - Moderate) */}
                 <path
                   d="M 230 180 L 350 190 L 360 255 L 250 250 Z"
-                  fill="#d97706"
+                  fill={paintFor('KHI-SOUTH').fill}
                   fillOpacity="0.35"
-                  stroke="#f59e0b"
+                  stroke={paintFor('KHI-SOUTH').stroke}
                   strokeWidth="1.5"
                   className="cursor-pointer hover:fill-opacity-60 transition-all"
                   onClick={() => navigate('/risk-map?zone=KHI-SOUTH')}
@@ -556,9 +591,9 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                 {/* Kemari / Port Zone (South-West Coastal) */}
                 <path
                   d="M 120 180 L 230 180 L 250 250 L 220 330 L 90 280 Z"
-                  fill="#006398"
+                  fill={paintFor('KHI-KEAMARI').fill}
                   fillOpacity="0.4"
-                  stroke="#38bdf8"
+                  stroke={paintFor('KHI-KEAMARI').stroke}
                   strokeWidth="1.5"
                   className="cursor-pointer hover:fill-opacity-60 transition-all"
                   onClick={() => navigate('/risk-map?zone=KHI-KEAMARI')}
@@ -588,12 +623,12 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                   <div className="relative flex items-center justify-center">
                     <span
                       className={`animate-ping absolute inline-flex h-6 w-6 rounded-full opacity-75 ${
-                        hs.level === 'Severe' ? 'bg-error' : hs.level === 'High' ? 'bg-[#f97316]' : 'bg-[#eab308]'
+                        hs.level === 'Severe' ? 'bg-error' : hs.level === 'High' ? 'bg-[#f97316]' : hs.level === 'Low' ? 'bg-[#34d399]' : hs.level === 'Moderate' ? 'bg-[#eab308]' : 'bg-slate-500'
                       }`}
                     />
                     <span
                       className={`relative inline-flex rounded-full h-3.5 w-3.5 border-2 border-white shadow-md ${
-                        hs.level === 'Severe' ? 'bg-error' : hs.level === 'High' ? 'bg-[#f97316]' : 'bg-[#eab308]'
+                        hs.level === 'Severe' ? 'bg-error' : hs.level === 'High' ? 'bg-[#f97316]' : hs.level === 'Low' ? 'bg-[#34d399]' : hs.level === 'Moderate' ? 'bg-[#eab308]' : 'bg-slate-500'
                       }`}
                     />
                   </div>
@@ -613,8 +648,8 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
                   <span className="font-label-mono-sm text-[10px] uppercase text-secondary font-bold">
                     Zone Inspector
                   </span>
-                  <span className="px-1.5 py-0.2 rounded bg-error font-label-mono-sm text-[9px] text-on-error font-bold">
-                    3 SEVERE ZONES
+                  <span className="px-1.5 py-0.2 rounded bg-surface-container-high font-label-mono-sm text-[9px] text-on-surface font-bold">
+                    {severeOnMap} severe in the priority list
                   </span>
                 </div>
                 <div className="font-title-md text-title-md font-semibold text-on-primary mt-0.5">

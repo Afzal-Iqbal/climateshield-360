@@ -80,6 +80,13 @@ export const PipelineFreshness: React.FC<PipelineFreshnessProps> = ({ isSample =
   const evaluations: ModelEvalExtended[] = modelEvalData?.evaluations || [];
   const modelSummary = modelSummaryResponse?.data;
 
+  const { data: qualitySummaryResponse, isLoading: loadingQuality } = useQuery({
+    queryKey: ['quality-summary'],
+    queryFn: api.getQualitySummary,
+    refetchInterval: 30000,
+  });
+  const qualitySummary = qualitySummaryResponse?.data;
+
   const handleRefreshAll = () => {
     refetchStatus();
     refetchRuns();
@@ -182,7 +189,7 @@ export const PipelineFreshness: React.FC<PipelineFreshnessProps> = ({ isSample =
                 </span>
               </div>
               <div className="flex items-center gap-2 text-on-surface-variant text-[11px] font-mono">
-                <span>Duration: {lastSuccessfulRun.duration_seconds ? `${lastSuccessfulRun.duration_seconds.toFixed(1)}s` : '10.2s'}</span>
+                <span>Duration: {lastSuccessfulRun.duration_seconds != null ? `${lastSuccessfulRun.duration_seconds.toFixed(1)}s` : 'not recorded'}</span>
                 <span>·</span>
                 <span className="text-[#059669] font-bold uppercase">{lastSuccessfulRun.status}</span>
               </div>
@@ -296,7 +303,7 @@ export const PipelineFreshness: React.FC<PipelineFreshnessProps> = ({ isSample =
                 </span>
               </div>
               <div className="text-[11px] font-mono text-on-surface-variant mt-1">
-                Avg Runtime: {hourlyEvidence.avg_duration_seconds ? `${hourlyEvidence.avg_duration_seconds}s` : '10.2s'}
+                Avg Runtime: {hourlyEvidence.avg_duration_seconds != null ? `${hourlyEvidence.avg_duration_seconds}s` : 'not recorded'}
               </div>
             </div>
           ) : (
@@ -325,23 +332,44 @@ export const PipelineFreshness: React.FC<PipelineFreshnessProps> = ({ isSample =
 
           <div className="flex flex-col gap-1">
             <span className="font-mono text-xs font-bold text-on-surface">
-              {statusData?.model_version || 'lightgbm_quantile_v1.0'}
+              {modelSummary?.model_version || statusData?.model_version || 'model report not loaded'}
             </span>
-            <div className="flex items-center gap-1.5 font-mono text-[11px] text-[#059669] font-bold">
-              <span className="w-2 h-2 rounded-full bg-[#059669]"></span>
-              <span>-35.1% MAE vs 30y Baseline</span>
-            </div>
-            <p className="text-[11px] text-on-surface-variant font-mono mt-0.5">
-              Uncertainty Interval: 97.4% observed 80% coverage
-            </p>
-            <div className="text-[10px] text-on-surface-variant font-mono bg-surface-container-low px-2 py-1 rounded border border-outline-variant/20 mt-1">
-              Weakest: <strong className="text-on-surface">Islamabad</strong> (MAE 0.1377)
-            </div>
+            {modelSummary ? (
+              <>
+                <p className="font-mono text-[11px] text-on-surface">
+                  MAE improvement {modelSummary.metrics.mae_improvement_pct}% versus {modelSummary.metrics.baseline_declared}
+                </p>
+                <p className="text-[11px] text-on-surface-variant font-mono mt-0.5">
+                  Interval coverage {modelSummary.interval_coverage.observed_coverage_pct}% of the nominal {modelSummary.interval_coverage.nominal_coverage_pct}% band
+                </p>
+                <div className="text-[10px] text-on-surface-variant font-mono bg-surface-container-low px-2 py-1 rounded border border-outline-variant/20 mt-1">
+                  Highest-error city: <strong className="text-on-surface">{modelSummary.weakest_group.name}</strong> (MAE {modelSummary.weakest_group.mae} mm)
+                </div>
+              </>
+            ) : (
+              <p className="text-[11px] text-on-surface-variant">Evaluation report is not loaded.</p>
+            )}
           </div>
         </div>
       </div>
 
       {/* ============================================================ */}
+      <section className="bg-surface-container-lowest rounded-xl p-space-md shadow-sm border border-outline-variant/30">
+        <h2 className="font-semibold text-on-surface mb-2">Latest Data Quality Agent result</h2>
+        {loadingQuality ? (
+          <p className="font-mono text-xs text-on-surface-variant">Reading quality_logs...</p>
+        ) : qualitySummary ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-xs text-on-surface">
+            <p>Records inspected: {qualitySummary.total_records_inspected}</p>
+            <p>Fix {qualitySummary.fix_count} · Fill {qualitySummary.fill_count}</p>
+            <p>Flag {qualitySummary.flag_count} · Exclude {qualitySummary.exclude_count}</p>
+            <p>Sources audited: {qualitySummary.sources_audited}</p>
+          </div>
+        ) : (
+          <p className="text-sm text-on-surface-variant">Quality summary is not available.</p>
+        )}
+      </section>
+
       {/* SECTION 3: "HOURLY EVIDENCE" PANEL (24 HOURS RUN STATUS)     */}
       {/* ============================================================ */}
       <div className="flex flex-col gap-space-md bg-surface-container-lowest p-space-md sm:p-space-lg rounded-xl shadow-sm border border-outline-variant/30">
@@ -679,70 +707,32 @@ export const PipelineFreshness: React.FC<PipelineFreshnessProps> = ({ isSample =
                 Model Version &amp; Evaluation
               </span>
               <span className="px-2.5 py-0.5 rounded-full bg-secondary-fixed text-on-secondary-fixed font-mono text-[10px] font-bold">
-                {modelSummary?.model_version || 'lightgbm_quantile_v1.0'}
+                {modelSummary?.model_version || 'not loaded'}
               </span>
             </div>
             <h3 className="font-title-md text-title-md text-on-surface font-semibold">
-              LightGBM Multi-Quantile Evaluation vs Baseline
+              Rainfall model versus the declared baseline
             </h3>
             <p className="font-body-sm text-body-sm text-on-surface-variant">
-              Continuous residual evaluation comparing ClimateShield multi-quantile inference (Q10, Q50, Q90) against the Pakistan Meteorological Department 30-year persistence baseline (Rule 5).
+              {modelSummary?.metrics.baseline_declared || 'Baseline text loads from the evaluation report.'} Rainfall error is in millimetres.
             </p>
           </div>
 
-          {/* Metric Comparison Card */}
-          <div className="p-space-md rounded-xl bg-surface-container-low flex flex-col gap-space-xs border border-outline-variant/30">
-            <div className="flex items-baseline justify-between font-mono text-[11px]">
-              <span className="text-on-surface-variant uppercase font-semibold">Error Reduction</span>
-              <span className="text-secondary font-bold">
-                -35.1% Error vs Persistence Baseline
-              </span>
+          {modelSummary ? (
+            <div className="p-space-md rounded-xl bg-surface-container-low flex flex-col gap-space-xs border border-outline-variant/30 font-mono text-xs">
+              <p>Model MAE {modelSummary.metrics.model_mae} mm</p>
+              <p>Baseline MAE {modelSummary.metrics.baseline_mae} mm</p>
+              <p>Improvement {modelSummary.metrics.mae_improvement_pct}%</p>
+              <p>20% MAE target {modelSummary.metrics.meets_20pct_target ? 'met' : 'not met'}</p>
+              <p>
+                Interval coverage {modelSummary.interval_coverage.observed_coverage_pct}% (nominal {modelSummary.interval_coverage.nominal_coverage_pct}%)
+              </p>
+              <p>Train {modelSummary.training_period.description} ({modelSummary.training_period.rows_count} rows)</p>
+              <p>Test {modelSummary.test_period.description} ({modelSummary.test_period.rows_count} rows)</p>
             </div>
-
-            <div className="flex items-baseline gap-space-xs mt-1">
-              <span className="font-metric-display text-metric-display text-on-surface tracking-tight">
-                0.0685°C
-              </span>
-              <span className="font-body-sm text-body-sm text-on-surface-variant">
-                Model MAE (Baseline: 0.1055°C)
-              </span>
-            </div>
-
-            {/* Visual Comparison Bar */}
-            <div className="w-full bg-surface-container-high h-2.5 rounded-full overflow-hidden flex relative mt-1">
-              <div
-                className="bg-secondary h-full rounded-full"
-                style={{ width: '64.9%' }}
-                title="Model MAE 0.0685"
-              ></div>
-              <div className="bg-error/30 h-full flex-1" title="Baseline MAE 0.1055"></div>
-            </div>
-
-            <div className="flex justify-between font-mono text-[11px] text-on-surface-variant pt-1">
-              <span>Model MAE: 0.0685°C</span>
-              <span className="text-error font-medium">PMD Baseline: 0.1055°C</span>
-            </div>
-          </div>
-
-          {/* Model Evaluation Summary Meta */}
-          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-outline-variant/20 font-mono text-xs">
-            <div className="bg-surface-container-low p-2 rounded flex flex-col">
-              <span className="text-[10px] text-on-surface-variant">Target (&gt;20% Gain)</span>
-              <span className="font-bold text-[#059669]">MET (+35.1%)</span>
-            </div>
-            <div className="bg-surface-container-low p-2 rounded flex flex-col">
-              <span className="text-[10px] text-on-surface-variant">Interval Coverage</span>
-              <span className="font-bold text-secondary">97.4% (Nominal 80%)</span>
-            </div>
-            <div className="bg-surface-container-low p-2 rounded flex flex-col">
-              <span className="text-[10px] text-on-surface-variant">Training Period</span>
-              <span className="font-semibold text-on-surface">2021–2024 (403k rows)</span>
-            </div>
-            <div className="bg-surface-container-low p-2 rounded flex flex-col">
-              <span className="text-[10px] text-on-surface-variant">Test Evaluation Period</span>
-              <span className="font-semibold text-on-surface">2025–2026 (189k rows)</span>
-            </div>
-          </div>
+          ) : (
+            <p className="text-sm text-on-surface-variant">Evaluation report is not loaded.</p>
+          )}
         </div>
 
         {/* Right Card: Errors-by-Group Matrix (Weakest Group Flagged) */}

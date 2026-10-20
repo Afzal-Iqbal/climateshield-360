@@ -47,6 +47,7 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
 
   // Drawer & UI States
   const [activeTab, setActiveTab] = useState<DrawerTab>('hazard');
+  const [is3D, setIs3D] = useState(false);
   const [hoveredZone, setHoveredZone] = useState<HoveredZoneInfo | null>(null);
   const [tilesOffline, setTilesOffline] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -185,6 +186,8 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
       },
       center: KARACHI_CENTER,
       zoom: INITIAL_ZOOM,
+      pitch: 0,
+      bearing: 0,
       minZoom: 8.5,
       maxZoom: 18,
       attributionControl: false,
@@ -424,8 +427,11 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
       mapRef.current.flyTo({
         center: KARACHI_CENTER,
         zoom: INITIAL_ZOOM,
+        pitch: 0,
+        bearing: 0,
         duration: 800,
       });
+      setIs3D(false);
     }
   };
 
@@ -435,6 +441,17 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
 
   const handleZoomOut = () => {
     if (mapRef.current) mapRef.current.zoomOut();
+  };
+
+  const handleToggle3D = () => {
+    if (!mapRef.current) return;
+    const next = !is3D;
+    mapRef.current.easeTo({
+      pitch: next ? 55 : 0,
+      bearing: next ? -25 : 0,
+      duration: shouldReduceMotion ? 0 : 900,
+    });
+    setIs3D(next);
   };
 
   const toggleFacilityType = (type: FacilityType) => {
@@ -685,6 +702,20 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
             aria-label="Reset View"
           >
             <span className="material-symbols-outlined text-[18px]">center_focus_strong</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleToggle3D}
+            className={`min-h-[44px] px-3 rounded-xl flex items-center gap-1 text-xs font-semibold ${
+              is3D
+                ? 'bg-secondary text-on-secondary'
+                : 'bg-surface-container/60 text-on-surface dark:text-on-primary'
+            }`}
+            aria-pressed={is3D}
+            aria-label="Toggle three dimensional map tilt"
+          >
+            <span className="material-symbols-outlined text-[18px]">view_in_ar</span>
+            3D
           </button>
         </div>
 
@@ -983,7 +1014,7 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
                           Meteorological Hazard &amp; Forecast
                         </h3>
                         <span className="font-mono text-[11px] text-error font-semibold flex items-center gap-1">
-                          <span className="w-2 h-2 rounded-full bg-error animate-ping" /> Live Ensemble
+                          <span className="w-2 h-2 rounded-full bg-secondary" /> Warehouse forecast
                         </span>
                       </div>
 

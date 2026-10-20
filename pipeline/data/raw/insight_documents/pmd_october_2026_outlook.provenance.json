@@ -1,0 +1,16 @@
+{
+  "doc_id": "pmd_october_2026_outlook",
+  "title": "PMD outlook for October 2026",
+  "publisher": "PMD",
+  "url": "https://weather.gov.pk/storage/files/91/Oct_2026_outlook.pdf",
+  "listing_url": "https://weather.gov.pk/",
+  "fetched_at_utc": "2026-10-20T03:32:06.220659+00:00",
+  "http_status": 200,
+  "content_type": "application/pdf",
+  "robots": "robots.txt does not disallow this path",
+  "bytes": 804775,
+  "sha256": "c11ddd858bda49153af8bdd0102cc2b6cef492c6ac80aadf15108e8642a0b978",
+  "error": "",
+  "text_chars": 5999,
+  "status": "parsed"
+}

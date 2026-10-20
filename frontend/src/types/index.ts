@@ -832,6 +832,25 @@ export interface ResponsibleUseNotes {
   emergency_contacts: EmergencyContactItem[];
 }
 
+export interface InsightCitation {
+  section_id: string;
+  title: string;
+  publisher: string;
+  excerpt: string;
+}
+
+export interface InsightAnswerData {
+  knows: boolean;
+  question: string;
+  answer: string;
+  citations: InsightCitation[];
+  row_ids: string[];
+  numbers: string[];
+  limits: string;
+  retriever: string;
+  index_sections: number;
+}
+
 export interface MethodologyResponseData {
   system_title: string;
   system_version: string;

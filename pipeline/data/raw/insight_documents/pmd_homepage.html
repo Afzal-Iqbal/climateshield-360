@@ -1,0 +1,380 @@
+<!--
+    pmd.gov.pk — landing page
+    Purpose: pmd.gov.pk no longer hosts the full site. This page stays live
+    at the root, explains that PMD's official website is now weather.gov.pk,
+    and gives visitors a handful of working quick links.
+
+    Plain static HTML on purpose — this server prioritizes index.html as its
+    default document, so this sidesteps the priority issue entirely instead
+    of fighting it. The PMD logo and citizen-portal image are referenced by
+    their existing absolute /en/template/... URLs; everything else (fonts,
+    icons, layout, styling) is self-contained in this one file.
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1.0, shrink-to-fit=no">
+
+<title>Pakistan Meteorological Department</title>
+<meta name="description" content="Pakistan Meteorological Department - Government of Pakistan">
+
+<link rel="canonical" href="https://pmd.gov.pk/">
+
+<!-- Inline SVG favicon (data URI) — the old /en/template/img/ icon files no longer
+     exist on the server (confirmed 404), so this renders a reliable navy/blue
+     "PMD" badge instead of a broken favicon in the browser tab. -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2300304d'/%3E%3Ctext x='32' y='42' font-family='Arial,Helvetica,sans-serif' font-size='24' font-weight='700' fill='%23ffffff' text-anchor='middle'%3EPMD%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2300304d'/%3E%3Ctext x='32' y='42' font-family='Arial,Helvetica,sans-serif' font-size='24' font-weight='700' fill='%23ffffff' text-anchor='middle'%3EPMD%3C/text%3E%3C/svg%3E">
+
+<meta property="og:site_name" content="Pakistan Meteorological Department">
+<meta property="og:type" content="government">
+<meta property="og:title" content="Pakistan Meteorological Department — Official Website">
+<meta property="og:description" content="Official domain of the Pakistan Meteorological Department, Government of Pakistan. Live forecasts, warnings and advisories are published at weather.gov.pk.">
+<meta property="og:url" content="https://pmd.gov.pk/">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Font Awesome: the site's own /en/template/vendor/... copy returns 404, so the
+     Quick Links icons were silently failing to load. Using a stable public CDN copy instead. -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "GovernmentOrganization",
+  "name": "Pakistan Meteorological Department",
+  "alternateName": "PMD",
+  "url": "https://pmd.gov.pk/",
+  "sameAs": [
+    "https://weather.gov.pk/",
+    "https://www.facebook.com/PMD.GOV",
+    "https://twitter.com/pmdgov",
+    "https://www.youtube.com/channel/UCDQNcQuQsk12ku9DGfBDosw"
+  ],
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "Headquarters Office, H-8/2",
+    "addressLocality": "Islamabad",
+    "addressCountry": "PK"
+  },
+  "telephone": ["+92-51-9250367", "+92-345-5297016"],
+  "email": ["pakmet_islamabad@yahoo.com", "pmdweather@pmd.gov.pk", "itunit.pmd@gmail.com"],
+  "parentOrganization": {
+    "@type": "GovernmentOrganization",
+    "name": "Government of Pakistan"
+  }
+}
+</script>
+
+<style>
+    :root {
+        --navy:#00304d;
+        --navy-deep:#00263d;
+        --blue:#0088cc;
+        --blue-dark:#006aa3;
+        --green:#145f31;
+        --text:#2c3a46;
+        --muted:#647588;
+        --bg:#f4f7fa;
+        --card:#ffffff;
+        --border:#e3e9ef;
+        --radius:12px;
+        --shadow-sm:0 1px 3px rgba(9,35,58,.07);
+        --shadow-md:0 14px 32px -8px rgba(9,35,58,.16);
+        --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    * { box-sizing:border-box; }
+    html { overflow-x:hidden; }
+    body {
+        margin:0; background:var(--bg); color:var(--text);
+        font-family:var(--font); overflow-x:hidden; -webkit-font-smoothing:antialiased;
+        line-height:1.55;
+    }
+    img { max-width:100%; height:auto; display:block; }
+    a { text-decoration:none; }
+    .container { max-width:1120px; margin:0 auto; padding:0 24px; }
+
+    /* ---------- Top bar ---------- */
+    .pmd-header-top { background:var(--navy); }
+    .pmd-header-top .container {
+        display:flex; justify-content:space-between; align-items:center;
+        flex-wrap:wrap; row-gap:6px; padding:9px 24px; font-size:12.5px;
+    }
+    .pmd-header-top .iso {
+        color:#cfe4f2; letter-spacing:.03em; font-weight:500;
+    }
+    .pmd-header-top .iso:hover { color:#fff; }
+    .pmd-social { display:flex; align-items:center; gap:16px; }
+    .pmd-social a {
+        color:#cfe4f2; font-size:14px; transition:color .15s;
+    }
+    .pmd-social a:hover { color:#fff; }
+
+    /* ---------- Logo row ---------- */
+    .pmd-logo-row { background:var(--card); border-bottom:1px solid var(--border); padding:20px 0; }
+    .pmd-logo-row .container {
+        display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; row-gap:16px;
+    }
+    .pmd-logo-brand { display:flex; align-items:center; min-width:0; }
+    .pmd-logo-row img.pmd-logo { width:64px; height:64px; flex-shrink:0; margin-right:16px; }
+    .pmd-title { min-width:0; }
+    .pmd-title strong {
+        display:block; font-size:20px; font-weight:700; color:var(--navy);
+        letter-spacing:-.01em; line-height:1.3;
+    }
+    .pmd-title span {
+        display:block; font-size:11.5px; font-weight:600; color:var(--green);
+        text-transform:uppercase; letter-spacing:.09em; margin-top:3px;
+    }
+    .pmd-logo-row img.pmd-citizen-portal { width:150px; }
+
+    /* ---------- Hero ---------- */
+    .pmd-hero {
+        position:relative;
+        background:linear-gradient(135deg, var(--navy) 0%, #004a75 60%, var(--blue-dark) 100%);
+        color:#fff; padding:88px 24px 120px; text-align:center; overflow:hidden;
+    }
+    .pmd-hero::before {
+        content:""; position:absolute; inset:0; opacity:.10; pointer-events:none;
+        background-image:radial-gradient(circle at 15% 25%, #ffffff 0, transparent 45%),
+                          radial-gradient(circle at 85% 75%, #ffffff 0, transparent 40%);
+    }
+    .pmd-hero-inner { position:relative; max-width:680px; margin:0 auto; }
+    .pmd-hero-badge {
+        display:inline-flex; align-items:center; gap:7px; background:rgba(255,255,255,.12);
+        border:1px solid rgba(255,255,255,.22); color:#dff0fa; font-size:12.5px; font-weight:600;
+        letter-spacing:.04em; text-transform:uppercase; padding:6px 16px; border-radius:999px;
+        margin-bottom:26px;
+    }
+    .pmd-hero h1 {
+        font-size:36px; font-weight:800; letter-spacing:-.02em; margin:0 0 16px; line-height:1.22;
+    }
+    .pmd-hero p {
+        font-size:16.5px; color:#cfe1ee; margin:0 auto 34px; max-width:520px; font-weight:400;
+    }
+    .pmd-hero p strong { color:#fff; font-weight:700; }
+    .pmd-cta-btn {
+        display:inline-flex; align-items:center; gap:10px; background:#fff; color:var(--navy);
+        font-size:16px; font-weight:700; padding:15px 34px; border-radius:9px;
+        box-shadow:var(--shadow-md); transition:transform .18s ease, box-shadow .18s ease; max-width:100%;
+    }
+    .pmd-cta-btn:hover { transform:translateY(-2px); box-shadow:0 20px 38px -10px rgba(0,0,0,.35); color:var(--navy); }
+    .pmd-cta-btn svg { flex-shrink:0; transition:transform .18s ease; }
+    .pmd-cta-btn:hover svg { transform:translateX(3px); }
+    .pmd-hero-wave { display:block; position:relative; margin-top:-2px; }
+    .pmd-hero-wave svg { display:block; width:100%; height:auto; }
+
+    /* ---------- Quick links ---------- */
+    .pmd-quicklinks { padding:12px 24px 68px; }
+    .pmd-section-head { text-align:center; margin-bottom:38px; }
+    .pmd-section-head h2 {
+        font-size:13px; font-weight:700; color:var(--navy); text-transform:uppercase;
+        letter-spacing:.1em; margin:0 0 10px;
+    }
+    .pmd-section-head .rule {
+        width:40px; height:3px; background:var(--blue); border-radius:2px; margin:0 auto;
+    }
+    .pmd-section-sub {
+        max-width:520px; margin:16px auto 0; font-size:15px; color:var(--muted); line-height:1.6;
+    }
+    .pmd-section-sub strong { color:var(--navy); font-weight:700; }
+    .pmd-qgrid {
+        display:grid; grid-template-columns:repeat(6, 1fr); gap:16px; max-width:1120px; margin:0 auto;
+    }
+    .pmd-qlink {
+        display:flex; flex-direction:column; align-items:center; gap:11px;
+        background:var(--card); border:1px solid var(--border); border-radius:var(--radius);
+        padding:26px 12px 22px; text-align:center; color:var(--text);
+        box-shadow:var(--shadow-sm); transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+    }
+    .pmd-qlink:hover {
+        transform:translateY(-3px); box-shadow:var(--shadow-md); border-color:#cfe1ee; color:var(--text);
+    }
+    .pmd-qicon {
+        width:46px; height:46px; border-radius:50%; background:#eaf5fc; color:var(--blue);
+        display:flex; align-items:center; justify-content:center; font-size:19px;
+        transition:background .16s ease, color .16s ease;
+    }
+    .pmd-qlink:hover .pmd-qicon { background:var(--blue); color:#fff; }
+    .pmd-qlink span { font-size:13.5px; font-weight:600; letter-spacing:-.01em; }
+
+    /* ---------- Footer ---------- */
+    footer.pmd-footer { background:var(--navy-deep); color:#b7c8d6; padding:56px 24px 0; margin-top:10px; }
+    .pmd-footer-grid {
+        display:grid; grid-template-columns:repeat(3, 1fr); gap:36px; max-width:1120px; margin:0 auto;
+        padding-bottom:36px;
+    }
+    footer.pmd-footer h6 {
+        color:#fff; font-weight:700; font-size:13px; text-transform:uppercase; letter-spacing:.08em;
+        margin:0 0 18px;
+    }
+    footer.pmd-footer ul { list-style:none; padding:0; margin:0; }
+    footer.pmd-footer li { margin-bottom:11px; font-size:14px; word-break:break-word; }
+    footer.pmd-footer a { color:#b7c8d6; transition:color .15s; }
+    footer.pmd-footer a:hover { color:#fff; }
+    footer.pmd-footer .social-row a {
+        display:inline-flex; align-items:center; gap:9px;
+    }
+    .pmd-footer-bottom {
+        border-top:1px solid rgba(255,255,255,.10); margin-top:8px; padding:20px 0;
+        text-align:center; font-size:12.5px; color:#8ea4b6; max-width:1120px; margin-left:auto; margin-right:auto;
+    }
+
+    /* ---------- Responsive ---------- */
+    @media (max-width: 900px) {
+        .pmd-qgrid { grid-template-columns:repeat(3, 1fr); }
+        .pmd-footer-grid { grid-template-columns:1fr 1fr; }
+    }
+    @media (max-width: 767px) {
+        .pmd-logo-row .container { flex-direction:column; text-align:center; }
+        .pmd-logo-brand { flex-direction:column; text-align:center; }
+        .pmd-logo-row img.pmd-logo { margin-right:0; margin-bottom:10px; }
+        .pmd-hero { padding:64px 20px 90px; }
+        .pmd-hero h1 { font-size:27px; }
+        .pmd-hero p { font-size:15px; }
+        .pmd-cta-btn { width:100%; max-width:320px; justify-content:center; }
+    }
+    @media (max-width: 560px) {
+        .pmd-qgrid { grid-template-columns:repeat(2, 1fr); }
+        .pmd-footer-grid { grid-template-columns:1fr; text-align:center; }
+        footer.pmd-footer .social-row { justify-content:center; }
+    }
+    @media (max-width: 400px) {
+        .pmd-title strong { font-size:17px; }
+        .pmd-logo-row img.pmd-logo { width:52px; height:52px; }
+        .pmd-logo-row img.pmd-citizen-portal { width:120px; }
+    }
+</style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="pmd-header-top">
+    <div class="container">
+        <a class="iso" href="https://www.pmd.gov.pk/certificate.pdf" target="_blank" rel="noopener">ISO 9001:2015 Certified</a>
+        <div class="pmd-social">
+            <a href="https://www.facebook.com/PMD.GOV" target="_blank" rel="noopener" title="Facebook"><i class="fab fa-facebook-f"></i></a>
+            <a href="https://twitter.com/pmdgov" target="_blank" rel="noopener" title="Twitter"><i class="fab fa-twitter"></i></a>
+            <a href="https://www.youtube.com/channel/UCDQNcQuQsk12ku9DGfBDosw" target="_blank" rel="noopener" title="YouTube"><i class="fab fa-youtube"></i></a>
+        </div>
+    </div>
+</div>
+
+<!-- Logo row -->
+<div class="pmd-logo-row">
+    <div class="container">
+        <div class="pmd-logo-brand">
+            <a href="/">
+                <img class="pmd-logo" alt="" src="https://www.pmd.gov.pk/en/template/img/web-logo.png" onerror="this.style.display='none'">
+            </a>
+            <div class="pmd-title">
+                <strong>Pakistan Meteorological Department</strong>
+                <span>Government of Pakistan</span>
+            </div>
+        </div>
+        <div>
+            <a href="https://web.facebook.com/PMDUPakistan/" target="_blank" rel="noopener" title="Pakistan Citizen Portal">
+                <img class="pmd-citizen-portal" alt="" src="https://www.pmd.gov.pk/en/template/img/pmdu.png" onerror="this.parentElement.style.display='none'">
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Hero / notice -->
+<div class="pmd-hero">
+    <div class="pmd-hero-inner">
+        <span class="pmd-hero-badge">Official Government Domain</span>
+        <h1>Our website has a new home</h1>
+        <p><strong>pmd.gov.pk</strong> is the official registered domain of the Pakistan Meteorological Department. Our live forecasts, warnings and advisories now publish at <strong>weather.gov.pk</strong>-both domains are owned and operated by PMD.</p>
+        <a href="https://weather.gov.pk" class="pmd-cta-btn">
+            Visit weather.gov.pk
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M3.5 8H12.5M12.5 8L8.5 4M12.5 8L8.5 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+        </a>
+    </div>
+    <div class="pmd-hero-wave">
+        <svg viewBox="0 0 1440 60" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M0,32 C240,64 480,0 720,16 C960,32 1200,64 1440,24 L1440,60 L0,60 Z" fill="#f4f7fa"></path>
+        </svg>
+    </div>
+</div>
+
+<!-- Quick links -->
+<div class="pmd-quicklinks">
+    <div class="pmd-section-head">
+        <h2>weather.gov.pk</h2>
+        <div class="rule"></div>
+        <p class="pmd-section-sub">PMD's official live platform for daily forecasts, weather alerts, press releases and public services. Jump straight to the sections you need below.</p>
+    </div>
+    <div class="pmd-qgrid">
+        <a class="pmd-qlink" href="https://weather.gov.pk/">
+            <span class="pmd-qicon"><i class="fas fa-home"></i></span>
+            <span>Home</span>
+        </a>
+        <a class="pmd-qlink" href="https://weather.gov.pk/nwfc/daily-forecast">
+            <span class="pmd-qicon"><i class="fas fa-cloud-sun"></i></span>
+            <span>Daily Forecast</span>
+        </a>
+        <a class="pmd-qlink" href="https://weather.gov.pk/public/">
+            <span class="pmd-qicon"><i class="fas fa-bell"></i></span>
+            <span>Alerts</span>
+        </a>
+        <a class="pmd-qlink" href="https://weather.gov.pk/nwfc/all-press-releases">
+            <span class="pmd-qicon"><i class="fas fa-newspaper"></i></span>
+            <span>Press Releases</span>
+        </a>
+        <a class="pmd-qlink" href="https://weather.gov.pk/tcwc/addressBook">
+            <span class="pmd-qicon"><i class="fas fa-address-book"></i></span>
+            <span>Address Book</span>
+        </a>
+        <a class="pmd-qlink" href="https://weather.gov.pk/home/contactus">
+            <span class="pmd-qicon"><i class="fas fa-phone"></i></span>
+            <span>Contact Us</span>
+        </a>
+    </div>
+</div>
+
+<!-- Footer -->
+<footer class="pmd-footer">
+    <div class="pmd-footer-grid">
+        <div>
+            <h6>PMD Online Services</h6>
+            <ul>
+                <li><a href="https://tender.pmd.gov.pk/" target="_blank" rel="noopener">Tenders</a></li>
+                <li><a href="https://webmail.pmd.gov.pk/Mondo/lang/sys/login.aspx" target="_blank" rel="noopener">PMD Mail</a></li>
+                <li><a href="https://circular.pmd.gov.pk/" target="_blank" rel="noopener">Circulars</a></li>
+                <li><a href="https://www.pmd.gov.pk/pension/index.html" target="_blank" rel="noopener">Pension Cell</a></li>
+            </ul>
+        </div>
+        <div>
+            <h6>Contact Us</h6>
+            <ul>
+                <li>Headquarters Office, H-8/2, Islamabad</li>
+                <li><a href="tel:+92519250367">+92-51-9250367</a></li>
+                <li><a href="tel:+923455297016">0345-5297016</a></li>
+                <li><a href="/cdn-cgi/l/email-protection#7707161c1a1203281e041b161a16151613370e161f18185914181a"><span class="__cf_email__" data-cfemail="59293832343c2d06302a353834383b383d192038313636773a3634">[email&#160;protected]</span></a></li>
+                <li><a href="/cdn-cgi/l/email-protection#02726f66756763766a677042726f662c656d742c7269"><span class="__cf_email__" data-cfemail="67170a03100206130f021527170a034900081149170c">[email&#160;protected]</span></a></li>
+                <li><a href="/cdn-cgi/l/email-protection#107964657e79643e607d7450777d71797c3e737f7d"><span class="__cf_email__" data-cfemail="5e372a2b30372a702e333a1e39333f3732703d3133">[email&#160;protected]</span></a></li>
+                <li><a href="https://weather.gov.pk/home/contactus" target="_blank" rel="noopener">Feedback / Suggestions</a></li>
+            </ul>
+        </div>
+        <div>
+            <h6>Social Media</h6>
+            <ul class="social-row" style="display:flex; flex-direction:column; gap:0;">
+                <li><a href="https://www.facebook.com/PMD.GOV" target="_blank" rel="noopener"><i class="fab fa-facebook-f"></i> Facebook</a></li>
+                <li><a href="https://twitter.com/pmdgov" target="_blank" rel="noopener"><i class="fab fa-twitter"></i> Twitter</a></li>
+                <li><a href="https://www.youtube.com/channel/UCDQNcQuQsk12ku9DGfBDosw" target="_blank" rel="noopener"><i class="fab fa-youtube"></i> YouTube</a></li>
+            </ul>
+        </div>
+    </div>
+    <div class="pmd-footer-bottom">
+        &copy; 2019-2026 Pakistan Meteorological Department &nbsp;|&nbsp; Powered By IT Unit
+    </div>
+</footer>
+
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a4d4f14e1b21c53c',t:'MTc5MjQ2NzAxMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>

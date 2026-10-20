@@ -42,10 +42,7 @@ if str(PROJECT_ROOT / "pipeline") not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT / "pipeline"))
 
 # Import feature-building function from train_and_evaluate without rewriting it
-try:
-    from src.models.train_and_evaluate import feature_engineering, CITY_PROVINCE_MAP
-except ImportError:
-    from climateshield.models.train_and_evaluate import feature_engineering, CITY_PROVINCE_MAP
+from climateshield.models.train_and_evaluate import feature_engineering, CITY_PROVINCE_MAP
 
 # Declared model metadata
 MODEL_VERSION = "lightgbm_quantile_v1.0"

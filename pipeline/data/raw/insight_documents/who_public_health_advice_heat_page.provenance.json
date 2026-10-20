@@ -1,0 +1,15 @@
+{
+  "doc_id": "who_public_health_advice_heat_page",
+  "title": "Public health advice on preventing health effects of heat",
+  "publisher": "WHO",
+  "url": "https://www.who.int/publications/i/item/WHO-EURO-2011-2510-42266-58691",
+  "fetched_at_utc": "2026-10-20T03:31:10.257694+00:00",
+  "http_status": 200,
+  "content_type": "text/html; charset=utf-8",
+  "robots": "robots.txt does not disallow this path",
+  "bytes": 90243,
+  "sha256": "8581a57d5d7e78f1d0d0d32953a3465d35f3ba94391f3c0d1acda784c72e781a",
+  "error": "",
+  "text_chars": 4953,
+  "status": "parsed"
+}
