@@ -851,6 +851,40 @@ export interface InsightAnswerData {
   index_sections: number;
 }
 
+export interface RAGCitation {
+  document: string;
+  section: string;
+}
+
+export interface RAGAnswerData {
+  text: string;
+  citations: RAGCitation[];
+  row_ids: string[];
+  limits: string;
+  supported: boolean;
+  missing?: string[];
+}
+
+export interface RagSectionData {
+  document: string;
+  section: string;
+  page?: number | null;
+  text: string;
+  publisher: string;
+  document_title: string;
+  source_url?: string;
+}
+
+export interface GoldRowItem {
+  row_id: string;
+  table: string;
+  fields: Record<string, any>;
+}
+
+export interface RowsResponseData {
+  rows: GoldRowItem[];
+}
+
 export interface MethodologyResponseData {
   system_title: string;
   system_version: string;

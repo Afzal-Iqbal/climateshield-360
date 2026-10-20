@@ -53,6 +53,16 @@ def ask_rag(body: RAGQuestionBody) -> APIResponse[dict]:
     )
 
 
+@router.get("/rag/section")
+def get_insight_rag_section(
+    document: str,
+    section: Optional[str] = None,
+) -> APIResponse[dict]:
+    """Forward to rag section retrieval."""
+    from routers.rag import get_rag_section
+    return get_rag_section(document=document, section=section)
+
+
 @router.post("/ask", response_model=APIResponse[InsightAnswerData])
 def ask_insight(body: InsightQuestionBody) -> APIResponse[InsightAnswerData]:
     """Answer one question from the local index and the read-only warehouse."""

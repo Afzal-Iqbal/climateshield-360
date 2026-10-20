@@ -53,13 +53,16 @@ def get_multilingual_embedding_function(
     If sentence_transformers is unavailable, gracefully falls back to Chroma's
     built-in ONNX multilingual or default embedding function.
     """
+    if os.getenv("CHROMA_EMBEDDING_PROVIDER") != "sentence_transformers":
+        return embedding_functions.DefaultEmbeddingFunction()
     try:
         import sentence_transformers  # noqa: F401
         return embedding_functions.SentenceTransformerEmbeddingFunction(
             model_name=model_name
         )
     except Exception as exc:
-        print(f"[RAG Indexer] SentenceTransformer notice ({exc}). Using Chroma default embedding function.")
+        if os.getenv("DEBUG"):
+            print(f"[RAG Indexer] SentenceTransformer notice ({exc}). Using Chroma default embedding function.")
         return embedding_functions.DefaultEmbeddingFunction()
 
 

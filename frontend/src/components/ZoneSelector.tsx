@@ -28,7 +28,7 @@ export const ZoneSelector: React.FC<{ className?: string }> = ({ className = '' 
   const selectedZone = KARACHI_ZONES.find((z) => z.id === currentZoneId) || KARACHI_ZONES[0];
 
   const handleSelect = (zone: ZoneOption) => {
-    if (location.pathname === '/risk-map') {
+    if (location.pathname === '/risk-map' || location.pathname === '/ai-assistant' || location.pathname === '/forecast') {
       const next = new URLSearchParams(searchParams);
       if (zone.id === 'all') {
         next.delete('zone');

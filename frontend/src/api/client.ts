@@ -30,6 +30,9 @@ import {
   PlannerResponseData,
   MethodologyResponseData,
   InsightAnswerData,
+  RAGAnswerData,
+  RagSectionData,
+  RowsResponseData,
 } from '../types';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
@@ -171,6 +174,23 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ question }),
     }),
+  askRag: (
+    params: { question: string; zone_id?: string; temperature?: number },
+    signal?: AbortSignal
+  ) =>
+    apiFetch<RAGAnswerData>('/insight/rag', {
+      method: 'POST',
+      body: JSON.stringify(params),
+      signal,
+    }),
+  getRagSection: (document: string, section?: string) => {
+    const q = new URLSearchParams();
+    q.set('document', document);
+    if (section) q.set('section', section);
+    return apiFetch<RagSectionData>(`/rag/section?${q.toString()}`);
+  },
+  getRows: (ids: string[]) =>
+    apiFetch<RowsResponseData>(`/rows?ids=${encodeURIComponent(ids.join(','))}`),
 };
 
 /**

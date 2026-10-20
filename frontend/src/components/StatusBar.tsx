@@ -84,22 +84,6 @@ export const StatusBar: React.FC<StatusBarProps> = ({ meta }) => {
         <span className="material-symbols-outlined text-[14px]">schedule</span>
         <span>{meta?.timezone_display || 'PKT (UTC+5)'}</span>
       </div>
-
-      {/* Live Weather Chip from API (Requirement 1 & 6) */}
-      {statusData?.latest_successful_run && (
-        <div
-          className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container dark:bg-surface-container-high border border-outline-variant/30 font-mono text-[11px] text-on-surface shrink-0"
-          title="Live meteorological ensemble reading from PMD Karachi Met Station WMO 41780"
-        >
-          <span className="material-symbols-outlined text-[15px] text-amber-500" aria-hidden="true">
-            thermostat
-          </span>
-          <span className="text-on-surface-variant">Live:</span>
-          <span>
-            <strong>43.8°C</strong> Feels Like (WBGT)
-          </span>
-        </div>
-      )}
     </div>
   );
 };

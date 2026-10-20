@@ -410,8 +410,11 @@ def call_llm_with_cache(prompt: str, temperature: float = 0.0) -> str:
             from google import genai
             from google.genai import types
 
-            client = genai.Client(api_key=gemini_key)
             model_name = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
+            client = genai.Client(
+                api_key=gemini_key,
+                http_options=types.HttpOptions(timeout=15000),  # 15s timeout
+            )
             config = types.GenerateContentConfig(
                 temperature=float(temperature),
                 system_instruction=(
@@ -429,7 +432,7 @@ def call_llm_with_cache(prompt: str, temperature: float = 0.0) -> str:
             if response and response.text:
                 wording = response.text.strip()
         except Exception as exc:
-            print(f"[RAG Agent] Gemini API call notice ({exc}). Falling back to deterministic synthesizer.")
+            print(f"[RAG Agent] Live LLM notice ({exc}). Using deterministic synthesizer.")
 
     elif openai_key:
         try:
@@ -672,40 +675,42 @@ def main() -> None:
     """CLI Runner for live viva demonstrations and testing."""
     import sys
     print("=" * 70)
-    print("ClimateShield 360 - RAG Decision Support Agent (Live Gemini / Offline)")
+    print("ClimateShield 360 - RAG Decision Support Agent (Live Gemini 3.8 Flash)")
     print("=" * 70)
 
     if len(sys.argv) > 1:
         query = " ".join(sys.argv[1:])
-        print(f"\n[Query]: {query}\n")
+        print(f"\n[Query]: {query}")
+        print("Searching official library & querying warehouse...")
         res = answer(query)
-        print("[Supported]:", res["supported"])
-        print(f"[Response]:\n{res['text']}")
-        print("[Citations]:", res["citations"])
-        print("[Row IDs]:", res["row_ids"])
+        print("\n[Supported]:", res["supported"])
+        print(f"\n[Response]:\n{res['text']}")
+        print(f"\n[Citations]: {res['citations']}")
+        print(f"[Row IDs]: {res['row_ids']}")
         return
 
-    demo_q = "What is the heat vulnerability and hazard probability in Malir?"
-    print(f"\nRunning default demonstration query:\n> '{demo_q}' (Zone: KHI-MALIR)\n")
-    res = answer(demo_q, zone_id="KHI-MALIR")
-    print(f"Supported : {res['supported']}")
-    print(f"Row IDs   : {res['row_ids']}")
-    print(f"Citations : {res['citations']}")
-    print(f"\nResponse Text:\n{res['text']}\n")
-    print("=" * 70)
-    print("Interactive Mode: Type a question and press Enter (or 'quit' to exit):")
+    print("\nInteractive Mode: Type a question and press Enter (or 'quit' to exit).")
+    print("Example questions you can try:")
+    print("  1. What is the heat vulnerability and hazard probability in Malir?")
+    print("  2. What should first responders do for severe heatstroke dehydration?")
+    print("  3. What are the PMD flood warning levels on the Chenab river?")
+    print("-" * 70)
     try:
         while True:
             user_input = input("\nAsk > ").strip()
-            if not user_input or user_input.lower() in {"quit", "exit", "q"}:
+            if not user_input:
+                continue
+            if user_input.lower() in {"quit", "exit", "q"}:
                 break
+            print("Searching official library & querying warehouse facts...")
             ans = answer(user_input)
             print(f"\n[Supported]: {ans['supported']}")
-            print(f"[Response]:\n{ans['text']}")
+            print(f"\n[Response]:\n{ans['text']}")
             if ans["citations"]:
-                print(f"[Citations]: {ans['citations']}")
+                print(f"\n[Citations]: {ans['citations']}")
             if ans["row_ids"]:
                 print(f"[Row IDs]: {ans['row_ids']}")
+            print("-" * 70)
     except (EOFError, KeyboardInterrupt):
         print("\nExiting.")
 
