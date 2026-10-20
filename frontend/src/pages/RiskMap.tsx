@@ -169,7 +169,7 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const mapLoadedRef = useRef(false);
-  const basemapTierRef = useRef<BasemapTier>('openfreemap');
+  const basemapTierRef = useRef<BasemapTier>('carto');
   const use3dRef = useRef(use3d);
   const hoveredIdRef = useRef<string | number | null>(null);
   const interactionsBoundRef = useRef(false);
@@ -399,7 +399,7 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
         map.setStyle(styleForTier(next) as any);
         toast.push(
           next === 'osm'
-            ? 'OpenFreeMap unavailable — using OpenStreetMap raster.'
+            ? 'CARTO Dark basemap unavailable — using OpenStreetMap raster.'
             : 'Tiles unavailable — districts on a dark canvas.',
           'warn'
         );
@@ -433,11 +433,11 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
     setMapError(null);
     setUseTableFallback(false);
     setMapReady(false);
-    basemapTierRef.current = 'openfreemap';
+    basemapTierRef.current = 'carto';
 
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
-      style: styleForTier('openfreemap') as any,
+      style: styleForTier('carto') as any,
       bounds: KARACHI_BOUNDS,
       fitBoundsOptions: { padding: 40 },
       minZoom: 5,
@@ -538,25 +538,15 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
     if (!mapRef.current || !mapLoadedRef.current || !selectedZoneId) return;
     const feat = filteredZones.features.find((f: any) => f.properties.zone_id === selectedZoneId);
     if (!feat?.geometry) return;
+    const b = boundsFromFeatures({ features: [feat] });
+    if (!b) return;
     try {
-      const coords =
-        feat.geometry.type === 'Polygon'
-          ? feat.geometry.coordinates[0]
-          : feat.geometry.coordinates[0][0];
-      const lons = coords.map((c: number[]) => c[0]);
-      const lats = coords.map((c: number[]) => c[1]);
-      mapRef.current.fitBounds(
-        [
-          [Math.min(...lons), Math.min(...lats)],
-          [Math.max(...lons), Math.max(...lats)],
-        ],
-        {
-          padding: 80,
-          maxZoom: 12.5,
-          duration: shouldReduceMotion ? 0 : 800,
-          pitch: use3d ? 55 : 0,
-        }
-      );
+      mapRef.current.fitBounds(b, {
+        padding: 80,
+        maxZoom: 12.5,
+        duration: shouldReduceMotion ? 0 : 800,
+        pitch: use3d ? 55 : 0,
+      });
       requestAnimationFrame(() => mapRef.current?.resize());
     } catch {
       /* ignore */

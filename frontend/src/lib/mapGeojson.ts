@@ -1,4 +1,4 @@
-import { HeightMetric } from './mapHeight';
+import { extrusionHeight, HeightMetric } from './mapHeight';
 import { ZoneGeoJSONFeature, ZoneGeoJSONFeatureCollection } from '../types';
 
 export const KARACHI_BOUNDS: [[number, number], [number, number]] = [
@@ -49,7 +49,7 @@ export function boundsFromFeatures(
 
 export function sanitizeZones(
   data?: any,
-  _heightMetric?: HeightMetric
+  heightMetric: HeightMetric = 'exposed_population'
 ): { collection: ZoneGeoJSONFeatureCollection } {
   if (!data || !Array.isArray(data.features)) {
     return {
@@ -63,6 +63,7 @@ export function sanitizeZones(
   const features: ZoneGeoJSONFeature[] = data.features.map((feat: any, idx: number) => {
     const rawProps = feat.properties || {};
     const zoneId = rawProps.zone_id || feat.id || `zone-${idx}`;
+    const extrusion_height = extrusionHeight(heightMetric, rawProps);
     return {
       type: 'Feature',
       id: zoneId,
@@ -82,6 +83,8 @@ export function sanitizeZones(
         evidence_strength: rawProps.evidence_strength || 'medium',
         baseline_value: typeof rawProps.baseline_value === 'number' ? rawProps.baseline_value : 0,
         ...rawProps,
+        extrusion_height,
+        has_metric: 1,
       },
     };
   });
