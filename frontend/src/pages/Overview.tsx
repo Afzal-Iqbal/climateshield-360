@@ -38,7 +38,7 @@ interface OverviewProps {
   isSample?: boolean;
 }
 
-export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
+export const Overview: React.FC<OverviewProps> = ({ isSample: _isSample = true }) => {
   const navigate = useNavigate();
   const shouldReduceMotion = useReducedMotion();
   const [timeRange, setTimeRange] = useState<'24h' | '48h' | '7d'>('24h');
@@ -46,6 +46,15 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
   const [priorityHazardFilter, setPriorityHazardFilter] = useState<'all' | 'heat' | 'heavy_rain'>('all');
   const [showAllPriorities, setShowAllPriorities] = useState(false);
   const [hoveredZone, setHoveredZone] = useState<string | null>(null);
+
+  // Query metadata for live status and data freshness
+  const { data: metaResponse } = useQuery({
+    queryKey: ['meta'],
+    queryFn: api.getMeta,
+    refetchInterval: 60000,
+  });
+  const isLive = metaResponse?.data?.is_live ?? false;
+  const dataAsOf = metaResponse?.data?.data_as_of;
 
   // Fetch Overview summary and prediction curves
   const {
@@ -56,7 +65,7 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
   } = useQuery({
     queryKey: ['overview', timeRange],
     queryFn: () => api.getOverview(timeRange),
-    refetchInterval: 60000,
+    refetchInterval: 120000,
   });
 
   // Fetch Ranked Priority Actions from exposure_index
@@ -183,8 +192,8 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
       <PageHeader
         title="Operational Hazard Overview"
         subtitle="Real-time multi-hazard telemetry, ensemble probability curves, and ranked municipal interventions for Karachi Division."
-        lastUpdated={overviewResponse?.generated_at}
-        isLive={!isSample}
+        lastUpdated={dataAsOf || overviewResponse?.generated_at}
+        isLive={isLive}
         actions={
           <div className="flex items-center gap-2">
             <span className="font-mono-val text-[11px] text-slate-400 font-semibold uppercase tracking-wider hidden sm:inline">

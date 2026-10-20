@@ -76,7 +76,7 @@ const CITIES = [
   { value: 'Sukkur', label: 'Sukkur' },
 ];
 
-export const EightImpacts: React.FC<EightImpactsProps> = ({ isSample = true }) => {
+export const EightImpacts: React.FC<EightImpactsProps> = ({ isSample: _isSample = true }) => {
   const [activeTabId, setActiveTabId] = useState<string>('physical');
   const [selectedDistrict, setSelectedDistrict] = useState<string>('');
   const [selectedCity, setSelectedCity] = useState<string>('Karachi');
@@ -95,7 +95,17 @@ export const EightImpacts: React.FC<EightImpactsProps> = ({ isSample = true }) =
         city: selectedCity,
         district_id: selectedDistrict || undefined,
       }),
+    refetchInterval: 120000,
   });
+
+  // Query metadata for real-time live status and data freshness
+  const { data: metaResponse } = useQuery({
+    queryKey: ['meta'],
+    queryFn: api.getMeta,
+    refetchInterval: 60000,
+  });
+  const isLive = metaResponse?.data?.is_live ?? false;
+  const dataAsOf = metaResponse?.data?.data_as_of;
 
   const domainData: ImpactDomainData | undefined = domainResponse?.data;
   const activeTabDef = TABS.find((t) => t.id === activeTabId) || TABS[0];
@@ -114,8 +124,8 @@ export const EightImpacts: React.FC<EightImpactsProps> = ({ isSample = true }) =
       <PageHeader
         title="Eight-Impact Analysis Matrix"
         subtitle="Multi-sectoral situational appraisal evaluating empirical exposure, structural assets, critical infrastructure, and human vulnerability across monitored municipal zones."
-        lastUpdated={domainResponse?.generated_at}
-        isLive={!isSample}
+        lastUpdated={dataAsOf || domainResponse?.generated_at}
+        isLive={isLive}
         actions={
           <div className="flex flex-wrap items-center gap-2.5">
             <Select

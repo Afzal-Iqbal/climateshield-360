@@ -13,6 +13,7 @@ import {
   Tooltip,
   EmptyState,
 } from '../components/ui';
+import { DataAsOf } from '../components/DataAsOf';
 import {
   RiskLevel,
   ZoneFeatureProperties,
@@ -114,6 +115,13 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
   const { data: zonesResponse } = useQuery({
     queryKey: ['map-zones', hazardMode],
     queryFn: () => api.getMapZones(hazardMode),
+    refetchInterval: 120000,
+  });
+
+  // Query metadata for real-time live status and data freshness
+  const { data: metaResponse } = useQuery({
+    queryKey: ['meta'],
+    queryFn: api.getMeta,
     refetchInterval: 60000,
   });
 
@@ -648,6 +656,11 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
 
           {/* Floating Top Bar: Hazard Mode + Height Metric + Severity Filter */}
           <div className="absolute top-4 left-4 z-20 flex flex-wrap items-center gap-2 max-w-[calc(100%-120px)] pointer-events-auto">
+            {/* Live Data As Of Timestamp Pill */}
+            <div className="px-3 py-1.5 rounded-xl bg-slate-900/90 backdrop-blur-xl border border-white/15 shadow-xl flex items-center">
+              <DataAsOf timestamp={metaResponse?.data?.data_as_of} compact />
+            </div>
+
             {/* Hazard Selector */}
             <div className="p-1 rounded-xl bg-slate-900/90 backdrop-blur-xl border border-white/15 shadow-xl flex items-center gap-1">
               <button

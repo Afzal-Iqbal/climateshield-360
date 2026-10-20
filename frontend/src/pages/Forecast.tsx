@@ -57,11 +57,20 @@ const CITIES = [
   'Sukkur',
 ];
 
-export const Forecast: React.FC<ForecastPageProps> = ({ isSample = false }) => {
+export const Forecast: React.FC<ForecastPageProps> = ({ isSample: _isSample = false }) => {
   const [selectedCity, setSelectedCity] = useState<string>('Karachi');
   const [selectedHazard, setSelectedHazard] = useState<'heavy_rain' | 'heat'>('heavy_rain');
   const [selectedRange, setSelectedRange] = useState<'24h' | '48h' | '7d'>('24h');
   const [viewGranularity, setViewGranularity] = useState<'hourly' | 'daily'>('hourly');
+
+  // Query metadata for real-time live status and data freshness
+  const { data: metaResponse } = useQuery({
+    queryKey: ['meta'],
+    queryFn: api.getMeta,
+    refetchInterval: 60000,
+  });
+  const isLive = metaResponse?.data?.is_live ?? false;
+  const dataAsOf = metaResponse?.data?.data_as_of;
 
   // Fetch forecast data from API
   const {
@@ -77,6 +86,7 @@ export const Forecast: React.FC<ForecastPageProps> = ({ isSample = false }) => {
         city: selectedCity,
         range: selectedRange,
       }),
+    refetchInterval: 120000,
   });
 
   // Fetch model evaluation summary from API
@@ -252,8 +262,8 @@ export const Forecast: React.FC<ForecastPageProps> = ({ isSample = false }) => {
       <PageHeader
         title={selectedHazard === 'heavy_rain' ? 'Heavy Rain NWP & ML Forecast' : 'Heat Wave Threshold Monitoring'}
         subtitle="Empirical sensor observations, LightGBM quantile regression predictions, and calibrated error bounds."
-        lastUpdated={latestObserved?.timestamp_utc}
-        isLive={!isSample}
+        lastUpdated={dataAsOf || latestObserved?.timestamp_utc}
+        isLive={isLive}
         actions={
           <div className="flex flex-wrap items-center gap-2.5">
             {/* City Selector */}
