@@ -291,7 +291,7 @@ export const InsightAgent: React.FC<InsightAgentProps> = ({ isSample = true }) =
   // Zone selection from top bar selector
   const currentZoneId = searchParams.get('zone') || searchParams.get('zone_id') || 'all';
   const selectedZone = KARACHI_ZONES.find((z) => z.id === currentZoneId) || KARACHI_ZONES[0];
-  const zoneQueryParam = selectedZone.id === 'all' ? 'Karachi' : selectedZone.id;
+  const zoneQueryParam = selectedZone.id === 'all' ? undefined : selectedZone.id;
 
   // Session Chat State
   const [messages, setMessages] = useState<ChatMessage[]>([]);

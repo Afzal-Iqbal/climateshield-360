@@ -206,3 +206,47 @@ def test_off_topic_question_returns_supported_false():
     assert result["citations"] == []
     assert result["row_ids"] == []
 
+
+def test_greeting_returns_friendly_assistant_intro():
+    """
+    Test 10: Greetings (hi, hello, salam) return an informative intro without dumping database numbers.
+    """
+    for greeting in ["hi", "hello", "hey", "salam", "assalam o alaikum", "help"]:
+        result = answer(greeting, zone_id="Karachi")
+        assert result["supported"] is True, f"Failed for {greeting}"
+        assert result["citations"] == []
+        assert result["row_ids"] == []
+        assert result.get("metrics", []) == []
+        assert "ClimateShield 360 AI Climate Assistant" in result["text"]
+        assert "NDMA" in result["text"]
+
+
+def test_qualitative_guideline_question_does_not_pull_heavy_rain_predictions():
+    """
+    Test 11: A purely qualitative guideline query returns domain advice without dumping heavy rain tables.
+    """
+    query = "What should people do in a heatwave according to NDMA?"
+    result = answer(query)
+
+    assert result["supported"] is True
+    assert len(result["citations"]) > 0
+    assert any("ndma" in c["document"].lower() or "heat" in c["document"].lower() for c in result["citations"])
+    assert result.get("metrics", []) == []
+    assert result["row_ids"] == []
+    assert "heavy_rain" not in result["text"].lower()
+
+
+def test_heat_hazard_question_only_retrieves_heat_records():
+    """
+    Test 12: A specific heat question does not return heavy rain predictions.
+    """
+    query = "What is the extreme heat vulnerability and hazard probability for Malir?"
+    result = answer(query, zone_id="KHI-MALIR")
+
+    assert result["supported"] is True
+    assert len(result["row_ids"]) > 0
+    # Must only include heat records, not heavy_rain
+    for rid in result["row_ids"]:
+        assert "heavy_rain" not in rid, f"Expected heat only, got {rid}"
+
+

@@ -114,6 +114,12 @@ UNVERIFIED_CLAIM_REGEX = re.compile(
     re.IGNORECASE,
 )
 
+# Conversational Greeting & Help intent regex
+GREETING_REGEX = re.compile(
+    r"^\s*(hi|hello|hey|heya|howdy|salam|a?salaam|assalam\s*o?\s*alaikum|good\s*(morning|afternoon|evening|day)|help|who\s*are\s*you|what\s*can\s*you\s*do|what\s*is\s*this)[\s\?!.]*$",
+    re.IGNORECASE,
+)
+
 # Thread-safe in-memory LLM cache
 _CACHE_LOCK = threading.Lock()
 _LLM_CACHE: Dict[str, str] = {}
@@ -248,13 +254,18 @@ def detect_target_zone_or_city(question: str, explicit_zone: Optional[str] = Non
     Viva point: Normalizes multi-dialect and district names into canonical identifiers.
     Returns None if no specific geographical target is identified.
     """
-    if explicit_zone and explicit_zone.strip():
+    if explicit_zone and explicit_zone.strip() and explicit_zone.strip().lower() != "all":
         return explicit_zone.strip()
 
     lowered = question.lower()
     known_districts = {
         "malir": "KHI-MALIR",
         "korangi": "KHI-KORANGI",
+        "central": "Central Karachi",
+        "east": "East Karachi",
+        "west": "West Karachi",
+        "south": "South Karachi",
+        "keamari": "Keamari",
         "karachi": "Karachi",
         "lahore": "Lahore",
         "rawalpindi": "Rawalpindi",
@@ -278,9 +289,44 @@ def retrieve_gold_rows(target_zone: Optional[str], question: str) -> List[Dict[s
     """
     Retrieve matching rows from predictions, exposure_index, and district_snapshot.
     Viva point: Strictly read-only queries with fallback across attached schemas.
+    Topically scoped to the user question so irrelevant tables/hazards are not retrieved.
     """
     if not target_zone:
         return []
+
+    q_lower = question.lower()
+
+    # 1. Qualitative Advisory Queries: If user is asking for guidance, symptoms, SOPs,
+    #    and not asking for numbers/statistics/probabilities, do not pull database predictions.
+    is_guidance_query = any(k in q_lower for k in [
+        "guideline", "sop", "advice", "what should", "symptom", "sign",
+        "who say", "ndma say", "pmd say", "precaution", "measure", "protocol",
+        "first responder", "dehydration", "treatment", "protect", "bulletin"
+    ])
+    asks_for_numbers = any(k in q_lower for k in [
+        "probability", "percent", "population", "forecast", "vulnerability",
+        "rate", "score", "risk level", "risk levels", "numbers", "data", "table",
+        "census", "hospital", "how many", "what is the risk", "exposure",
+        "statistics", "metric", "chance"
+    ])
+    if is_guidance_query and not asks_for_numbers:
+        return []
+
+    # 2. Hazard filtering
+    is_heat_query = any(k in q_lower for k in ["heat", "heatwave", "temperature", "sunstroke", "hyperthermia", "exhaustion"])
+    is_rain_query = any(k in q_lower for k in ["rain", "flood", "monsoon", "precipitation", "drainage", "river", "inundation", "heavy_rain"])
+
+    hazard_filter: Optional[str] = None
+    if is_heat_query and not is_rain_query:
+        hazard_filter = "heat"
+    elif is_rain_query and not is_heat_query:
+        hazard_filter = "heavy_rain"
+
+    # 3. Infrastructure / Census filtering
+    asks_about_infra = any(k in q_lower for k in [
+        "population", "census", "hospital", "facilities", "infrastructure",
+        "snapshot", "demographic", "people", "residents"
+    ])
 
     facts: List[Dict[str, Any]] = []
     try:
@@ -297,8 +343,22 @@ def retrieve_gold_rows(target_zone: Optional[str], question: str) -> List[Dict[s
                 return []
 
         # 1. Query 'exposure_index' (e.g. from sample_db or main)
-        exposure_rows = safe_fetch(
+        if hazard_filter:
+            exp_sql = """
+            SELECT zone_id, hazard_type, exposed_population, facilities_count,
+                   vulnerability_score, risk_level, evidence_strength
+            FROM (
+                SELECT * FROM exposure_index
+                UNION ALL
+                SELECT * FROM sample_db.exposure_index
+            )
+            WHERE (UPPER(zone_id) LIKE UPPER(?) OR UPPER(?) LIKE '%' || UPPER(zone_id) || '%')
+              AND LOWER(hazard_type) = LOWER(?)
+            LIMIT 2;
             """
+            exp_params = [f"%{target_zone}%", target_zone, hazard_filter]
+        else:
+            exp_sql = """
             SELECT zone_id, hazard_type, exposed_population, facilities_count,
                    vulnerability_score, risk_level, evidence_strength
             FROM (
@@ -308,19 +368,32 @@ def retrieve_gold_rows(target_zone: Optional[str], question: str) -> List[Dict[s
             )
             WHERE UPPER(zone_id) LIKE UPPER(?) OR UPPER(?) LIKE '%' || UPPER(zone_id) || '%'
             LIMIT 2;
-            """,
-            [f"%{target_zone}%", target_zone],
-        )
+            """
+            exp_params = [f"%{target_zone}%", target_zone]
+
+        exposure_rows = safe_fetch(exp_sql, exp_params)
         if not exposure_rows and ("karachi" in target_zone.lower() or target_zone.startswith("KHI")):
-            exposure_rows = safe_fetch(
-                """
-                SELECT zone_id, hazard_type, exposed_population, facilities_count,
-                       vulnerability_score, risk_level, evidence_strength
-                FROM exposure_index
-                LIMIT 2;
-                """,
-                [],
-            )
+            if hazard_filter:
+                exposure_rows = safe_fetch(
+                    """
+                    SELECT zone_id, hazard_type, exposed_population, facilities_count,
+                           vulnerability_score, risk_level, evidence_strength
+                    FROM exposure_index
+                    WHERE LOWER(hazard_type) = LOWER(?)
+                    LIMIT 2;
+                    """,
+                    [hazard_filter],
+                )
+            else:
+                exposure_rows = safe_fetch(
+                    """
+                    SELECT zone_id, hazard_type, exposed_population, facilities_count,
+                           vulnerability_score, risk_level, evidence_strength
+                    FROM exposure_index
+                    LIMIT 2;
+                    """,
+                    [],
+                )
 
         for row in exposure_rows:
             zone_id, hazard, exposed_pop, facilities, vuln_score, risk_level, evidence = row
@@ -341,9 +414,22 @@ def retrieve_gold_rows(target_zone: Optional[str], question: str) -> List[Dict[s
             })
 
         # 2. Query 'predictions'
-        pred_rows = safe_fetch(
+        if hazard_filter:
+            pred_sql = """
+            SELECT zone_id, hazard_type, probability, interval_low, interval_high, baseline_value, CAST(forecast_time AS VARCHAR) as forecast_time
+            FROM (
+                SELECT zone_id, hazard_type, probability, interval_low, interval_high, baseline_value, CAST(forecast_time AS VARCHAR) as forecast_time FROM predictions
+                UNION ALL
+                SELECT zone_id, hazard_type, probability, interval_low, interval_high, baseline_value, CAST(forecast_time AS VARCHAR) as forecast_time FROM sample_db.predictions
+            )
+            WHERE (UPPER(zone_id) LIKE UPPER(?) OR UPPER(?) LIKE '%' || UPPER(zone_id) || '%')
+              AND LOWER(hazard_type) = LOWER(?)
+            LIMIT 2;
             """
-            SELECT zone_id, hazard_type, probability, interval_low, interval_high, baseline_value, forecast_time
+            pred_params = [f"%{target_zone}%", target_zone, hazard_filter]
+        else:
+            pred_sql = """
+            SELECT zone_id, hazard_type, probability, interval_low, interval_high, baseline_value, CAST(forecast_time AS VARCHAR) as forecast_time
             FROM (
                 SELECT zone_id, hazard_type, probability, interval_low, interval_high, baseline_value, CAST(forecast_time AS VARCHAR) as forecast_time FROM predictions
                 UNION ALL
@@ -351,18 +437,30 @@ def retrieve_gold_rows(target_zone: Optional[str], question: str) -> List[Dict[s
             )
             WHERE UPPER(zone_id) LIKE UPPER(?) OR UPPER(?) LIKE '%' || UPPER(zone_id) || '%'
             LIMIT 2;
-            """,
-            [f"%{target_zone}%", target_zone],
-        )
+            """
+            pred_params = [f"%{target_zone}%", target_zone]
+
+        pred_rows = safe_fetch(pred_sql, pred_params)
         if not pred_rows and ("karachi" in target_zone.lower() or target_zone.startswith("KHI")):
-            pred_rows = safe_fetch(
-                """
-                SELECT zone_id, hazard_type, probability, interval_low, interval_high, baseline_value, CAST(forecast_time AS VARCHAR)
-                FROM predictions
-                LIMIT 2;
-                """,
-                [],
-            )
+            if hazard_filter:
+                pred_rows = safe_fetch(
+                    """
+                    SELECT zone_id, hazard_type, probability, interval_low, interval_high, baseline_value, CAST(forecast_time AS VARCHAR)
+                    FROM predictions
+                    WHERE LOWER(hazard_type) = LOWER(?)
+                    LIMIT 2;
+                    """,
+                    [hazard_filter],
+                )
+            else:
+                pred_rows = safe_fetch(
+                    """
+                    SELECT zone_id, hazard_type, probability, interval_low, interval_high, baseline_value, CAST(forecast_time AS VARCHAR)
+                    FROM predictions
+                    LIMIT 2;
+                    """,
+                    [],
+                )
 
         for row in pred_rows:
             zone_id, hazard, prob, low, high, base, f_time = row
@@ -380,29 +478,30 @@ def retrieve_gold_rows(target_zone: Optional[str], question: str) -> List[Dict[s
                 },
             })
 
-        # 3. Query 'district_snapshot'
-        district_rows = safe_fetch(
-            """
-            SELECT region_name, district_name, pbs_total_pop, osm_hospitals_count,
-                   osm_access_pop_hospitals_30min, row_id
-            FROM district_snapshot
-            WHERE UPPER(region_name) LIKE UPPER(?) OR UPPER(district_name) LIKE UPPER(?)
-            LIMIT 2;
-            """,
-            [f"%{target_zone}%", f"%{target_zone}%"],
-        )
-        for row in district_rows:
-            region, district, pop, hosp_count, hosp_access, r_id = row
-            facts.append({
-                "table": "district_snapshot",
-                "row_id": str(r_id or f"district|{district or region}"),
-                "label": f"District Census & Infrastructure ({district or region})",
-                "fields": {
-                    "total_population": pop,
-                    "hospitals_count": hosp_count,
-                    "population_within_30min_hospital": hosp_access,
-                },
-            })
+        # 3. Query 'district_snapshot' only if the user specifically asked for infrastructure/population/census
+        if asks_about_infra:
+            district_rows = safe_fetch(
+                """
+                SELECT region_name, district_name, pbs_total_pop, osm_hospitals_count,
+                       osm_access_pop_hospitals_30min, row_id
+                FROM district_snapshot
+                WHERE UPPER(region_name) LIKE UPPER(?) OR UPPER(district_name) LIKE UPPER(?)
+                LIMIT 2;
+                """,
+                [f"%{target_zone}%", f"%{target_zone}%"],
+            )
+            for row in district_rows:
+                region, district, pop, hosp_count, hosp_access, r_id = row
+                facts.append({
+                    "table": "district_snapshot",
+                    "row_id": str(r_id or f"district|{district or region}"),
+                    "label": f"District Census & Infrastructure ({district or region})",
+                    "fields": {
+                        "total_population": pop,
+                        "hospitals_count": hosp_count,
+                        "population_within_30min_hospital": hosp_access,
+                    },
+                })
 
     finally:
         conn.close()
@@ -520,7 +619,7 @@ def call_llm_with_cache(prompt: str, temperature: float = 0.0) -> str:
             model_name = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
             client = genai.Client(
                 api_key=gemini_key,
-                http_options=types.HttpOptions(timeout=15000),  # 15s timeout
+                http_options=types.HttpOptions(timeout=10000),  # 10s timeout (Google GenAI min)
             )
             config = types.GenerateContentConfig(
                 temperature=float(temperature),
@@ -644,6 +743,28 @@ def answer(
             "row_ids": [],
             "limits": DISCLAIMER_ONLY,
             "supported": False,
+        }
+
+    # Conversational Greeting & Help intent
+    if GREETING_REGEX.match(clean_q):
+        return {
+            "text": (
+                "Hello! I am the ClimateShield 360 AI Climate Assistant for Karachi.\n\n"
+                "I provide evidence-based decision support using verified disaster guidelines "
+                "(NDMA, PDMA Sindh, PMD, WHO) and DuckDB warehouse gold tables. Numbers are exact "
+                "and citations link to official source manifests.\n\n"
+                "You can ask me questions such as:\n"
+                "• 'What should people do in a heatwave according to NDMA?'\n"
+                "• 'What does the latest PMD flood bulletin say?'\n"
+                "• 'What does WHO say about signs of heat stroke?'\n"
+                "• 'What are the heat and rain risk levels for Malir?'\n"
+                "• 'What is the current temperature and weather today in Karachi?'"
+            ),
+            "citations": [],
+            "row_ids": [],
+            "limits": DISCLAIMER_ONLY,
+            "supported": True,
+            "metrics": [],
         }
 
     # Guardrail: Check for misleading casualty/mortality claims (e.g. "confirm X killed 500 people")
