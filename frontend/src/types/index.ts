@@ -856,6 +856,14 @@ export interface RAGCitation {
   section: string;
 }
 
+export interface AnswerMetric {
+  group: string;
+  label: string;
+  raw_value: number | string;
+  formatted_value: string;
+  unit: string;
+}
+
 export interface RAGAnswerData {
   text: string;
   citations: RAGCitation[];
@@ -863,6 +871,7 @@ export interface RAGAnswerData {
   limits: string;
   supported: boolean;
   missing?: string[];
+  metrics?: AnswerMetric[];
 }
 
 export interface RagSectionData {

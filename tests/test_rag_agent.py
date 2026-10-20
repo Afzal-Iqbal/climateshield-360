@@ -156,3 +156,53 @@ def test_caching_layer_limits_calls():
     
     assert res1["text"] == res2["text"]
     assert len(_LLM_CACHE) == cache_size_initial, "Subsequent query must leverage cache without re-prompting"
+
+
+def test_weather_question_does_not_cite_ndma_contingency_plan():
+    """
+    Test 7 (Requirement 15): The weather question does not cite the NDMA contingency plan.
+    Answers with observed weather facts from DuckDB with supported=False.
+    """
+    query = "What's the weather today in Karachi?"
+    result = answer(query)
+
+    assert result["supported"] is False
+    # Must not cite NDMA contingency plan
+    for cit in result["citations"]:
+        assert "contingency_plan" not in cit["document"].lower()
+    assert result["citations"] == [], f"Expected 0 citations for weather query, got: {result['citations']}"
+    # Must include observed weather gold row_id
+    assert len(result["row_ids"]) > 0
+    assert any("Karachi" in r for r in result["row_ids"])
+    assert "weather table" in result["text"].lower()
+    assert "Missing:" in result["text"]
+
+
+def test_heat_health_question_cites_heat_document_and_shows_emergency_line():
+    """
+    Test 8 (Requirement 15): A heat-health question cites a heat document and shows the emergency line.
+    """
+    query = "What are the official public health guidelines and signs of heatstroke?"
+    result = answer(query)
+
+    assert result["supported"] is True
+    assert len(result["citations"]) > 0
+    assert any(
+        "heat" in c["document"].lower() or "who" in c["document"].lower() or "ndma" in c["document"].lower()
+        for c in result["citations"]
+    ), f"Expected heat-related document citation, got: {result['citations']}"
+    assert "Rescue 1122" in result["text"]
+    assert "Rescue 1122" in result["limits"]
+
+
+def test_off_topic_question_returns_supported_false():
+    """
+    Test 9 (Requirement 15): An off-topic question returns supported=false.
+    """
+    query = "What is the stock price of Apple on NASDAQ?"
+    result = answer(query)
+
+    assert result["supported"] is False
+    assert result["citations"] == []
+    assert result["row_ids"] == []
+

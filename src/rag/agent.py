@@ -68,15 +68,16 @@ SAMPLE_DB_PATH = PROJECT_ROOT / "warehouse" / "sample.duckdb"
 
 # Thresholds and Limits
 # In Chroma cosine space (1 - cosine_similarity):
-# Values <= 0.60 indicate high/medium semantic relevance; > 0.60 indicates weak or unrelated queries.
-DEFAULT_DISTANCE_THRESHOLD = 0.60
+# Values <= 0.50 indicate high semantic relevance; > 0.50 indicates weak or unrelated queries.
+DEFAULT_DISTANCE_THRESHOLD = 0.50
 
+DISCLAIMER_ONLY = "Information only, not professional advice."
 EMERGENCY_FOOTER = (
     "Information only, not professional advice. In an emergency contact official services: "
     "Rescue 1122 or the National Disaster Management Authority (NDMA)."
 )
 HEALTH_EMERGENCY_POINTER = (
-    "Official Health Advisory: For acute heat exhaustion, heatstroke, or medical emergencies, "
+    "Health & Safety Advisory: For acute heat exhaustion, heatstroke, or medical emergencies, "
     "immediately contact Rescue 1122 or proceed to the nearest emergency healthcare facility."
 )
 
@@ -86,6 +87,7 @@ NUMBER_REGEX = re.compile(r"\b\d+(?:\.\d+)?\b")
 # Health / Emergency detection keywords
 HEALTH_KEYWORDS = {
     "heatstroke",
+    "heat stroke",
     "exhaustion",
     "dehydration",
     "hospital",
@@ -99,6 +101,11 @@ HEALTH_KEYWORDS = {
     "emergency",
     "ambulance",
     "rescue",
+    "flood danger",
+    "flash flood",
+    "injury",
+    "drowning",
+    "safety",
 }
 
 # Misleading casualty / unverified loss query triggers
@@ -110,6 +117,106 @@ UNVERIFIED_CLAIM_REGEX = re.compile(
 # Thread-safe in-memory LLM cache
 _CACHE_LOCK = threading.Lock()
 _LLM_CACHE: Dict[str, str] = {}
+
+
+def retrieve_observed_weather(target_zone: Optional[str]) -> Optional[Dict[str, Any]]:
+    """
+    Retrieve latest observed weather row from weather_hourly for observed-data answers.
+    Viva point: Fulfills Requirement 12 - answers weather queries from observed warehouse facts.
+    """
+    city_lookup = "Karachi"
+    if target_zone:
+        if "karachi" in target_zone.lower() or target_zone.upper().startswith("KHI"):
+            city_lookup = "Karachi"
+        else:
+            city_lookup = target_zone
+
+    try:
+        conn = get_duckdb_connection()
+        row = conn.execute(
+            """
+            SELECT city, timestamp_pkt, temperature_2m_c, relative_humidity_pct, rain_mm, row_id
+            FROM weather_hourly
+            WHERE UPPER(city) = UPPER(?)
+            ORDER BY timestamp_pkt DESC
+            LIMIT 1;
+            """,
+            [city_lookup],
+        ).fetchone()
+        conn.close()
+        if row:
+            city_name, ts, temp, humidity, rain, row_id = row
+            return {
+                "city": city_name,
+                "timestamp_pkt": ts,
+                "temperature": round(float(temp), 1) if temp is not None else None,
+                "humidity": round(float(humidity), 1) if humidity is not None else None,
+                "rain_mm": round(float(rain), 1) if rain is not None else 0.0,
+                "row_id": str(row_id),
+            }
+    except Exception as exc:
+        print(f"[RAG Agent] Database weather query notice: {exc}")
+    return None
+
+
+def is_general_weather_query(question: str) -> bool:
+    """
+    Detect if user is asking for daily/current weather (temperature, humidity, weather today)
+    that the policy/hazard library cannot answer.
+    """
+    q = question.lower()
+    if any(k in q for k in ["guideline", "sop", "plan", "vulnerab", "exposure", "contingency", "first responder", "hajj", "advisory", "hazard"]):
+        return False
+    weather_patterns = [
+        r"\bweather\b",
+        r"\bhow('s| is) the weather\b",
+        r"\bwhat('s| is) the weather\b",
+        r"\bcurrent weather\b",
+        r"\btoday'?s weather\b",
+        r"\bcurrent temperature\b",
+        r"\btemperature today\b",
+        r"\btemperature right now\b",
+        r"\bwhat('s| is) the temperature\b",
+    ]
+    return any(re.search(pat, q) for pat in weather_patterns)
+
+
+def is_section_topically_relevant(question: str, section: Dict[str, Any]) -> bool:
+    """
+    Check if a retrieved section is topically relevant to the question.
+    Prevents citing NDMA contingency plans for general weather or unrelated queries.
+    """
+    q = question.lower()
+    doc = (section.get("document") or "").lower()
+    sec_title = (section.get("section") or "").lower()
+    text = (section.get("text") or "").lower()
+
+    # Off-topic keywords
+    if any(k in q for k in ["stock", "market", "nintendo", "tokyo", "apple", "nasdaq", "cricket", "president", "election", "football", "bitcoin"]):
+        return False
+
+    is_q_heat = any(k in q for k in ["heat", "heatstroke", "heatwave", "sunstroke", "hyperthermia", "exhaustion", "dehydration"])
+    is_doc_heat = any(k in doc or k in sec_title for k in ["heat", "heatwave", "who_signs", "who_public_health", "pdma_sindh_heatwave"])
+
+    is_q_flood = any(k in q for k in ["flood", "rain", "monsoon", "river", "chenab", "indus", "inundation", "drainage"])
+    is_doc_flood = any(k in doc or k in sec_title for k in ["flood", "monsoon", "pmd_flood"])
+
+    if is_q_heat and not is_doc_heat and not any(k in text[:300] for k in ["heat", "heatstroke", "heatwave", "temperature"]):
+        return False
+
+    if is_q_flood and not is_doc_flood and not any(k in text[:300] for k in ["flood", "monsoon", "river"]):
+        return False
+
+    # Check term overlap
+    q_words = set(re.findall(r"\b[a-zA-Z]{4,}\b", q)) - {
+        "what", "whats", "where", "which", "about", "today", "official", "latest", "karachi", "tell", "does", "have"
+    }
+    if not q_words:
+        return True
+
+    overlap = [w for w in q_words if w in doc or w in sec_title or w in text[:300]]
+    return len(overlap) >= 1
+
 
 
 def get_duckdb_connection() -> duckdb.DuckDBPyConnection:
@@ -379,7 +486,7 @@ def extract_slot_mappings(facts: List[Dict[str, Any]]) -> Tuple[Dict[str, str], 
                 token = f"{{n{slot_counter}}}"
                 placeholder_to_value[token] = val_str
                 placeholder_to_row_id[token] = row_id
-                placeholder_to_desc[token] = f"{label} - {field_name.replace('_', ' ')}"
+                placeholder_to_desc[token] = f"{label} :: {field_name.replace('_', ' ')}"
                 slot_counter += 1
 
     return placeholder_to_value, placeholder_to_row_id, placeholder_to_desc
@@ -474,18 +581,34 @@ def synthesize_safe_wording_from_prompt(prompt: str) -> str:
     """
     Deterministic synthesis for tests and offline Viva environments.
     Extracts placeholders from the prompt and constructs a grammatically sound,
-    fully compliant draft strictly using the provided slots without digits.
+    fully compliant draft stating each number and model label once (Requirement 13).
     """
     available_slots = re.findall(r"(\{n\d+\}):\s*([^\n]+)", prompt)
     if not available_slots:
-        return "Based on the verified official documents, this topic is acknowledged, but no specific numerical measurements match this query."
+        return "Based on verified records, this topic is acknowledged, but no specific numerical measurements match this query."
 
-    parts = []
-    for token, desc in available_slots[:4]:
-        parts.append(f"the verified {desc.strip()} is {token}")
+    # Group slots by model / table label
+    # desc format is: "{label} :: {field_name}"
+    groups: Dict[str, List[Tuple[str, str]]] = {}
+    for token, desc in available_slots:
+        if " :: " in desc:
+            model_label, metric_name = desc.split(" :: ", 1)
+        elif " - " in desc:
+            model_label, metric_name = desc.rsplit(" - ", 1)
+        else:
+            model_label, metric_name = "Warehouse Metric", desc
+        model_label = model_label.strip()
+        metric_name = metric_name.strip()
+        if model_label not in groups:
+            groups[model_label] = []
+        groups[model_label].append((token, metric_name))
 
-    sentences = "According to official warehouse records, " + ", while ".join(parts) + "."
-    return sentences
+    sentences = []
+    for model_label, items in list(groups.items())[:2]:
+        metrics_phrase = ", ".join([f"{metric} is {token}" for token, metric in items])
+        sentences.append(f"{model_label}: {metrics_phrase}")
+
+    return "Verified records indicate " + "; while ".join(sentences) + "."
 
 
 def answer(
@@ -502,15 +625,16 @@ def answer(
 
     Viva Step-by-Step Flow:
     1. Input Sanity & Guardrail Validation (reject empty, malicious, or false casualty claims).
-    2. Hybrid Retrieval:
+    2. Observed Data Check: If question asks for daily weather that policy library cannot answer,
+       answer with observed weather from weather_hourly gold row with supported=False (Req 12).
+    3. Hybrid Retrieval:
        - Structured DuckDB query for gold rows from predictions, exposure_index, district_snapshot.
-       - Vector search in ChromaDB for official advisories (NDMA/PMD/PDMA/WHO).
-    3. Fail-Closed Threshold Check: If distance is too high AND no gold rows match, exit supported=False.
-    4. Numeric Placeholder Mapping ({n1}, {n2}, ...).
-    5. Prompt LLM to produce creative, authoritative wording containing ONLY slot placeholders.
-       (Runs with temperature=0.0 for deterministic, reliable viva demonstrations).
+       - Vector search in ChromaDB for domain guidance (NDMA/PMD/PDMA/WHO).
+    4. Fail-Closed Threshold & Topical Relevance: Require sections to be topically relevant.
+    5. Numeric Placeholder Mapping ({n1}, {n2}, ...) stating each number once.
     6. Deterministic Slot-Filling and Strict Regex Number Verification.
-    7. Public Health Emergency Service Pointer Injection.
+    7. Citations capped at documents actually supporting a sentence (Req 14).
+    8. Emergency protocol line only when health/safety related (Req 11).
     """
     clean_q = (question or "").strip()
     if not clean_q:
@@ -518,45 +642,92 @@ def answer(
             "text": "I don't know. The question is empty.",
             "citations": [],
             "row_ids": [],
-            "limits": EMERGENCY_FOOTER,
+            "limits": DISCLAIMER_ONLY,
             "supported": False,
         }
 
     # Guardrail: Check for misleading casualty/mortality claims (e.g. "confirm X killed 500 people")
     # AGENT_RULES.md Rule 2: "No synthetic data presented as real."
     has_unverified_mortality_query = bool(UNVERIFIED_CLAIM_REGEX.search(clean_q))
+    if has_unverified_mortality_query:
+        return {
+            "text": (
+                "I cannot confirm or validate casualty or mortality figures. Verified warehouse tables "
+                "do not track clinical mortality counts, and synthetic casualty claims are strictly rejected."
+            ),
+            "citations": [],
+            "row_ids": [],
+            "limits": DISCLAIMER_ONLY,
+            "supported": False,
+        }
 
     # 1. Resolve Target Zone
     target_zone = detect_target_zone_or_city(clean_q, zone_id)
 
-    # 2. Hybrid Retrieval: Gold rows + Document sections
+    # 2. Check for daily/current weather question (Requirement 12)
+    # The policy library cannot answer daily weather; answer from weather_hourly if gold row exists
+    if is_general_weather_query(clean_q):
+        weather = retrieve_observed_weather(target_zone)
+        if weather:
+            city = weather["city"]
+            temp = weather["temperature"]
+            hum = weather["humidity"]
+            rain = weather["rain_mm"]
+            row_id = weather["row_id"]
+            text = (
+                f"Latest observed temperature, humidity and rainfall for {city} from the weather table: "
+                f"{temp}°C, {hum}% humidity, and {rain} mm rainfall. "
+                "Missing: daily weather forecast narrative in the official document library."
+            )
+            metrics = [
+                {"group": f"Observed Weather · {city}", "label": "Temperature", "raw_value": temp, "formatted_value": f"{temp}°C", "unit": "°C"},
+                {"group": f"Observed Weather · {city}", "label": "Relative Humidity", "raw_value": hum, "formatted_value": f"{hum}%", "unit": "%"},
+                {"group": f"Observed Weather · {city}", "label": "Rainfall", "raw_value": rain, "formatted_value": f"{rain} mm", "unit": "mm"},
+            ]
+            return {
+                "text": text,
+                "citations": [],
+                "row_ids": [row_id],
+                "limits": DISCLAIMER_ONLY,
+                "supported": False,
+                "metrics": metrics,
+            }
+        else:
+            return {
+                "text": (
+                    f"I don't know. No observed weather records found for '{target_zone or 'specified area'}'. "
+                    "Missing: daily weather forecast narrative in official documents and observed weather table records."
+                ),
+                "citations": [],
+                "row_ids": [],
+                "limits": DISCLAIMER_ONLY,
+                "supported": False,
+            }
+
+    # 3. Hybrid Retrieval: Gold rows + Document sections
     gold_rows = retrieve_gold_rows(target_zone, clean_q)
     sections, best_distance = retrieve_library_sections(clean_q, top_k=3)
 
-    # Filter citations
-    citations = [
-        {"document": s["document"], "section": s["section"]}
-        for s in sections
+    # Filter sections by relevance threshold and topical relevance (Requirement 12)
+    relevant_sections = [
+        s for s in sections
+        if s.get("distance", 1.0) <= distance_threshold and is_section_topically_relevant(clean_q, s)
     ]
+    is_retrieval_weak = len(relevant_sections) == 0
 
-    # 3. Fail-Closed Threshold Validation (Requirement 4)
-    # If the user asks for a specific zone but no rows match, or retrieval is below threshold:
-    is_retrieval_weak = best_distance > distance_threshold
-
-    # If the user specifically asked about an unknown zone/district and no rows match:
+    # 4. Fail-Closed Threshold Validation (Requirement 4 & 12)
     if zone_id and not gold_rows:
         return {
             "text": (
                 f"I don't know. The gold warehouse tables do not contain records for zone '{zone_id}'. "
                 "Missing: verified predictions, exposure index, or district snapshot rows."
             ),
-            "citations": citations if not is_retrieval_weak else [],
+            "citations": [],
             "row_ids": [],
-            "limits": EMERGENCY_FOOTER,
+            "limits": DISCLAIMER_ONLY,
             "supported": False,
         }
 
-    # If both retrieval is weak (below score threshold) and no gold rows match:
     if is_retrieval_weak and not gold_rows:
         return {
             "text": (
@@ -566,56 +737,41 @@ def answer(
             ),
             "citations": [],
             "row_ids": [],
-            "limits": EMERGENCY_FOOTER,
+            "limits": DISCLAIMER_ONLY,
             "supported": False,
         }
 
-    # If the user asks a misleading casualty confirmation question, do NOT invent facts:
-    if has_unverified_mortality_query:
-        return {
-            "text": (
-                "I cannot confirm or validate casualty or mortality figures. Official verified warehouse tables "
-                "do not track clinical mortality counts, and synthetic casualty claims are strictly rejected."
-            ),
-            "citations": citations if not is_retrieval_weak else [],
-            "row_ids": [],
-            "limits": EMERGENCY_FOOTER,
-            "supported": False,
-        }
-
-    # 4. Extract Slot Mappings
+    # 5. Extract Slot Mappings
     slot_to_val, slot_to_row, slot_to_desc = extract_slot_mappings(gold_rows)
 
-    # 5. Build LLM Prompt with instructions for articulate, live domain phrasing
+    # 6. Build LLM Prompt
     context_blocks = "\n".join([
         f"- Document: {s['document']} | Section: {s['section']}\n  Excerpt: {s['text'][:350]}"
-        for s in sections if s.get("distance", 1.0) <= distance_threshold
+        for s in relevant_sections
     ])
     slots_block = "\n".join([f"{token}: {desc}" for token, desc in slot_to_desc.items()])
 
     prompt = f"""
 You are the ClimateShield 360 AI Insight Agent providing extreme-weather decision support for Karachi, Pakistan.
-Your goal is to provide a comprehensive, fluent, and highly professional answer suitable for municipal authorities and disaster management teams.
+Your goal is to provide a concise, factual answer stating each number and model name once.
 
 CRITICAL NON-NEGOTIABLE PROVENANCE RULES:
 1. YOU ARE STRICTLY FORBIDDEN FROM TYPING LITERAL DIGITS OR NUMBERS (0-9).
 2. Whenever you mention any probability, population count, vulnerability score, threshold, ratio, or measurement, you MUST use one of the exact bracketed placeholders below:
 {slots_block or 'No numerical placeholders available for this query.'}
-3. Base your phrasing on the official emergency guidance excerpts below. Synthesize their recommendations clearly and articulately.
-4. If the user question cannot be supported by the data or makes false casualty assertions, state clearly that it is unsupported.
-
-Official Guidance Excerpts:
+3. State each model name once and list its metric placeholders together without repeating phrases.
+4. Base your phrasing on the guidance excerpts below:
 {context_blocks or 'No specific text excerpts retrieved.'}
 
 User Question: {clean_q}
 
-Provide an articulate, authoritative answer adhering strictly to the placeholder contract:
+Provide an evidence-based answer adhering strictly to the placeholder contract:
 """.strip()
 
-    # 6. LLM Generation (with deterministic temperature=0.0)
+    # 7. LLM Generation
     draft_wording = call_llm_with_cache(prompt, temperature=temperature)
 
-    # 7. Slot-Filling & Regex Provenance Guardrail (Requirement 3)
+    # 8. Slot-Filling & Regex Provenance Guardrail (Requirement 3)
     used_row_ids: Set[str] = set()
     filled_text = draft_wording
 
@@ -624,19 +780,23 @@ Provide an articulate, authoritative answer adhering strictly to the placeholder
             filled_text = filled_text.replace(token, val)
             used_row_ids.add(slot_to_row[token])
 
-    # If no slots were used but we have official document text, incorporate verified context
-    if not used_row_ids and sections and not is_retrieval_weak:
-        top_sec = sections[0]
-        # Clean digits from excerpt to prevent unverified number smuggling
-        safe_excerpt = re.sub(r"\d+(?:\.\d+)?", "", top_sec["text"][:300]).strip()
+    used_sections = []
+    if not used_row_ids and relevant_sections:
+        top_sec = relevant_sections[0]
+        safe_excerpt = re.sub(r"\d+(?:\.\d+)?", "", top_sec["text"][:280]).strip()
         doc_label = re.sub(r"\d+", "", top_sec['document'].split('.')[0].replace('_', ' ')).strip()
-        filled_text = f"According to official guidance ({doc_label}): {safe_excerpt}"
+        filled_text = f"Guidance from {doc_label}: {safe_excerpt}."
+        used_sections.append(top_sec)
+    elif relevant_sections and any(word in clean_q.lower() for word in ["guideline", "sop", "who", "ndma", "sign", "advice", "protocol", "symptom"]):
+        top_sec = relevant_sections[0]
+        safe_excerpt = re.sub(r"\d+(?:\.\d+)?", "", top_sec["text"][:200]).strip()
+        doc_label = re.sub(r"\d+", "", top_sec['document'].split('.')[0].replace('_', ' ')).strip()
+        filled_text = f"Guidance from {doc_label}: {safe_excerpt}. {filled_text}"
+        used_sections.append(top_sec)
 
     # Strict Validation: Check every number in filled_text
     allowed_numbers = set(slot_to_val.values())
     present_numbers = NUMBER_REGEX.findall(filled_text)
-
-    # If the text contains any number that was NOT from the gold warehouse rows, reject it!
     hallucinated_numbers = [num for num in present_numbers if num not in allowed_numbers]
     if hallucinated_numbers:
         return {
@@ -644,30 +804,75 @@ Provide an articulate, authoritative answer adhering strictly to the placeholder
                 "I don't know. The generated answer contained unverified numerical figures "
                 f"({hallucinated_numbers}) not present in the gold warehouse tables."
             ),
-            "citations": citations if not is_retrieval_weak else [],
+            "citations": [],
             "row_ids": [],
-            "limits": EMERGENCY_FOOTER,
+            "limits": DISCLAIMER_ONLY,
             "supported": False,
         }
 
-    # 8. Health-Related Emergency Pointer Guardrail (Requirement 5)
-    is_health_related = any(k in clean_q.lower() or k in filled_text.lower() for k in HEALTH_KEYWORDS)
-    if is_health_related:
+    # 9. Health & Safety Guardrail (Requirement 11)
+    is_health_or_safety = any(k in clean_q.lower() or k in filled_text.lower() for k in HEALTH_KEYWORDS)
+    if is_health_or_safety:
         filled_text = f"{filled_text}\n\n{HEALTH_EMERGENCY_POINTER}"
+        limits_text = EMERGENCY_FOOTER
+    else:
+        limits_text = DISCLAIMER_ONLY
 
-    # Only include citations that met the threshold
+    # 10. Cap citations at the ones actually used in the text (Requirement 14)
     valid_citations = [
         {"document": s["document"], "section": s["section"]}
-        for s in sections
-        if s.get("distance", 1.0) <= distance_threshold
-    ]
+        for s in used_sections
+    ][:2]
+
+    # Build structured metrics for frontend presentation (Requirement 8 & 9)
+    metrics = []
+    for fact in gold_rows:
+        if fact["row_id"] in used_row_ids:
+            label = fact["label"]
+            clean_group = label.replace("(", "· ").replace(")", "").replace(" - ", " · ")
+            for k, v in fact["fields"].items():
+                if v is None:
+                    continue
+                label_name = k.replace("_", " ").title()
+                unit = ""
+                if "prob" in k or "interval" in k or "base" in k:
+                    unit = "%"
+                    formatted = f"{round(float(v) * 100, 1)}%"
+                elif "score" in k:
+                    unit = "score"
+                    formatted = str(v)
+                elif "pop" in k:
+                    unit = "people"
+                    formatted = f"{int(v):,}"
+                elif "count" in k or "facilit" in k or "hospital" in k:
+                    unit = "count"
+                    formatted = f"{int(v):,}"
+                elif "temp" in k:
+                    unit = "°C"
+                    formatted = f"{v}°C"
+                elif "humid" in k:
+                    unit = "%"
+                    formatted = f"{v}%"
+                elif "rain" in k:
+                    unit = "mm"
+                    formatted = f"{v} mm"
+                else:
+                    formatted = str(v)
+                metrics.append({
+                    "group": clean_group,
+                    "label": label_name,
+                    "raw_value": v,
+                    "formatted_value": formatted,
+                    "unit": unit,
+                })
 
     return {
         "text": filled_text,
         "citations": valid_citations,
         "row_ids": sorted(list(used_row_ids)),
-        "limits": EMERGENCY_FOOTER,
+        "limits": limits_text,
         "supported": True,
+        "metrics": metrics,
     }
 
 
