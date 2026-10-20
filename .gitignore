@@ -43,12 +43,9 @@ dist-ssr/
 *.tsbuildinfo
 
 # Environment variables
-.env
-.env.local
 .env.*.local
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
@@ -56,3 +53,4 @@ dist-ssr/
 # DuckDB write / temp files (keep sample.duckdb if tracked or ignore temp)
 *.duckdb.tmp
 *.duckdb.wal
+config.bat

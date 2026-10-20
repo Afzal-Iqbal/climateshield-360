@@ -198,7 +198,7 @@ export const api = {
  * Formats a UTC ISO string into a human-readable PKT time.
  */
 export function formatPKT(
-  utcDateStr?: string | null,
+  utcDateStr?: string | Date | null,
   options: Intl.DateTimeFormatOptions = {}
 ): string {
   if (!utcDateStr) return '—';
@@ -218,7 +218,7 @@ export function formatPKT(
       }).format(date) + ' PKT'
     );
   } catch {
-    return utcDateStr;
+    return typeof utcDateStr === 'string' ? utcDateStr : utcDateStr.toISOString();
   }
 }
 

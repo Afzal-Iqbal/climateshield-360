@@ -22,7 +22,7 @@ interface EmergencyPlannerProps {
   isSample?: boolean;
 }
 
-export const EmergencyPlanner: React.FC<EmergencyPlannerProps> = ({ isSample = false }) => {
+export const EmergencyPlanner: React.FC<EmergencyPlannerProps> = ({ isSample: _isSample = false }) => {
   const [selectedHazard, setSelectedHazard] = useState<'heat' | 'heavy_rain'>('heat');
   const [selectedRange, setSelectedRange] = useState<'24h' | '48h' | '7d'>('24h');
   const [expandedZoneId, setExpandedZoneId] = useState<string | null>(null);
@@ -39,8 +39,16 @@ export const EmergencyPlanner: React.FC<EmergencyPlannerProps> = ({ isSample = f
     queryFn: () => api.getPlanner({ hazard: selectedHazard, range: selectedRange }),
   });
 
+  // Query metadata for real-time live status and data freshness
+  const { data: metaResponse } = useQuery({
+    queryKey: ['meta'],
+    queryFn: api.getMeta,
+    refetchInterval: 60000,
+  });
+  const isLive = metaResponse?.data?.is_live ?? false;
+  const dataAsOf = metaResponse?.data?.data_as_of;
+
   const plannerData = plannerRes?.data;
-  const isSampleData = plannerRes?.is_sample ?? isSample;
   const districts = plannerData?.districts || [];
   const cityForecast = plannerData?.city_forecast;
   const resourceSummary = plannerData?.resource_summary;
@@ -59,8 +67,8 @@ export const EmergencyPlanner: React.FC<EmergencyPlannerProps> = ({ isSample = f
       <PageHeader
         title="Emergency Action Planner"
         subtitle="Sindh PDMA & KMC Multi-Hazard Priority Triage: ranked district exposure, critical resource gap detection, and deterministic standard operating procedures."
-        lastUpdated={plannerRes?.generated_at}
-        isLive={!isSampleData}
+        lastUpdated={dataAsOf || plannerRes?.generated_at}
+        isLive={isLive}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <a

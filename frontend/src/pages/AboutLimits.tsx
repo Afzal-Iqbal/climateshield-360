@@ -27,15 +27,23 @@ interface AboutLimitsProps {
   isSample?: boolean;
 }
 
-export const AboutLimits: React.FC<AboutLimitsProps> = ({ isSample = true }) => {
+export const AboutLimits: React.FC<AboutLimitsProps> = ({ isSample: _isSample = true }) => {
   const { data: methodologyResponse, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['methodology'],
     queryFn: api.getMethodology,
     staleTime: 60000,
   });
 
+  // Query metadata for real-time live status and data freshness
+  const { data: metaResponse } = useQuery({
+    queryKey: ['meta'],
+    queryFn: api.getMeta,
+    refetchInterval: 60000,
+  });
+  const isLive = metaResponse?.data?.is_live ?? false;
+  const dataAsOf = metaResponse?.data?.data_as_of;
+
   const data = methodologyResponse?.data;
-  const isSampleData = methodologyResponse?.is_sample ?? isSample;
 
   const [manifestSearch, setManifestSearch] = useState<string>('');
   const [manifestPage, setManifestPage] = useState<number>(0);
@@ -165,8 +173,8 @@ export const AboutLimits: React.FC<AboutLimitsProps> = ({ isSample = true }) => 
       <PageHeader
         title="Data Sources, Methodology & Operational Limits"
         subtitle="Complete system disclosure, table contracts, DuckDB quality rules, machine learning baselines, and safety boundaries."
-        lastUpdated={data.audited_at}
-        isLive={!isSampleData}
+        lastUpdated={dataAsOf || data.audited_at}
+        isLive={isLive}
       />
 
       {/* 4 Summary StatCards */}

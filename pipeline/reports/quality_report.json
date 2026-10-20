@@ -1,9 +1,9 @@
 {
-  "generated_at_utc": "2026-10-19T17:08:41.428563+00:00",
-  "started_at_utc": "2026-10-19T17:08:04.308167+00:00",
+  "generated_at_utc": "2026-10-20T16:11:54.186266+00:00",
+  "started_at_utc": "2026-10-20T16:11:16.828576+00:00",
   "pipeline": "climateshield.pipeline.run.make_data",
   "raw_files_unchanged": true,
-  "n_raw_files": 154,
+  "n_raw_files": 293,
   "n_inventory_files": 40,
   "decision_counts": {
     "keep": 13,
@@ -36,7 +36,7 @@
       },
       {
         "path": "data/cleaned/01_open_meteo_heat_rainfall/weather_hourly.parquet",
-        "bytes": 11241030
+        "bytes": 11250311
       },
       {
         "path": "data/cleaned/02_openstreetmap_geofabrik/district_name_lookup.csv",
@@ -88,7 +88,7 @@
       },
       {
         "path": "data/cleaned/03_ndma_pmd_hazards_warnings/glofas_river_discharge.parquet",
-        "bytes": 10907
+        "bytes": 11239
       },
       {
         "path": "data/cleaned/03_ndma_pmd_hazards_warnings/pmd_river_danger_levels.csv",
@@ -150,7 +150,7 @@
       },
       {
         "path": "data/processed/glofas_river_discharge.parquet",
-        "bytes": 10907
+        "bytes": 11239
       },
       {
         "path": "data/processed/health_facilities.parquet",
@@ -234,7 +234,7 @@
       },
       {
         "path": "data/processed/weather_hourly.parquet",
-        "bytes": 11241030
+        "bytes": 11250311
       }
     ],
     "reports": [
@@ -248,11 +248,11 @@
       },
       {
         "path": "reports/fairness_by_group.csv",
-        "bytes": 1189
+        "bytes": 1337
       },
       {
         "path": "reports/figures/baseline_vs_model_mae.png",
-        "bytes": 59163
+        "bytes": 59075
       },
       {
         "path": "reports/figures/fairness_by_city.png",
@@ -260,11 +260,11 @@
       },
       {
         "path": "reports/hourly_ingest_log.csv",
-        "bytes": 13251
+        "bytes": 19651
       },
       {
         "path": "reports/hourly_ingest_status.json",
-        "bytes": 12451
+        "bytes": 12403
       },
       {
         "path": "reports/initial_quality_report.json",
@@ -272,11 +272,11 @@
       },
       {
         "path": "reports/model_vs_baseline_metrics.json",
-        "bytes": 1003
+        "bytes": 1353
       },
       {
         "path": "reports/model_vs_baseline_summary.md",
-        "bytes": 2574
+        "bytes": 2593
       },
       {
         "path": "reports/quality_logs.csv",
@@ -289,7 +289,7 @@
     ]
   },
   "gold_tables": {
-    "weather_hourly_rows": 592464,
+    "weather_hourly_rows": 592752,
     "weather_6h_sample_rows": 98696,
     "district_snapshot_rows": 160,
     "health_facilities_rows": 5144,
@@ -299,9 +299,9 @@
     "path": "data/processed/climateshield.duckdb",
     "engine": "duckdb",
     "tables": {
-      "weather_hourly": 592464,
+      "weather_hourly": 592752,
       "weather_6h_sample": 98696,
-      "glofas_river_discharge": 72,
+      "glofas_river_discharge": 84,
       "weather_city_stats": 12,
       "city_locations": 12,
       "district_snapshot": 160,
@@ -409,8 +409,8 @@
         "check_id": "schema",
         "action": "keep",
         "passed": true,
-        "n_rows": 592464,
-        "message": "Pandera schema passed for weather_hourly (592464 rows)."
+        "n_rows": 592752,
+        "message": "Pandera schema passed for weather_hourly (592752 rows)."
       },
       {
         "table": "district_snapshot",
@@ -449,7 +449,7 @@
         "check_id": "peshawar_coverage",
         "action": "flag",
         "passed": false,
-        "n_rows": 33312,
+        "n_rows": 33336,
         "message": "Peshawar series starts 2023-01-01T00:00:00+00:00 (not 2021-01-01). Long gap: flag, do not fill."
       },
       {
