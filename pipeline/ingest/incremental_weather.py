@@ -2,16 +2,16 @@
 PakRoad FloodWatch / ClimateShield 360 - Incremental Weather Ingestion
 Author: HackInsight 2026 Team (Climate & Infrastructure Analytics Track)
 
-This module implements the robust incremental hourly ingestion pipeline:
-1. Determines the latest timestamp already recorded in the DuckDB warehouse.
-2. Fetches only new hourly weather records for all 12 monitored Pakistani cities
-   from Open-Meteo using the exact parameters and variables as the existing pipeline.
-3. Implements 3-tier exponential backoff retries on network or HTTP errors,
-   leaving existing data completely untouched on failure.
+Stage 1 Incremental Ingestion:
+1. Determines latest timestamp in warehouse and applies 3-hour overlap window
+   to capture late corrections.
+2. Fetches incremental weather for all 12 cities with exponential backoff (3 tries).
+3. Upserts into cleaned tables using unique keys (city, timestamp, source) keeping
+   fetched_at so corrected values replace old ones and nothing is counted twice.
 4. Preserves raw API responses unchanged on disk in data/raw/hourly_ingest/<run_id>/.
 5. Appends provenance entries (SHA-256, query, timestamp, licence) to manifest.csv.
-6. Runs existing flattening, cleaning, and quality-range checks on the new records only.
-7. Atomically appends new non-forecast observations to weather_hourly gold parquet and DuckDB.
+6. Keeps missing values as missing and flags them; never fills gaps silently.
+7. Isolates failures: failed city does not halt other cities or corrupt earlier data.
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ import logging
 import os
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlencode
@@ -51,6 +51,7 @@ if str(PIPELINE_ROOT) not in sys.path:
 from climateshield.config import (
     CLEANED_DIR,
     DATA_DIR,
+    HTTP_RATE_LIMIT_SECONDS,
     MANIFEST_PATH,
     OPEN_METEO_CITY_POINTS,
     OPEN_METEO_FORECAST_URL,
@@ -68,7 +69,7 @@ from climateshield.quality.logger import QualityLogger
 
 def get_latest_warehouse_timestamp(warehouse_path: Path = WAREHOUSE_PATH) -> datetime:
     """
-    Query the real DuckDB warehouse to find the latest timestamp_utc in weather_hourly.
+    Query DuckDB warehouse to find the latest timestamp_utc in weather_hourly.
     Returns datetime in UTC timezone.
     """
     if not warehouse_path.is_file():
@@ -145,28 +146,93 @@ def fetch_city_weather_raw(
     )
 
 
+def upsert_weather_records(
+    existing_df: Optional[pd.DataFrame],
+    new_records_df: pd.DataFrame,
+) -> Tuple[pd.DataFrame, int, int]:
+    """
+    Upsert new records into existing dataframe using unique key (city, timestamp_utc, source_api).
+    Corrected values replace old ones and newer ingest_fetch_time_utc is preserved.
+    Returns (combined_df, inserted_count, updated_count).
+    """
+    if new_records_df.empty:
+        return existing_df if existing_df is not None else pd.DataFrame(), 0, 0
+
+    new_df = new_records_df.copy()
+    new_df["timestamp_utc"] = pd.to_datetime(new_df["timestamp_utc"], utc=True)
+
+    if existing_df is None or existing_df.empty:
+        return new_df, len(new_df), 0
+
+    existing = existing_df.copy()
+    existing["timestamp_utc"] = pd.to_datetime(existing["timestamp_utc"], utc=True)
+
+    # Ensure key columns exist
+    for col in ["city", "timestamp_utc", "source_api"]:
+        if col not in existing.columns:
+            existing[col] = ""
+        if col not in new_df.columns:
+            new_df[col] = ""
+
+    # Create composite key for matching
+    existing["_upsert_key"] = (
+        existing["city"].astype(str)
+        + "|"
+        + existing["timestamp_utc"].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        + "|"
+        + existing["source_api"].astype(str)
+    )
+    new_df["_upsert_key"] = (
+        new_df["city"].astype(str)
+        + "|"
+        + new_df["timestamp_utc"].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+        + "|"
+        + new_df["source_api"].astype(str)
+    )
+
+    existing_keys = set(existing["_upsert_key"])
+    new_keys = set(new_df["_upsert_key"])
+
+    updated_keys = existing_keys.intersection(new_keys)
+    inserted_keys = new_keys.difference(existing_keys)
+
+    # Remove rows from existing that are being updated
+    kept_existing = existing[~existing["_upsert_key"].isin(new_keys)]
+
+    combined = pd.concat([kept_existing, new_df], ignore_index=True)
+    combined = combined.drop(columns=["_upsert_key"])
+
+    return combined, len(inserted_keys), len(updated_keys)
+
+
 def run_incremental_fetch(
     warehouse_path: Path = WAREHOUSE_PATH,
     run_id: Optional[str] = None,
+    overlap_hours: int = 3,
 ) -> Dict[str, Any]:
     """
-    Execute step 1 of hourly pipeline:
-    - Queries latest warehouse timestamp.
-    - Fetches incremental weather for all 12 cities.
-    - Saves raw JSON unchanged.
-    - Appends manifest.csv.
-    - Runs cleaning and quality checks on new rows only.
-    - Appends new rows to parquet and DuckDB warehouse.
+    Execute incremental weather ingestion:
+    - Finds latest timestamp in warehouse and subtracts 3 hours overlap window.
+    - Requests only newer data.
+    - Preserves raw responses unedited on disk.
+    - Appends manifest entries with SHA-256 and licence.
+    - Cleans and applies quality agent flags without silently filling missing values.
+    - Upserts into gold tables using (city, timestamp_utc, source_api).
     """
     now_utc = datetime.now(timezone.utc)
     if run_id is None:
         run_id = now_utc.strftime("%Y-%m-%dT%H-%M-%SZ")
 
     latest_ts = get_latest_warehouse_timestamp(warehouse_path)
-    logger.info("Latest recorded timestamp in warehouse: %s UTC", latest_ts.isoformat())
+    fetch_start_ts = latest_ts - timedelta(hours=overlap_hours)
+    logger.info(
+        "Latest recorded timestamp in warehouse: %s UTC. Ingest window start (with %dh overlap): %s UTC",
+        latest_ts.isoformat(),
+        overlap_hours,
+        fetch_start_ts.isoformat(),
+    )
 
-    # Range to query: from the latest date to tomorrow (to catch latest completed hours + forecast)
-    start_date = latest_ts.strftime("%Y-%m-%d")
+    start_date = fetch_start_ts.strftime("%Y-%m-%d")
     end_date = now_utc.strftime("%Y-%m-%d")
 
     run_raw_dir = RAW_HOURLY_DIR / run_id
@@ -174,41 +240,44 @@ def run_incremental_fetch(
 
     fetched_files: List[Tuple[str, Path, str, bytes]] = []
     manifest_rows: List[Dict[str, Any]] = []
+    failed_cities: List[Tuple[str, str]] = []
 
     licence_meta = SOURCE_LICENCES.get("01_open_meteo_heat_rainfall", {})
     licence_name = licence_meta.get("licence", "CC-BY-4.0")
     source_url = licence_meta.get("source_url", "https://open-meteo.com/")
 
-    # 1. Fetch raw data for each city with retry mechanism
+    # 1. Fetch raw data for each city with retry mechanism and error isolation
     for slug, point in OPEN_METEO_CITY_POINTS.items():
         city_name = point["city"]
         logger.info("Fetching incremental weather for %s...", city_name)
-        raw_bytes, query_url = fetch_city_weather_raw(slug, point, start_date, end_date)
+        try:
+            raw_bytes, query_url = fetch_city_weather_raw(slug, point, start_date, end_date)
+            raw_filename = f"weather_{slug}_raw.json"
+            raw_path = run_raw_dir / raw_filename
+            raw_path.write_bytes(raw_bytes)
 
-        raw_filename = f"weather_{slug}_raw.json"
-        raw_path = run_raw_dir / raw_filename
-        # Save raw file unchanged
-        raw_path.write_bytes(raw_bytes)
+            sha256_hash = hashlib.sha256(raw_bytes).hexdigest()
+            fetched_files.append((city_name, raw_path, query_url, raw_bytes))
 
-        sha256_hash = hashlib.sha256(raw_bytes).hexdigest()
-        fetched_files.append((city_name, raw_path, query_url, raw_bytes))
-
-        # Relative filepath for manifest
-        rel_path = f"hourly_ingest/{run_id}/{raw_filename}"
-        manifest_rows.append(
-            {
-                "filepath": rel_path,
-                "source": "Open-Meteo",
-                "source_folder": "01_open_meteo_heat_rainfall",
-                "query": query_url,
-                "fetch_time_utc": now_utc.isoformat(),
-                "archive_mtime_utc": now_utc.isoformat(),
-                "sha256": sha256_hash,
-                "bytes": len(raw_bytes),
-                "licence": licence_name,
-                "source_url": source_url,
-            }
-        )
+            rel_path = f"hourly_ingest/{run_id}/{raw_filename}"
+            manifest_rows.append(
+                {
+                    "filepath": rel_path,
+                    "source": "Open-Meteo",
+                    "source_folder": "01_open_meteo_heat_rainfall",
+                    "query": query_url,
+                    "fetch_time_utc": now_utc.isoformat(),
+                    "archive_mtime_utc": now_utc.isoformat(),
+                    "sha256": sha256_hash,
+                    "bytes": len(raw_bytes),
+                    "licence": licence_name,
+                    "source_url": source_url,
+                }
+            )
+            time.sleep(HTTP_RATE_LIMIT_SECONDS)
+        except Exception as exc:
+            logger.error("Failed to fetch weather for %s: %s", city_name, exc)
+            failed_cities.append((city_name, str(exc)))
 
     # 2. Append manifest.csv
     if manifest_rows:
@@ -222,20 +291,20 @@ def run_incremental_fetch(
         combined_manifest.to_csv(MANIFEST_PATH, index=False)
         logger.info("Appended %d entries to %s", len(manifest_rows), MANIFEST_PATH)
 
-    # 3. Clean and quality check new rows only
+    # 3. Clean and quality check new/overlapping rows
     logger_q = QualityLogger()
     agent = DataQualityAgent(logger_q)
 
     all_new_cleaned: List[pd.DataFrame] = []
     for city_name, raw_path, _, _ in fetched_files:
         flattened = _flatten_city_json(raw_path, city_name)
-        # Filter strictly new hours beyond the latest warehouse timestamp
-        new_hours = flattened[flattened["timestamp_utc"] > latest_ts].copy()
-        if new_hours.empty:
+        # Filter to rows starting at fetch_start_ts to catch late corrections
+        overlapping_and_new = flattened[flattened["timestamp_utc"] >= fetch_start_ts].copy()
+        if overlapping_and_new.empty:
             continue
 
-        # Run quality range flags on new rows only
-        checked = _flag_ranges(new_hours, agent)
+        # Run quality range flags; missing values are preserved and flagged
+        checked = _flag_ranges(overlapping_and_new, agent)
         checked["timestamp_utc"] = pd.to_datetime(checked["timestamp_utc"], utc=True)
         checked["row_id"] = (
             checked["city"] + "|" + checked["timestamp_utc"].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -248,41 +317,48 @@ def run_incremental_fetch(
 
         all_new_cleaned.append(checked)
 
-    total_new_rows = 0
+    total_inserted = 0
+    total_updated = 0
     if all_new_cleaned:
         combined_new = pd.concat(all_new_cleaned, ignore_index=True)
-        # Filter out future forecasts for the gold observation table
         observed_new = combined_new[combined_new["is_forecast"] == False].copy()
 
         gold_parquet = PROCESSED_DIR / "weather_hourly.parquet"
-        if gold_parquet.is_file():
-            existing_gold = pd.read_parquet(gold_parquet)
-            existing_ids = set(existing_gold["row_id"].astype(str))
-            truly_new = observed_new[~observed_new["row_id"].astype(str).isin(existing_ids)]
-            if not truly_new.empty:
-                updated_gold = pd.concat([existing_gold, truly_new], ignore_index=True)
-                updated_gold.to_parquet(gold_parquet, index=False)
-                total_new_rows = len(truly_new)
-                logger.info("Added %d new observed rows to %s", total_new_rows, gold_parquet)
-                # Update DuckDB table
-                con = duckdb.connect(str(warehouse_path), read_only=False)
-                try:
-                    src_sql = str(gold_parquet.resolve()).replace("'", "''")
-                    con.execute(f"CREATE OR REPLACE TABLE weather_hourly AS SELECT * FROM read_parquet('{src_sql}');")
-                finally:
-                    con.close()
-        else:
-            observed_new.to_parquet(gold_parquet, index=False)
-            total_new_rows = len(observed_new)
+        existing_gold = pd.read_parquet(gold_parquet) if gold_parquet.is_file() else None
+
+        updated_gold, total_inserted, total_updated = upsert_weather_records(
+            existing_gold, observed_new
+        )
+
+        if not updated_gold.empty:
+            updated_gold.to_parquet(gold_parquet, index=False)
+            logger.info(
+                "Upserted weather_hourly.parquet: %d inserted, %d updated",
+                total_inserted,
+                total_updated,
+            )
+            # Update DuckDB table
+            con = duckdb.connect(str(warehouse_path), read_only=False)
+            try:
+                src_sql = str(gold_parquet.resolve()).replace("'", "''")
+                con.execute(f"CREATE OR REPLACE TABLE weather_hourly AS SELECT * FROM read_parquet('{src_sql}');")
+            finally:
+                con.close()
+
+    status = "success"
+    if failed_cities:
+        status = "partial" if fetched_files else "failed"
 
     return {
         "run_id": run_id,
         "fetch_time_utc": now_utc.isoformat(),
         "cities_fetched": len(fetched_files),
+        "cities_failed": failed_cities,
         "raw_files_written": len(fetched_files),
-        "new_observations_added": total_new_rows,
+        "new_observations_inserted": total_inserted,
+        "observations_updated": total_updated,
         "manifest_entries_added": len(manifest_rows),
-        "status": "success",
+        "status": status,
     }
 
 

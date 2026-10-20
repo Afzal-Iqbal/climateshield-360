@@ -1,5 +1,5 @@
 import React from 'react';
-import { formatPKT } from '../../api/client';
+import { DataAsOf } from '../DataAsOf';
 
 interface PageHeaderProps {
   title: string | React.ReactNode;
@@ -8,6 +8,8 @@ interface PageHeaderProps {
   lastUpdated?: string | null;
   badge?: React.ReactNode;
   isLive?: boolean;
+  freshnessStatus?: 'Fresh' | 'Late' | 'Stale';
+  ageMinutes?: number;
   className?: string;
 }
 
@@ -18,6 +20,8 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
   lastUpdated,
   badge,
   isLive = false,
+  freshnessStatus,
+  ageMinutes,
   className = '',
 }) => {
   return (
@@ -30,12 +34,24 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
             {title}
           </h1>
           {badge}
-          {isLive && (
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+
+          {/* Dynamic Live / Late / Stale Status Badge (Requirement 18 & 21) */}
+          {isLive ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-mono-val shadow-[0_0_10px_rgba(16,185,129,0.2)]">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Live Pipeline
+              Live
             </span>
-          )}
+          ) : freshnessStatus === 'Late' ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30 font-mono-val">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              Late {ageMinutes !== undefined ? `(${Math.round(ageMinutes)}m)` : ''}
+            </span>
+          ) : freshnessStatus === 'Stale' ? (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-500/15 text-rose-400 border border-rose-500/30 font-mono-val">
+              <span className="w-1.5 h-1.5 rounded-full bg-rose-400" />
+              Stale {ageMinutes !== undefined ? `(${Math.round(ageMinutes)}m)` : ''}
+            </span>
+          ) : null}
         </div>
         {subtitle && (
           <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-400 text-slate-600 font-body max-w-3xl leading-relaxed">
@@ -46,9 +62,8 @@ export const PageHeader: React.FC<PageHeaderProps> = ({
 
       <div className="flex flex-wrap items-center gap-2.5 shrink-0">
         {lastUpdated && (
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/20 dark:bg-black/20 bg-slate-100 text-slate-400 dark:text-slate-400 text-slate-600 text-[11px] border border-white/5 dark:border-white/5 border-slate-200 font-mono-val">
-            <span className="material-symbols-outlined text-[14px]">update</span>
-            <span>As of: {formatPKT(lastUpdated)}</span>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-black/20 dark:bg-black/20 bg-slate-100 text-slate-400 dark:text-slate-400 text-slate-600 text-[11px] border border-white/5 dark:border-white/5 border-slate-200">
+            <DataAsOf timestamp={lastUpdated} />
           </div>
         )}
         {actions}

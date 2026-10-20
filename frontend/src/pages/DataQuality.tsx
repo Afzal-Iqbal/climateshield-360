@@ -36,7 +36,7 @@ interface DataQualityProps {
   isSample?: boolean;
 }
 
-export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => {
+export const DataQuality: React.FC<DataQualityProps> = ({ isSample: _isSample = true }) => {
   const [selectedAction, setSelectedAction] = useState<string>('all');
   const [selectedSource, setSelectedSource] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -50,8 +50,17 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
   const { data: summaryResponse, refetch: refetchSummary } = useQuery({
     queryKey: ['quality-summary'],
     queryFn: api.getQualitySummary,
-    refetchInterval: 30000,
+    refetchInterval: 120000,
   });
+
+  // Query metadata for real-time live status and data freshness
+  const { data: metaResponse } = useQuery({
+    queryKey: ['meta'],
+    queryFn: api.getMeta,
+    refetchInterval: 60000,
+  });
+  const isLive = metaResponse?.data?.is_live ?? false;
+  const dataAsOf = metaResponse?.data?.data_as_of;
 
   // 2. Fetch Paginated Decisions
   const {
@@ -194,8 +203,8 @@ export const DataQuality: React.FC<DataQualityProps> = ({ isSample = true }) => 
       <PageHeader
         title="Data Quality Center"
         subtitle="Automated DuckDB validation audits, schema sanity checks, and immutable transformation logs."
-        lastUpdated={summaryResponse?.generated_at}
-        isLive={!isSample}
+        lastUpdated={dataAsOf || summaryResponse?.generated_at}
+        isLive={isLive}
         actions={
           <Button variant="outline" size="sm" icon="refresh" onClick={handleRefreshAll}>
             Refresh Audits

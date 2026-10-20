@@ -53,7 +53,7 @@ def test_meta_endpoint():
     assert meta["timezone_display"] == "PKT (UTC+5)"
     assert meta["last_run"] is not None
     assert meta["last_run"]["run_id"] is not None
-    assert meta["last_run"]["status"] == "success"
+    assert meta["last_run"]["status"] in ("success", "partial")
 
 
 def test_cors_headers():
