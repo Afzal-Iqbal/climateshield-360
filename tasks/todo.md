@@ -1,20 +1,49 @@
-# Tasks: Risk Map Loading State Fix
+# Tasks: Permanent Map Fix & CARTO Purge
 
-- [ ] **Task 1: Add `zonesStillArriving` guard and update UI conditions**
+- [x] **Task 1: Purge CARTO & Configure OpenFreeMap Dark in `mapBasemap.ts`**
 
-  **Description:** Derive a `zonesStillArriving` boolean that is `true` when either `isZonesLoading` is true OR `isZonesSuccess` is true but features are empty. Use this single flag to: (a) show the "Loading risk data…" spinner, and (b) suppress the "No District Polygons" empty state. The empty state should only render when `!zonesStillArriving && features.length === 0` — which in practice never happens because the dataset always has zones.
+  **Description:** Update `frontend/src/lib/mapBasemap.ts` to redefine `BasemapTier` as `'openfreemap' | 'osm' | 'dark'`, pointing `'openfreemap'` to OpenFreeMap Dark (`https://tiles.openfreemap.org/styles/dark`), remove all CARTO CDN urls, and configure `nextBasemapTier`: `openfreemap` → `osm` → `dark`.
 
   **Acceptance criteria:**
-  - [ ] A `zonesStillArriving` const is computed after the `filteredZones` memo (~line 251)
-  - [ ] Loading spinner block (line ~828) uses `zonesStillArriving` instead of `isZonesLoading`
-  - [ ] Empty state block (line ~843) uses `!zonesStillArriving` instead of `!isZonesLoading`
-  - [ ] No other lines in `RiskMap.tsx` are changed
+  - [x] No occurrences of `carto` or `cartocdn.com` in `mapBasemap.ts`
+  - [x] Tier 1 is OpenFreeMap Dark (`https://tiles.openfreemap.org/styles/dark`)
+  - [x] Tier 2 is OSM Raster (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`)
+  - [x] Tier 3 is Dark Canvas (`#0b0f19`)
 
   **Verification:**
-  - [ ] `cd frontend && npm run build` exits 0
-  - [ ] Open `http://127.0.0.1:5173/risk-map` → spinner shows until zones render
-  - [ ] "No District Polygons" dialog never appears during normal load
+  - [x] TypeScript compilation passes: `npx tsc -b frontend`
+  - [x] Zero lint/type errors in `mapBasemap.ts`
 
-  **Dependencies:** None
-  **Files likely touched:** `frontend/src/pages/RiskMap.tsx`
-  **Estimated scope:** XS (1 file, ~5 lines changed)
+- [x] **Task 2: Update `RiskMap.tsx` initialization & fallback messages**
+
+  **Description:** Ensure `RiskMap.tsx` initializes `basemapTierRef` and `styleForTier` to `'openfreemap'`, update the fallback toast message to reflect the new hierarchy (`OpenFreeMap unavailable — using OpenStreetMap raster`), and verify error handler skips non-fatal tile network warnings.
+
+  **Acceptance criteria:**
+  - [x] `basemapTierRef` defaults to `'openfreemap'`
+  - [x] Map constructor uses `styleForTier('openfreemap')`
+  - [x] Toast notification says `OpenFreeMap unavailable — using OpenStreetMap raster.` when falling back to `osm`
+  - [x] Error handler ignores individual tile 404s/asset drops
+
+  **Verification:**
+  - [x] `npm run build` succeeds cleanly in `frontend/`
+
+## Checkpoint: Core Implementation
+- [x] Application builds without errors (`npm run build`)
+- [x] Backend test suite passes (`pytest`)
+
+- [x] **Task 3: Full Project Verification**
+
+  **Description:** Run the full frontend production build and backend test suite to guarantee zero regressions.
+
+  **Acceptance criteria:**
+  - [x] `cd frontend && npm run build` completes in <10s with 0 errors
+  - [x] `cd backend && PYTHONPATH=backend pytest backend/tests` passes 81/81 tests
+
+- [ ] **Task 4: Commit and Push to `Hunain` Branch**
+
+  **Description:** Stage the changes, commit with a descriptive message, and push directly to `origin/Hunain` using `git` and `gh` CLI.
+
+  **Acceptance criteria:**
+  - [ ] Git commit created on branch `Hunain`
+  - [ ] Pushed to `https://github.com/Afzal-Iqbal/climateshield-360` under `Hunain`
+  - [ ] Branch `main` untouched

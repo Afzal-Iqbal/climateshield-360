@@ -169,7 +169,7 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const mapLoadedRef = useRef(false);
-  const basemapTierRef = useRef<BasemapTier>('carto');
+  const basemapTierRef = useRef<BasemapTier>('openfreemap');
   const use3dRef = useRef(use3d);
   const hoveredIdRef = useRef<string | number | null>(null);
   const interactionsBoundRef = useRef(false);
@@ -437,7 +437,7 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
 
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
-      style: styleForTier('carto') as any,
+      style: styleForTier('openfreemap') as any,
       bounds: KARACHI_BOUNDS,
       fitBoundsOptions: { padding: 40 },
       minZoom: 5,
