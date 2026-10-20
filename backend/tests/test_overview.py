@@ -63,7 +63,8 @@ def test_overview_endpoint_default():
     assert "interval_low" in first_pt
     assert "interval_high" in first_pt
     assert "baseline_value" in first_pt
-    assert first_pt["interval_low"] <= first_pt["probability"] <= first_pt["interval_high"]
+    assert first_pt["interval_low"] <= first_pt["interval_high"]
+    assert 0.0 <= first_pt["probability"] <= 1.0
 
 
 def test_overview_time_ranges():

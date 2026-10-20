@@ -27,7 +27,7 @@ interface PipelineFreshnessProps {
   isSample?: boolean;
 }
 
-export const PipelineFreshness: React.FC<PipelineFreshnessProps> = ({ isSample = true }) => {
+export const PipelineFreshness: React.FC<PipelineFreshnessProps> = ({ isSample: _isSample = true }) => {
   const [runSearchQuery, setRunSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -60,8 +60,17 @@ export const PipelineFreshness: React.FC<PipelineFreshnessProps> = ({ isSample =
   } = useQuery({
     queryKey: ['freshness'],
     queryFn: api.getFreshness,
-    refetchInterval: 30000,
+    refetchInterval: 60000,
   });
+
+  // Query metadata for real-time live status and data freshness
+  const { data: metaResponse } = useQuery({
+    queryKey: ['meta'],
+    queryFn: api.getMeta,
+    refetchInterval: 60000,
+  });
+  const isLive = metaResponse?.data?.is_live ?? false;
+  const dataAsOf = metaResponse?.data?.data_as_of;
 
   // 4. Fetch model evaluation with weakest group
   const {
@@ -228,8 +237,8 @@ export const PipelineFreshness: React.FC<PipelineFreshnessProps> = ({ isSample =
       <PageHeader
         title="Automation & System Health"
         subtitle="Prefect flow execution telemetry, source SLA freshness tracking, and warehouse run contracts."
-        lastUpdated={statusData?.latest_successful_run?.started_at}
-        isLive={!isSample}
+        lastUpdated={dataAsOf || statusData?.latest_successful_run?.started_at}
+        isLive={isLive}
         actions={
           <Button variant="outline" size="sm" icon="refresh" onClick={handleRefreshAll}>
             Refresh Telemetry

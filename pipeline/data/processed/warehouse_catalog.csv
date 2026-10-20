@@ -1,7 +1,7 @@
 table_name,n_rows
-weather_hourly,592464
+weather_hourly,592752
 weather_6h_sample,98696
-glofas_river_discharge,72
+glofas_river_discharge,84
 weather_city_stats,12
 city_locations,12
 district_snapshot,160

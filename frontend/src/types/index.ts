@@ -30,8 +30,19 @@ export interface LastRunSummary {
   run_id?: string;
   started_at?: string;
   finished_at?: string;
-  status?: 'pending' | 'running' | 'success' | 'failed';
+  status?: 'pending' | 'running' | 'success' | 'partial' | 'failed';
   notes?: string;
+}
+
+export interface SourceMetaInfo {
+  source_name: string;
+  age_minutes: number;
+  status: 'Fresh' | 'Late' | 'Stale';
+  expected_every_minutes: number;
+  publisher?: string;
+  licence?: string;
+  last_fetched_at?: string;
+  last_data_timestamp?: string;
 }
 
 export interface MetaData {
@@ -42,13 +53,19 @@ export interface MetaData {
   timezone_display: string;
   db_path: string;
   last_run?: LastRunSummary | null;
+  data_as_of?: string | null;
+  last_run_at?: string | null;
+  last_run_status?: string | null;
+  next_run_at?: string | null;
+  sources?: SourceMetaInfo[];
+  is_live?: boolean;
 }
 
 export interface RunStatus {
   run_id: string;
   started_at: string;
   finished_at?: string;
-  status: 'pending' | 'running' | 'success' | 'failed';
+  status: 'pending' | 'running' | 'success' | 'partial' | 'failed';
   notes?: string;
 }
 
