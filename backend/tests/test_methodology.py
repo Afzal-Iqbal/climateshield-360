@@ -1,7 +1,7 @@
 """
 Unit tests for the /api/methodology endpoint.
-Ensures conformance with AGENT_RULES.md and prompt requirements:
-- Reads manifest.csv, Dataset_Declaration.md, model_vs_baseline_metrics.json, and quality reports.
+Ensures conformance with doc/AGENT_RULES.md and prompt requirements:
+- Reads manifest.csv, doc/Dataset_Declaration.md, model_vs_baseline_metrics.json, and quality reports.
 - Returns dataset names, source links, licences, collection times, coverage,
   quality rules, ML target, baseline, evaluation method, limitations,
   risk score definitions and thresholds, known gaps, and responsible-use notes.

@@ -1,6 +1,6 @@
 """
 Emergency Action Planner router for ClimateShield 360 Karachi.
-Adheres strictly to AGENT_RULES.md:
+Adheres strictly to doc/AGENT_RULES.md:
 - Rule 1: Never hard-code outputs. Every metric, ranking, and facility comes from DuckDB.
 - Rule 2: Sample data reports is_sample=true.
 - Rule 3: Store time in UTC; display in PKT (UTC+5).

@@ -1,6 +1,6 @@
 /**
  * TypeScript types matching ClimateShield 360 table contract and API conventions.
- * Defined in AGENT_RULES.md.
+ * Defined in doc/AGENT_RULES.md.
  */
 
 export interface APIResponse<T> {
@@ -500,7 +500,7 @@ export interface ForecastData {
   generated_at: string;
   issued_at?: string | null;
   horizon_hours?: number | null;
-  forecast_origin?: 'model' | 'none';
+  forecast_origin?: 'model' | 'external' | 'none';
   is_stale?: boolean;
   stale_reason?: string | null;
 }
@@ -850,6 +850,19 @@ export interface ResponsibleUseNotes {
 export interface InsightCitation {
   source: string;
   detail: string;
+  title?: string | null;
+  section?: string | null;
+}
+
+export interface InsightFact {
+  label: string;
+  value: string;
+  unit: string;
+}
+
+export interface InsightDataRow {
+  label: string;
+  row_id: string;
 }
 
 export interface InsightAnswer {
@@ -858,6 +871,12 @@ export interface InsightAnswer {
   answer: string;
   citations: InsightCitation[];
   limitations?: string | null;
+  supported?: boolean;
+  facts?: InsightFact[];
+  data_rows?: InsightDataRow[];
+  model_label?: string | null;
+  zone?: string | null;
+  safety_related?: boolean;
 }
 
 export interface MethodologyResponseData {

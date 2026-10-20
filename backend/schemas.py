@@ -1,6 +1,6 @@
 """
 Pydantic schemas matching the ClimateShield 360 table contract and API conventions.
-Defined in AGENT_RULES.md.
+Defined in doc/AGENT_RULES.md.
 """
 
 from datetime import datetime
@@ -13,7 +13,7 @@ T = TypeVar("T")
 # --- API Standard Response Wrappers ---
 
 class APIResponse(BaseModel, Generic[T]):
-    """Standard API response structure adhering to AGENT_RULES.md convention."""
+    """Standard API response structure adhering to doc/AGENT_RULES.md convention."""
     data: T
     generated_at: datetime = Field(
         description="Timestamp in UTC when this response payload was generated"
@@ -24,7 +24,7 @@ class APIResponse(BaseModel, Generic[T]):
 
 
 class ErrorResponse(BaseModel):
-    """Standard error response structure adhering to AGENT_RULES.md convention."""
+    """Standard error response structure adhering to doc/AGENT_RULES.md convention."""
     error: str
     detail: Optional[str] = None
 
@@ -903,6 +903,19 @@ class InsightQuestion(BaseModel):
 class InsightCitation(BaseModel):
     source: str
     detail: str
+    title: Optional[str] = None
+    section: Optional[str] = None
+
+
+class InsightFact(BaseModel):
+    label: str
+    value: str
+    unit: str
+
+
+class InsightDataRow(BaseModel):
+    label: str
+    row_id: str
 
 
 class InsightAnswer(BaseModel):
@@ -911,5 +924,11 @@ class InsightAnswer(BaseModel):
     answer: str
     citations: List[InsightCitation] = []
     limitations: Optional[str] = None
+    supported: bool = False
+    facts: List[InsightFact] = []
+    data_rows: List[InsightDataRow] = []
+    model_label: Optional[str] = None
+    zone: Optional[str] = None
+    safety_related: bool = False
 
 

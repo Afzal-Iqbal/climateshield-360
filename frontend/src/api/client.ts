@@ -1,6 +1,6 @@
 /**
  * Typed API Client for ClimateShield 360 Karachi.
- * Adheres to AGENT_RULES.md:
+ * Adheres to doc/AGENT_RULES.md:
  * - Base URL from environment or Vite proxy fallback
  * - Envelope unwrapping {data, generated_at, is_sample}
  * - Error structure handling {error, detail}

@@ -1,6 +1,6 @@
 """
 Predictions router for ClimateShield 360 Karachi.
-Follows all conventions from AGENT_RULES.md:
+Follows all conventions from doc/AGENT_RULES.md:
 - Rule 5: Always show uncertainty intervals and the baseline comparison where predictions appear.
 - Standard envelope: {data, generated_at, is_sample}
 - Read-only DuckDB access

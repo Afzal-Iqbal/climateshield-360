@@ -108,3 +108,57 @@ def test_coverage_does_not_claim_every_area_works():
     assert data["status"] == "answered"
     assert "unsupported" in data["answer"].lower()
     assert "economic" in data["answer"]
+
+
+def test_weather_question_does_not_cite_ndma_contingency():
+    response = client.post(
+        "/api/insight/ask",
+        json={"question": "What's the weather today in Karachi?"},
+    )
+    data = response.json()["data"]
+    assert data["supported"] is False
+    sources = {item["source"] for item in data["citations"]}
+    titles = " ".join(str(item.get("title") or "") for item in data["citations"]).lower()
+    details = " ".join(str(item.get("detail") or "") for item in data["citations"]).lower()
+    assert "anticipatory" not in titles
+    assert "contingency" not in titles
+    assert "anticipatory" not in details
+    assert "document_catalog" not in sources
+    if data["status"] == "answered":
+        assert "weather table" in data["answer"].lower()
+        assert data["facts"]
+        assert data["data_rows"]
+
+
+def test_heat_health_cites_heat_document_and_shows_emergency_line():
+    response = client.post(
+        "/api/insight/ask",
+        json={"question": "Heat stroke risk with the current Karachi temperature?"},
+    )
+    data = response.json()["data"]
+    assert data["safety_related"] is True
+    assert data["limitations"]
+    assert "1736" in data["limitations"]
+    assert "1122" in data["limitations"]
+    if data["status"] == "answered":
+        doc_titles = [
+            str(item.get("title") or "").lower()
+            for item in data["citations"]
+            if item.get("source") == "document_catalog"
+        ]
+        assert data["supported"] is True
+        assert doc_titles
+        assert any("weather advisory" in title or "heat" in title for title in doc_titles)
+        assert not any("anticipatory" in title for title in doc_titles)
+
+
+def test_off_topic_question_returns_supported_false():
+    response = client.post(
+        "/api/insight/ask",
+        json={"question": "What will the stock market do next week?"},
+    )
+    data = response.json()["data"]
+    assert data["status"] == "unknown"
+    assert data["supported"] is False
+    assert data["citations"] == []
+    assert "°C" not in data["answer"]

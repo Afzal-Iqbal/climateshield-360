@@ -8,7 +8,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Core Palette (from DESIGN.md & Stitch HTML)
+        // Core Palette (from doc/frontend/DESIGN.md & Stitch HTML)
         "primary": "#001428",
         "on-primary": "#ffffff",
         "primary-container": "#0f2942",
@@ -63,7 +63,7 @@ export default {
         "error-container": "rgb(var(--cs-error-container) / <alpha-value>)",
         "on-error-container": "rgb(var(--cs-on-error-container) / <alpha-value>)",
 
-        // Risk Escalation Scale (Rule 4 & DESIGN.md)
+        // Risk Escalation Scale (Rule 4 & doc/frontend/DESIGN.md)
         "risk-low": "#059669",
         "risk-low-surface": "#ECFDF5",
         "risk-low-border": "#A7F3D0",
@@ -98,17 +98,18 @@ export default {
         "margin-desktop": "2rem",
       },
       fontFamily: {
-        "sans": ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
-        "mono": ["JetBrains Mono", "monospace"],
+        "sans": ["Inter", "system-ui", "sans-serif"],
+        "display": ["Sora", "Inter", "system-ui", "sans-serif"],
+        "mono": ["JetBrains Mono", "ui-monospace", "monospace"],
         "urdu": ["Noto Nastaliq Urdu", "Noto Sans Arabic", "sans-serif"],
-        "headline-xl": ["Inter", "sans-serif"],
-        "headline-lg": ["Inter", "sans-serif"],
-        "headline-md": ["Inter", "sans-serif"],
+        "headline-xl": ["Sora", "Inter", "sans-serif"],
+        "headline-lg": ["Sora", "Inter", "sans-serif"],
+        "headline-md": ["Sora", "Inter", "sans-serif"],
         "title-md": ["Inter", "sans-serif"],
         "body-lg": ["Inter", "sans-serif"],
         "body-md": ["Inter", "sans-serif"],
         "body-sm": ["Inter", "sans-serif"],
-        "metric-display": ["Inter", "sans-serif"],
+        "metric-display": ["JetBrains Mono", "monospace"],
         "label-mono-md": ["JetBrains Mono", "monospace"],
         "label-mono-sm": ["JetBrains Mono", "monospace"],
       },

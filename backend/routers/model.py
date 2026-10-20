@@ -1,6 +1,6 @@
 """
 Model evaluation summary router for ClimateShield 360 Karachi.
-Follows all conventions from AGENT_RULES.md:
+Follows all conventions from doc/AGENT_RULES.md:
 - Rule 1: Never hard-code outputs. Values come from warehouse and audit reports.
 - Rule 5: Always show uncertainty intervals and baseline comparison.
 - Standard envelope: {data, generated_at, is_sample}

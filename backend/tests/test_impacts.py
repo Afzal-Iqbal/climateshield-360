@@ -1,6 +1,6 @@
 """
 Unit and integration tests for GET /api/impacts/{impact_area} endpoint.
-Adheres to AGENT_RULES.md:
+Adheres to doc/AGENT_RULES.md:
 - Never hard-code outputs
 - Standard envelope: {data, generated_at, is_sample}
 - Rule 2: No synthetic data presented as real; producers & economic are limited evidence

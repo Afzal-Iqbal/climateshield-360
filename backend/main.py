@@ -1,6 +1,6 @@
 """
 Main FastAPI Application for ClimateShield 360 Karachi.
-Follows all conventions specified in AGENT_RULES.md:
+Follows all conventions specified in doc/AGENT_RULES.md:
 - Read-only DuckDB access
 - Timestamps in UTC, display in PKT (UTC+5)
 - Standard envelope: {data, generated_at, is_sample}

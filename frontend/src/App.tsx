@@ -1,18 +1,24 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
 import { Layout } from './components/Layout';
-import { Overview } from './pages/Overview';
-import { RiskMap } from './pages/RiskMap';
-import { Forecast } from './pages/Forecast';
-import { EightImpacts } from './pages/EightImpacts';
-import { DataQuality } from './pages/DataQuality';
-import { InsightAgent } from './pages/InsightAgent';
-import { EmergencyPlanner } from './pages/EmergencyPlanner';
-import { PipelineFreshness } from './pages/PipelineFreshness';
-import { AboutLimits } from './pages/AboutLimits';
+import { ToastProvider, Skeleton } from './components/ui';
 import { api } from './api/client';
 import { ThemeProvider } from './context/ThemeContext';
+
+const Overview = lazy(() => import('./pages/Overview').then((m) => ({ default: m.Overview })));
+const RiskMap = lazy(() => import('./pages/RiskMap').then((m) => ({ default: m.RiskMap })));
+const Forecast = lazy(() => import('./pages/Forecast').then((m) => ({ default: m.Forecast })));
+const EightImpacts = lazy(() => import('./pages/EightImpacts').then((m) => ({ default: m.EightImpacts })));
+const DataQuality = lazy(() => import('./pages/DataQuality').then((m) => ({ default: m.DataQuality })));
+const InsightAgent = lazy(() => import('./pages/InsightAgent').then((m) => ({ default: m.InsightAgent })));
+const EmergencyPlanner = lazy(() =>
+  import('./pages/EmergencyPlanner').then((m) => ({ default: m.EmergencyPlanner }))
+);
+const PipelineFreshness = lazy(() =>
+  import('./pages/PipelineFreshness').then((m) => ({ default: m.PipelineFreshness }))
+);
+const AboutLimits = lazy(() => import('./pages/AboutLimits').then((m) => ({ default: m.AboutLimits })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,8 +30,19 @@ const queryClient = new QueryClient({
   },
 });
 
+const PageFallback = () => (
+  <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-4">
+    <Skeleton className="h-10 w-64" />
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <Skeleton className="h-28" />
+      <Skeleton className="h-28" />
+      <Skeleton className="h-28" />
+    </div>
+    <Skeleton className="h-64 w-full" />
+  </div>
+);
+
 const AppRoutes: React.FC = () => {
-  // Query metadata for sample data status and pipeline last run
   const { data: metaResponse, isLoading } = useQuery({
     queryKey: ['meta'],
     queryFn: api.getMeta,
@@ -37,55 +54,97 @@ const AppRoutes: React.FC = () => {
   return (
     <Routes>
       <Route path="/" element={<Layout meta={meta} isLoadingMeta={isLoading} />}>
-        {/* 1. Overview */}
-        <Route index element={<Overview isSample={isSample} />} />
-
-        {/* 2. Risk Map */}
-        <Route path="risk-map" element={<RiskMap isSample={isSample} />} />
-
-        {/* 3. Heat & Rain Forecast */}
-        <Route path="forecast" element={<Forecast isSample={isSample} />} />
-
-        {/* 4. Eight-Impact Analysis */}
-        <Route path="eight-impacts" element={<EightImpacts isSample={isSample} />} />
-
-        {/* 5. Data Quality Center */}
-        <Route path="data-quality" element={<DataQuality isSample={isSample} />} />
-
-        {/* 6. AI Climate Assistant */}
-        <Route path="ai-assistant" element={<InsightAgent isSample={isSample} />} />
-
-        {/* 7. Emergency Action Planner */}
-        <Route path="emergency-planner" element={<EmergencyPlanner isSample={isSample} />} />
-
-        {/* 8. Automation & System Health */}
-        <Route path="system-health" element={<PipelineFreshness isSample={isSample} />} />
-
-        {/* 9. Data Sources & Methodology */}
-        <Route path="methodology" element={<AboutLimits isSample={isSample} />} />
-
-        {/* URL Redirection for Legacy Routes */}
+        <Route
+          index
+          element={
+            <Suspense fallback={<PageFallback />}>
+              <Overview isSample={isSample} />
+            </Suspense>
+          }
+        />
+        <Route
+          path="risk-map"
+          element={
+            <Suspense fallback={<PageFallback />}>
+              <RiskMap isSample={isSample} />
+            </Suspense>
+          }
+        />
+        <Route
+          path="forecast"
+          element={
+            <Suspense fallback={<PageFallback />}>
+              <Forecast isSample={isSample} />
+            </Suspense>
+          }
+        />
+        <Route
+          path="eight-impacts"
+          element={
+            <Suspense fallback={<PageFallback />}>
+              <EightImpacts isSample={isSample} />
+            </Suspense>
+          }
+        />
+        <Route
+          path="data-quality"
+          element={
+            <Suspense fallback={<PageFallback />}>
+              <DataQuality isSample={isSample} />
+            </Suspense>
+          }
+        />
+        <Route
+          path="ai-assistant"
+          element={
+            <Suspense fallback={<PageFallback />}>
+              <InsightAgent isSample={isSample} />
+            </Suspense>
+          }
+        />
+        <Route
+          path="emergency-planner"
+          element={
+            <Suspense fallback={<PageFallback />}>
+              <EmergencyPlanner isSample={isSample} />
+            </Suspense>
+          }
+        />
+        <Route
+          path="system-health"
+          element={
+            <Suspense fallback={<PageFallback />}>
+              <PipelineFreshness isSample={isSample} />
+            </Suspense>
+          }
+        />
+        <Route
+          path="methodology"
+          element={
+            <Suspense fallback={<PageFallback />}>
+              <AboutLimits isSample={isSample} />
+            </Suspense>
+          }
+        />
         <Route path="insight-agent" element={<Navigate to="/ai-assistant" replace />} />
         <Route path="pipeline-freshness" element={<Navigate to="/system-health" replace />} />
         <Route path="about-limits" element={<Navigate to="/methodology" replace />} />
-
-        {/* Fallback */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
   );
 };
 
-export const App: React.FC = () => {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
+export const App: React.FC = () => (
+  <QueryClientProvider client={queryClient}>
+    <ThemeProvider>
+      <ToastProvider>
         <BrowserRouter>
           <AppRoutes />
         </BrowserRouter>
-      </ThemeProvider>
-    </QueryClientProvider>
-  );
-};
+      </ToastProvider>
+    </ThemeProvider>
+  </QueryClientProvider>
+);
 
 export default App;

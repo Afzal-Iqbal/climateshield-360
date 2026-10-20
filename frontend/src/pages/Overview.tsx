@@ -18,6 +18,7 @@ import { SampleBanner } from '../components/SampleBanner';
 import { EmptyState } from '../components/EmptyState';
 import { AnimatedNumber } from '../components/AnimatedNumber';
 import { Skeleton } from '../components/Skeleton';
+import { PageContainer } from '../components/ui';
 import { RiskLevel } from '../types';
 
 interface OverviewProps {
@@ -140,7 +141,7 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
 
   if (isOverviewError || isPrioritiesError) {
     return (
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6">
+      <PageContainer>
         <SampleBanner isSample={isSample} />
         <EmptyState
           icon="error"
@@ -152,7 +153,7 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
             refetchPriorities();
           }}
         />
-      </div>
+      </PageContainer>
     );
   }
 
@@ -161,7 +162,7 @@ export const Overview: React.FC<OverviewProps> = ({ isSample = true }) => {
       initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.2 }}
-      className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6"
+      className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-5"
     >
       {/* Sample Data Operational Banner (Rule 2) */}
       <SampleBanner isSample={overviewResponse?.is_sample ?? isSample} />

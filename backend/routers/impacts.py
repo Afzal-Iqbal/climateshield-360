@@ -1,6 +1,6 @@
 """
 Impacts router for ClimateShield 360 Karachi.
-Follows AGENT_RULES.md:
+Follows doc/AGENT_RULES.md:
 - Read-only DuckDB access
 - Envelope: {data, generated_at, is_sample}
 - Eight tabs: Physical, Environmental, Producers, Economic, Public Health, Infrastructure, Social, Emergency Response
@@ -123,7 +123,7 @@ def get_impact_domain_data(
     city: str,
     district_id: Optional[str],
 ) -> ImpactDomainData:
-    """Compute domain data strictly from DuckDB tables according to contract_mapping.md."""
+    """Compute domain data strictly from DuckDB tables according to doc/contract_mapping.md."""
     city_name = city.strip() if city else "Karachi"
     target_districts = resolve_district_codes(city_name, district_id)
 
@@ -453,7 +453,7 @@ def get_impact_domain_data(
                 "Crop and agricultural producer telemetry was excluded during the Step 2 Data Quality Agent audit "
                 "(rule EXCLUDE_ALL_ZERO_COLUMNS): the upstream crop-flood exposure layer contained all-zero values "
                 "across all 160 districts and was deemed invalid for operational decision-making. "
-                "In strict compliance with AGENT_RULES.md (Rule 1: 'Never hard-code outputs' and Rule 2: 'No synthetic data "
+                "In strict compliance with doc/AGENT_RULES.md (Rule 1: 'Never hard-code outputs' and Rule 2: 'No synthetic data "
                 "presented as real'), no numerical figures or placeholder tables are generated for this domain."
             ),
             indicators=[],

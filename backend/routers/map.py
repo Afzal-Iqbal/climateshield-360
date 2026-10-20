@@ -1,6 +1,6 @@
 """
 Geospatial Risk Map Router for ClimateShield 360 Karachi.
-Follows all conventions from AGENT_RULES.md:
+Follows all conventions from doc/AGENT_RULES.md:
 - Rule 1: Never hard-code outputs. Every metric, polygon, and facility comes from DuckDB.
 - Rule 2: Reports is_sample=true for demo warehouse.
 - Rule 3: Store time in UTC; display in PKT (UTC+5).

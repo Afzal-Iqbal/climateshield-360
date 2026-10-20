@@ -2,7 +2,7 @@
 PakRoad FloodWatch / ClimateShield 360 - Prefect Hourly Orchestration Flow
 Author: HackInsight 2026 Team (Climate & Infrastructure Analytics Track)
 
-This flow implements the scheduled hourly automation matching AGENT_RULES.md:
+This flow implements the scheduled hourly automation matching doc/AGENT_RULES.md:
 Tasks:
 1. fetch: Fetches new hourly weather observations from Open-Meteo for 12 cities
    with 3 retries and exponential backoff, saving raw JSON files unchanged and

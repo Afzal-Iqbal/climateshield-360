@@ -1,6 +1,6 @@
 """
 Overview and Priorities router for ClimateShield 360 Karachi.
-Follows all conventions from AGENT_RULES.md:
+Follows all conventions from doc/AGENT_RULES.md:
 - Read-only DuckDB access
 - UTC storage, PKT display (Rule 3)
 - Explicit empty state handling (Rule 1)

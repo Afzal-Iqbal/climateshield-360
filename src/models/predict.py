@@ -2,7 +2,7 @@
 PakRoad FloodWatch / ClimateShield 360 - Inference & Prediction Pipeline
 Author: HackInsight 2026 Team (Climate & Infrastructure Analytics Track)
 
-This module implements the production inference pipeline matching AGENT_RULES.md:
+This module implements the production inference pipeline matching doc/AGENT_RULES.md:
 1. Loads the latest hourly weather records for all monitored cities from DuckDB.
 2. Builds exact model features using feature_engineering imported from train_and_evaluate.py.
 3. Loads the trained Multi-Quantile LightGBM models (Q10, Q50, Q90) without retraining.
@@ -316,7 +316,7 @@ def run_predictions(db_path: str = "pipeline/data/processed/climateshield.duckdb
                     "model_version": MODEL_VERSION,
                     "generated_at": now_utc,
                     "median": med,
-                    "zone_id": str(row["city"]),  # Preserves AGENT_RULES.md contract
+                    "zone_id": str(row["city"]),  # Preserves doc/AGENT_RULES.md contract
                 }
             )
 

@@ -44,7 +44,7 @@ export const EmergencyPlanner: React.FC<EmergencyPlannerProps> = ({ isSample = f
     : districts;
 
   return (
-    <div className="w-full flex-1 flex flex-col px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto space-y-6">
+    <div className="w-full flex-1 flex flex-col px-4 sm:px-6 lg:px-8 py-6 max-w-7xl mx-auto space-y-5">
       {/* 1. Header & Emergency Context */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-4 border-b border-outline-variant/30">
         <div>

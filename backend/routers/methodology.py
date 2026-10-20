@@ -1,7 +1,7 @@
 """
 Methodology and Data Governance Router for ClimateShield 360 Karachi.
-Follows all conventions from AGENT_RULES.md:
-- Reads manifest.csv, Dataset_Declaration.md, model_vs_baseline_metrics.json,
+Follows all conventions from doc/AGENT_RULES.md:
+- Reads manifest.csv, doc/Dataset_Declaration.md, model_vs_baseline_metrics.json,
   and quality reports (cleaning_rules.json, quality_report.json, pmd_river_danger_levels).
 - Returns: dataset names, source links, licences, collection times, coverage,
   quality rules, ML target, baseline, evaluation method, limitations,
@@ -81,10 +81,11 @@ def _load_manifest_csv() -> List[Dict[str, str]]:
 
 
 def _load_dataset_declaration_md() -> str:
-    """Reads Dataset_Declaration.md from workspace root."""
+    """Reads Dataset_Declaration.md from the doc/ folder."""
     candidates = [
+        PROJECT_ROOT / "doc" / "Dataset_Declaration.md",
         PROJECT_ROOT / "Dataset_Declaration.md",
-        PROJECT_ROOT.parent / "Dataset_Declaration.md",
+        PROJECT_ROOT.parent / "doc" / "Dataset_Declaration.md",
     ]
     for c in candidates:
         if c.is_file():
@@ -146,7 +147,7 @@ def _load_quality_report_json() -> Dict[str, Any]:
 
 
 def _parse_declaration_sources(declaration_text: str) -> Dict[int, Dict[str, str]]:
-    """Extracts structured source metadata from Dataset_Declaration.md."""
+    """Extracts structured source metadata from doc/Dataset_Declaration.md."""
     sources: Dict[int, Dict[str, str]] = {}
     if not declaration_text:
         return sources
@@ -273,7 +274,7 @@ def get_methodology() -> APIResponse[MethodologyResponseData]:
     cleaning_rules = _load_cleaning_rules_json()
     quality_report = _load_quality_report_json()
 
-    # Parse source metadata from Dataset_Declaration.md
+    # Parse source metadata from doc/Dataset_Declaration.md
     decl_sources = _parse_declaration_sources(declaration_text)
 
     # Compute manifest stats per source folder

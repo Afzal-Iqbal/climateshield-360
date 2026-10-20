@@ -1,6 +1,6 @@
 """
 Unit tests for the /api/model/summary endpoint.
-Ensures conformance with AGENT_RULES.md:
+Ensures conformance with doc/AGENT_RULES.md:
 - Rule 1: Never hard-code outputs. Values come from warehouse and audit reports.
 - Standard envelope: {data, generated_at, is_sample}
 - Required fields: model vs baseline metrics, training and test periods, interval coverage,

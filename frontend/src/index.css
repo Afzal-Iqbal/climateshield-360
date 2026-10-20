@@ -1,73 +1,37 @@
+@import '@fontsource/sora/400.css';
+@import '@fontsource/sora/600.css';
+@import '@fontsource/sora/700.css';
+@import '@fontsource/inter/400.css';
+@import '@fontsource/inter/500.css';
+@import '@fontsource/inter/600.css';
+@import '@fontsource/inter/700.css';
+@import '@fontsource/jetbrains-mono/400.css';
+@import '@fontsource/jetbrains-mono/500.css';
+@import '@fontsource/jetbrains-mono/700.css';
 @import 'maplibre-gl/dist/maplibre-gl.css';
+@import './design/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  :root {
-    color-scheme: light;
-    --bg-page: #f7f9fb;
-    --text-page: #191c1e;
-    --card-bg: #ffffff;
-    --card-glass: rgba(255, 255, 255, 0.85);
-    --border-subtle: rgba(116, 119, 126, 0.2);
-    --cs-surface: 247 249 251;
-    --cs-surface-dim: 216 218 220;
-    --cs-surface-bright: 247 249 251;
-    --cs-surface-container-lowest: 255 255 255;
-    --cs-surface-container-low: 242 244 246;
-    --cs-surface-container: 236 238 240;
-    --cs-surface-container-high: 230 232 234;
-    --cs-surface-container-highest: 224 227 229;
-    --cs-surface-variant: 224 227 229;
-    --cs-surface-tint: 73 96 124;
-    --cs-on-surface: 25 28 30;
-    --cs-on-surface-variant: 67 71 77;
-    --cs-background: 247 249 251;
-    --cs-on-background: 25 28 30;
-    --cs-outline: 116 119 126;
-    --cs-outline-variant: 195 198 206;
-    --cs-error-container: 255 218 214;
-    --cs-on-error-container: 147 0 10;
-  }
-
-  .dark {
-    color-scheme: dark;
-    --bg-page: #0a1124;
-    --text-page: #e8eef6;
-    --card-bg: #0f1933;
-    --card-glass: rgba(15, 25, 51, 0.85);
-    --border-subtle: rgba(255, 255, 255, 0.1);
-    --cs-surface: 15 25 51;
-    --cs-surface-dim: 8 12 22;
-    --cs-surface-bright: 26 39 68;
-    --cs-surface-container-lowest: 10 17 36;
-    --cs-surface-container-low: 16 26 48;
-    --cs-surface-container: 21 32 56;
-    --cs-surface-container-high: 27 40 68;
-    --cs-surface-container-highest: 34 48 80;
-    --cs-surface-variant: 34 48 80;
-    --cs-surface-tint: 176 201 232;
-    --cs-on-surface: 232 238 246;
-    --cs-on-surface-variant: 168 180 196;
-    --cs-background: 10 17 36;
-    --cs-on-background: 232 238 246;
-    --cs-outline: 139 151 168;
-    --cs-outline-variant: 58 74 99;
-    --cs-error-container: 69 16 16;
-    --cs-on-error-container: 254 202 202;
-  }
-
-  html, body {
+  html,
+  body,
+  #root {
     margin: 0;
     padding: 0;
+    min-height: 100%;
+    min-width: 360px;
     background-color: var(--bg-page);
     color: var(--text-page);
-    min-width: 360px;
+  }
+
+  body {
+    font-family: var(--cs-font-body);
     overflow-x: hidden;
   }
 
-  /* Primary stays navy for the sidebar. On dark content surfaces, primary text would disappear. */
   .dark .text-primary {
     color: #b0c9e8;
   }
@@ -75,9 +39,85 @@
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--cs-accent));
+    outline-offset: 2px;
+  }
 }
 
-/* Material symbols styling */
+@layer components {
+  .cs-glass {
+    background: var(--card-glass);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .cs-hairline {
+    height: 1px;
+    background: var(--cs-hairline);
+  }
+
+  .cs-page-grid {
+    background-image:
+      linear-gradient(rgb(var(--cs-border) / 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--cs-border) / 0.08) 1px, transparent 1px);
+    background-size: 48px 48px;
+    background-position: center top;
+  }
+
+  .cs-noise {
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  }
+
+  .cs-header-glow {
+    background: radial-gradient(1200px 180px at 20% 0%, rgb(var(--cs-accent) / 0.18), transparent 60%),
+      radial-gradient(900px 160px at 80% 0%, rgb(var(--cs-accent-2) / 0.12), transparent 55%);
+  }
+
+  /* Same accent glow as the top bar, oriented for the vertical sidebar */
+  .cs-sidebar-glow {
+    background:
+      radial-gradient(500px 420px at 15% 0%, rgb(var(--cs-accent) / 0.22), transparent 58%),
+      radial-gradient(420px 520px at 90% 35%, rgb(var(--cs-accent-2) / 0.14), transparent 55%),
+      radial-gradient(380px 360px at 40% 100%, rgb(var(--cs-accent) / 0.1), transparent 50%),
+      linear-gradient(165deg, #001428 0%, #0a2038 42%, #0f2942 100%);
+  }
+
+  .cs-skeleton {
+    background: linear-gradient(
+      90deg,
+      rgb(var(--cs-surface-container)) 0%,
+      rgb(var(--cs-surface-container-high)) 45%,
+      rgb(var(--cs-surface-container)) 100%
+    );
+    background-size: 200% 100%;
+    animation: cs-shimmer 1.4s ease-in-out infinite;
+  }
+
+  .cs-progress-bar {
+    animation: cs-progress 0.9s ease-in-out infinite;
+  }
+}
+
+@keyframes cs-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes cs-progress {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
 .material-symbols-outlined {
   font-family: 'Material Symbols Outlined';
   font-weight: normal;
@@ -92,7 +132,6 @@
   -webkit-font-smoothing: antialiased;
 }
 
-/* Hide scrollbars while allowing smooth scrolling */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -101,7 +140,6 @@
   scrollbar-width: none;
 }
 
-/* Glassmorphism & Soft Shadow utilities */
 .glass-panel {
   background: var(--card-glass);
   backdrop-filter: blur(12px);
@@ -109,9 +147,17 @@
   border: 1px solid var(--border-subtle);
 }
 
-/* Respect prefers-reduced-motion */
 @media (prefers-reduced-motion: reduce) {
-  *, ::before, ::after {
+  .cs-skeleton,
+  .cs-progress-bar,
+  .animate-ping,
+  .animate-spin {
+    animation: none !important;
+  }
+
+  *,
+  ::before,
+  ::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;

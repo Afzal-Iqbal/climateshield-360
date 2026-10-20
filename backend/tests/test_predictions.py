@@ -1,6 +1,6 @@
 """
 Unit tests for the /api/predictions endpoint.
-Ensures conformance with AGENT_RULES.md:
+Ensures conformance with doc/AGENT_RULES.md:
 - Rule 5: Always show uncertainty intervals and baseline comparisons
 - Standard envelope: {data, generated_at, is_sample}
 """

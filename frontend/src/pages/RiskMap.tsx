@@ -1,29 +1,122 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import maplibregl from 'maplibre-gl';
 import { api } from '../api/client';
 import { RiskBadge } from '../components/RiskBadge';
 import { EmptyState } from '../components/EmptyState';
-import {
-  RiskLevel,
-  ZoneFeatureProperties,
-} from '../types';
+import { Badge, Button, ErrorState, PageHeader, useToast } from '../components/ui';
+import { BasemapTier, nextBasemapTier, styleForTier } from '../lib/mapBasemap';
+import { boundsFromFeatures, KARACHI_BOUNDS, sanitizeZones } from '../lib/mapGeojson';
+import { extrusionHeight, heightLegend, HeightMetric, preferFlatMap, supportsWebGL } from '../lib/mapHeight';
+import { RiskLevel, ZoneDetailData, ZoneFeatureProperties } from '../types';
 
 type HazardMode = 'heat' | 'rain' | 'combined';
 type SeverityFilter = 'all' | RiskLevel;
 type FacilityType = 'hospital' | 'school' | 'shelter' | 'power_substation' | 'drainage_culvert';
 type DrawerTab = 'hazard' | 'exposure' | 'vulnerability' | 'evidence';
+type MapMode = '2d' | '3d';
 
-interface HoveredZoneInfo {
-  properties: ZoneFeatureProperties;
-  x: number;
-  y: number;
+const RISK_COLOR: maplibregl.ExpressionSpecification = [
+  'match',
+  ['get', 'risk_level'],
+  'Severe',
+  '#DC2626',
+  'High',
+  '#EA580C',
+  'Moderate',
+  '#F59E0B',
+  'Low',
+  '#10B981',
+  '#64748B',
+];
+
+function addDistrictLayers(map: maplibregl.Map, use3d: boolean) {
+  if (!map.getSource('zones-source')) {
+    map.addSource('zones-source', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+      promoteId: 'zone_id',
+    });
+  }
+  if (!map.getLayer('zones-fill')) {
+    map.addLayer({
+      id: 'zones-fill',
+      type: 'fill',
+      source: 'zones-source',
+      paint: {
+        'fill-color': ['case', ['==', ['get', 'has_metric'], 0], '#64748B', RISK_COLOR],
+        'fill-opacity': use3d ? 0.22 : 0.65,
+      },
+    });
+  }
+  if (!map.getLayer('zones-extrusion')) {
+    map.addLayer({
+      id: 'zones-extrusion',
+      type: 'fill-extrusion',
+      source: 'zones-source',
+      paint: {
+        'fill-extrusion-color': ['case', ['==', ['get', 'has_metric'], 0], '#64748B', RISK_COLOR],
+        'fill-extrusion-height': ['coalesce', ['get', 'extrusion_height'], 0],
+        'fill-extrusion-base': 0,
+        'fill-extrusion-opacity': 0.88,
+      },
+      layout: { visibility: use3d ? 'visible' : 'none' },
+    });
+  }
+  if (!map.getLayer('zones-borders')) {
+    map.addLayer({
+      id: 'zones-borders',
+      type: 'line',
+      source: 'zones-source',
+      paint: { 'line-color': '#FFFFFF', 'line-width': 1.6, 'line-opacity': 0.8 },
+    });
+  }
+  if (!map.getLayer('zones-selected')) {
+    map.addLayer({
+      id: 'zones-selected',
+      type: 'line',
+      source: 'zones-source',
+      paint: { 'line-color': '#38BDF8', 'line-width': 3.2, 'line-opacity': 0.95 },
+      filter: ['==', ['get', 'zone_id'], ''],
+    });
+  }
+  if (!map.getSource('facilities-source')) {
+    map.addSource('facilities-source', {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+    });
+  }
+  if (!map.getLayer('facilities-points')) {
+    map.addLayer({
+      id: 'facilities-points',
+      type: 'circle',
+      source: 'facilities-source',
+      paint: {
+        'circle-radius': 6.5,
+        'circle-color': [
+          'match',
+          ['get', 'type'],
+          'hospital',
+          '#EF4444',
+          'school',
+          '#3B82F6',
+          'shelter',
+          '#10B981',
+          'power_substation',
+          '#F59E0B',
+          'drainage_culvert',
+          '#06B6D4',
+          '#94A3B8',
+        ],
+        'circle-stroke-width': 2,
+        'circle-stroke-color': '#FFFFFF',
+        'circle-opacity': 0.95,
+      },
+    });
+  }
 }
-
-const KARACHI_CENTER: [number, number] = [67.08, 24.89];
-const INITIAL_ZOOM = 10.3;
 
 interface RiskMapProps {
   isSample?: boolean;
@@ -31,36 +124,65 @@ interface RiskMapProps {
 
 export const RiskMap: React.FC<RiskMapProps> = () => {
   const shouldReduceMotion = useReducedMotion();
+  const toast = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedZoneId = searchParams.get('zone') || searchParams.get('zone_id') || null;
 
-  // Filter States
   const [hazardMode, setHazardMode] = useState<HazardMode>('combined');
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all');
   const [enabledFacilityTypes, setEnabledFacilityTypes] = useState<Record<FacilityType, boolean>>({
     hospital: true,
     school: true,
     shelter: true,
-    power_substation: true,
-    drainage_culvert: true,
+    power_substation: false,
+    drainage_culvert: false,
+  });
+  const [activeTab, setActiveTab] = useState<DrawerTab>('hazard');
+  const [hoveredZone, setHoveredZone] = useState<{
+    properties: ZoneFeatureProperties;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [legendOpen, setLegendOpen] = useState(true);
+  const [layersOpen, setLayersOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const [useTableFallback, setUseTableFallback] = useState(false);
+  const [heightMetric, setHeightMetric] = useState<HeightMetric>('exposed_population');
+  const [force3d, setForce3d] = useState(false);
+  const [mapMode, setMapMode] = useState<MapMode>(() => {
+    try {
+      const saved = localStorage.getItem('cs-map-mode');
+      if (saved === '2d' || saved === '3d') return saved;
+    } catch {
+      /* ignore */
+    }
+    return preferFlatMap() ? '2d' : '3d';
   });
 
-  // Drawer & UI States
-  const [activeTab, setActiveTab] = useState<DrawerTab>('hazard');
-  const [hoveredZone, setHoveredZone] = useState<HoveredZoneInfo | null>(null);
-  const [tilesOffline, setTilesOffline] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
+  const webglOk = supportsWebGL();
+  const flatPreferred = preferFlatMap() && !force3d;
+  const use3d = mapMode === '3d' && webglOk && !flatPreferred;
 
-  // Map DOM and Instance References
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const mapLoadedRef = useRef(false);
+  const basemapTierRef = useRef<BasemapTier>('openfreemap');
+  const use3dRef = useRef(use3d);
+  const hoveredIdRef = useRef<string | number | null>(null);
+  const interactionsBoundRef = useRef(false);
+  const zonesDataRef = useRef<GeoJSON.FeatureCollection>({ type: 'FeatureCollection', features: [] });
+  const facilitiesDataRef = useRef<GeoJSON.FeatureCollection>({ type: 'FeatureCollection', features: [] });
 
-  // 1. Fetch Zones GeoJSON FeatureCollection
+  use3dRef.current = use3d;
+
   const {
     data: zonesResponse,
     isLoading: isZonesLoading,
     isError: isZonesError,
+    isSuccess: isZonesSuccess,
     refetch: refetchZones,
   } = useQuery({
     queryKey: ['map-zones', hazardMode],
@@ -68,23 +190,20 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
     refetchInterval: 60000,
   });
 
-  // Active facility types array for API query
-  const activeFacilityTypesParam = useMemo(() => {
-    return Object.entries(enabledFacilityTypes)
-      .filter(([_, enabled]) => enabled)
-      .map(([type]) => type);
-  }, [enabledFacilityTypes]);
+  const activeFacilityTypesParam = useMemo(
+    () =>
+      Object.entries(enabledFacilityTypes)
+        .filter(([, enabled]) => enabled)
+        .map(([type]) => type),
+    [enabledFacilityTypes]
+  );
 
-  // 2. Fetch Facilities GeoJSON Points
-  const {
-    data: facilitiesResponse,
-  } = useQuery({
+  const { data: facilitiesResponse } = useQuery({
     queryKey: ['map-facilities', activeFacilityTypesParam.join(',')],
     queryFn: () => api.getMapFacilities(activeFacilityTypesParam),
     refetchInterval: 60000,
   });
 
-  // 3. Fetch Selected Zone Detail Dossier
   const {
     data: zoneDetailResponse,
     isLoading: isZoneDetailLoading,
@@ -97,1283 +216,972 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
     refetchInterval: 60000,
   });
 
-  const zonesGeoJSON = zonesResponse?.data;
+  const { data: statusResponse } = useQuery({
+    queryKey: ['pipeline-status'],
+    queryFn: api.getStatus,
+    refetchInterval: 60000,
+  });
 
-  // Filtered Zones based on Severity Filter
-  const filteredZonesGeoJSON = useMemo(() => {
-    if (!zonesGeoJSON) return null;
-    if (severityFilter === 'all') return zonesGeoJSON;
-    return {
-      ...zonesGeoJSON,
-      features: zonesGeoJSON.features.filter(
-        (f) => f.properties.risk_level === severityFilter
-      ),
-    };
-  }, [zonesGeoJSON, severityFilter]);
+  // /api/meta has no is_live; match freshness card via /api/status status_indicator
+  const freshnessTone =
+    statusResponse?.data?.status_indicator === 'failed'
+      ? 'Failed'
+      : statusResponse?.data?.status_indicator === 'late'
+        ? 'Late'
+        : statusResponse?.data?.status_indicator === 'ok'
+          ? 'Live'
+          : 'Unknown';
 
-  // URL Query Sync for Selected Zone
-  const handleSelectZone = (zoneId: string | null) => {
-    const nextParams = new URLSearchParams(searchParams);
-    if (zoneId) {
-      nextParams.set('zone', zoneId);
-    } else {
-      nextParams.delete('zone');
-      nextParams.delete('zone_id');
-    }
-    setSearchParams(nextParams);
-  };
+  const sanitized = useMemo(
+    () => sanitizeZones(zonesResponse?.data, heightMetric),
+    [zonesResponse?.data, heightMetric]
+  );
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(window.location.href);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
-  };
-
-  const handleDownloadGeoJSON = () => {
-    if (!zonesGeoJSON) return;
-    const blob = new Blob([JSON.stringify(zonesGeoJSON, null, 2)], {
-      type: 'application/geo+json',
+  // Deep-clone every time — MapLibre mutates FeatureCollections in place and would
+  // otherwise empty the memoized React data (shows "No district polygons").
+  const filteredZones = useMemo(() => {
+    const features =
+      severityFilter === 'all'
+        ? sanitized.collection.features
+        : sanitized.collection.features.filter((f) => f.properties.risk_level === severityFilter);
+    return structuredClone({
+      type: 'FeatureCollection' as const,
+      features,
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `climateshield-karachi-${hazardMode}-zones.geojson`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  }, [sanitized.collection, severityFilter]);
 
-  // Initialize MapLibre GL
-  useEffect(() => {
-    if (!mapContainerRef.current || mapRef.current) return;
+  // Snapshot for MapLibre only — never hand React-owned objects to setData.
+  zonesDataRef.current = structuredClone(filteredZones) as unknown as GeoJSON.FeatureCollection;
+  facilitiesDataRef.current = (facilitiesResponse?.data || {
+    type: 'FeatureCollection',
+    features: [],
+  }) as unknown as GeoJSON.FeatureCollection;
 
-    // Resilient MapLibre Style Specification
-    // Free tile source (OpenStreetMap raster tiles) with graceful blank dark nautical background fallback (#0A1A2F)
-    const map = new maplibregl.Map({
-      container: mapContainerRef.current,
-      style: {
-        version: 8,
-        sources: {
-          'osm-raster': {
-            type: 'raster',
-            tiles: [
-              'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-            ],
-            tileSize: 256,
-            attribution:
-              '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a> contributors',
-          },
-        },
-        layers: [
-          {
-            id: 'background',
-            type: 'background',
-            paint: {
-              'background-color': '#0A1A2F', // Nautical dark GIS canvas fallback
-            },
-          },
-          {
-            id: 'osm-raster-tiles',
-            type: 'raster',
-            source: 'osm-raster',
-            minzoom: 0,
-            maxzoom: 19,
-            paint: {
-              'raster-opacity': 0.65,
-            },
-          },
-        ],
-      },
-      center: KARACHI_CENTER,
-      zoom: INITIAL_ZOOM,
-      minZoom: 8.5,
-      maxZoom: 18,
-      attributionControl: false,
-    });
-
-    map.addControl(
-      new maplibregl.AttributionControl({ compact: true }),
-      'bottom-right'
-    );
-
-    map.on('error', (e) => {
-      // Graceful offline/tile degradation: falls back to dark nautical blank background (#0A1A2F)
-      if (e.error && String(e.error).toLowerCase().includes('tile')) {
-        setTilesOffline(true);
+  const handleSelectZone = useCallback(
+    (zoneId: string | null) => {
+      const next = new URLSearchParams(searchParams);
+      if (zoneId) next.set('zone', zoneId);
+      else {
+        next.delete('zone');
+        next.delete('zone_id');
       }
-    });
+      setSearchParams(next);
+    },
+    [searchParams, setSearchParams]
+  );
 
-    map.on('load', () => {
-      mapLoadedRef.current = true;
+  const syncSources = useCallback((map: maplibregl.Map) => {
+    try {
+      // Always pass a fresh deep clone — never the React-owned collection.
+      const zonesPayload = structuredClone(zonesDataRef.current);
+      const facPayload = structuredClone(facilitiesDataRef.current);
+      const zones = map.getSource('zones-source') as maplibregl.GeoJSONSource | undefined;
+      zones?.setData(zonesPayload as any);
+      const fac = map.getSource('facilities-source') as maplibregl.GeoJSONSource | undefined;
+      fac?.setData(facPayload as any);
+    } catch (err) {
+      console.error('[RiskMap] syncSources failed', err);
+    }
+  }, []);
 
-      // 1. Add Zones GeoJSON Source
-      map.addSource('zones-source', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      });
+  const attachInteractions = useCallback(
+    (map: maplibregl.Map) => {
+      if (interactionsBoundRef.current) return;
+      interactionsBoundRef.current = true;
 
-      // 2. Zone Choropleth Fill Layer
-      // Rule 4: Low green, Moderate yellow, High orange, Severe red
-      map.addLayer({
-        id: 'zones-fill',
-        type: 'fill',
-        source: 'zones-source',
-        paint: {
-          'fill-color': [
-            'match',
-            ['get', 'risk_level'],
-            'Severe',
-            '#DC2626',
-            'High',
-            '#EA580C',
-            'Moderate',
-            '#F59E0B',
-            'Low',
-            '#10B981',
-            '#64748B',
-          ],
-          'fill-opacity': 0.6,
-        },
-      });
+      let tipRaf = 0;
+      let pendingPoint: { x: number; y: number } | null = null;
+      let lastProps: ZoneFeatureProperties | null = null;
+      let lastZoneId: string | null = null;
 
-      // 3. Zone Boundaries Layer
-      map.addLayer({
-        id: 'zones-borders',
-        type: 'line',
-        source: 'zones-source',
-        paint: {
-          'line-color': '#FFFFFF',
-          'line-width': 1.8,
-          'line-opacity': 0.75,
-        },
-      });
+      const flushTip = () => {
+        tipRaf = 0;
+        if (!pendingPoint || !lastProps) return;
+        const point = pendingPoint;
+        pendingPoint = null;
+        setHoveredZone({ properties: lastProps, x: point.x, y: point.y });
+      };
 
-      // 4. Zone Selection Highlight Layer
-      map.addLayer({
-        id: 'zones-selected',
-        type: 'line',
-        source: 'zones-source',
-        paint: {
-          'line-color': '#38BDF8',
-          'line-width': 3.5,
-          'line-opacity': 0.95,
-        },
-        filter: ['==', ['get', 'zone_id'], ''],
-      });
-
-      // 5. Add Facilities GeoJSON Source & Points Layer
-      map.addSource('facilities-source', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
-      });
-
-      map.addLayer({
-        id: 'facilities-points',
-        type: 'circle',
-        source: 'facilities-source',
-        paint: {
-          'circle-radius': 6.5,
-          'circle-color': [
-            'match',
-            ['get', 'type'],
-            'hospital',
-            '#EF4444',
-            'school',
-            '#3B82F6',
-            'shelter',
-            '#10B981',
-            'power_substation',
-            '#F59E0B',
-            'drainage_culvert',
-            '#06B6D4',
-            '#94A3B8',
-          ],
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#FFFFFF',
-          'circle-opacity': 0.9,
-        },
-      });
-
-      // --- Interactive Events ---
-
-      // Zone hover tooltip
-      map.on('mousemove', 'zones-fill', (e) => {
-        if (!e.features || e.features.length === 0) return;
+      const onMove = (e: maplibregl.MapLayerMouseEvent) => {
+        if (!e.features?.length) return;
         map.getCanvas().style.cursor = 'pointer';
         const feat = e.features[0];
         const props = feat.properties as unknown as ZoneFeatureProperties;
-
-        // Parse interval if stored as stringified JSON in GeoJSON properties
+        const id = String(feat.id ?? props.zone_id ?? '');
+        // Tooltip only — no setFeatureState. Feature-state + fill-extrusion + CSS
+        // blur near the canvas blanks WebGL on Windows GPUs.
         let intervalArr: [number, number] = [props.interval_low, props.interval_high];
-        if (typeof props.interval === 'string') {
+        if (typeof (props as any).interval === 'string') {
           try {
-            intervalArr = JSON.parse(props.interval);
+            intervalArr = JSON.parse((props as any).interval);
           } catch {
-            intervalArr = [props.interval_low, props.interval_high];
+            /* keep */
           }
         }
-
-        setHoveredZone({
-          properties: {
-            ...props,
-            interval: intervalArr,
-          },
-          x: e.point.x,
-          y: e.point.y,
-        });
-      });
-
-      map.on('mouseleave', 'zones-fill', () => {
+        if (id !== lastZoneId) {
+          lastZoneId = id;
+          lastProps = { ...props, interval: intervalArr };
+        }
+        pendingPoint = { x: e.point.x, y: e.point.y };
+        if (!tipRaf) tipRaf = requestAnimationFrame(flushTip);
+      };
+      const onLeave = () => {
         map.getCanvas().style.cursor = '';
+        if (tipRaf) {
+          cancelAnimationFrame(tipRaf);
+          tipRaf = 0;
+        }
+        pendingPoint = null;
+        lastProps = null;
+        lastZoneId = null;
+        hoveredIdRef.current = null;
         setHoveredZone(null);
+      };
+      const onClick = (e: maplibregl.MapLayerMouseEvent) => {
+        const zid = e.features?.[0]?.properties?.zone_id;
+        if (zid) handleSelectZone(String(zid));
+      };
+      ['zones-fill', 'zones-extrusion'].forEach((layer) => {
+        map.on('mousemove', layer, onMove);
+        map.on('mouseleave', layer, onLeave);
+        map.on('click', layer, onClick);
       });
-
-      // Zone click to open detail drawer
-      map.on('click', 'zones-fill', (e) => {
-        if (e.features && e.features.length > 0) {
-          const zid = e.features[0].properties?.zone_id;
-          if (zid) {
-            handleSelectZone(zid);
-          }
-        }
-      });
-
-      // Facility click
       map.on('click', 'facilities-points', (e) => {
-        if (e.features && e.features.length > 0) {
-          const fprops = e.features[0].properties;
-          const zid = fprops?.zone_id;
-          if (zid) {
-            handleSelectZone(zid);
-          }
-        }
+        const zid = e.features?.[0]?.properties?.zone_id;
+        if (zid) handleSelectZone(String(zid));
       });
-    });
+    },
+    [handleSelectZone]
+  );
 
-    mapRef.current = map;
+  const onStyleReady = useCallback(
+    (map: maplibregl.Map) => {
+      mapLoadedRef.current = true;
+      setMapReady(true);
+      try {
+        addDistrictLayers(map, use3dRef.current);
+        attachInteractions(map);
+        syncSources(map);
+        map.resize();
+      } catch (err) {
+        console.error('[RiskMap] layer setup failed', err);
+        setMapError(err instanceof Error ? err.message : 'Failed to add map layers');
+        setUseTableFallback(true);
+      }
+    },
+    [attachInteractions, syncSources]
+  );
 
-    return () => {
-      map.remove();
+  const basemapFallbackLockRef = useRef(false);
+
+  const applyBasemapFallback = useCallback(
+    (map: maplibregl.Map, reason: string) => {
+      // Guard against error storms blanking the map via repeated setStyle.
+      if (basemapFallbackLockRef.current) return;
+      const next = nextBasemapTier(basemapTierRef.current);
+      console.warn(`[RiskMap] Basemap fallback (${basemapTierRef.current} → ${next}): ${reason}`);
+      if (!next) {
+        setMapError(reason);
+        setUseTableFallback(true);
+        toast.push(reason, 'warn');
+        return;
+      }
+      basemapFallbackLockRef.current = true;
+      basemapTierRef.current = next;
+      mapLoadedRef.current = false;
+      interactionsBoundRef.current = false;
+      try {
+        map.setStyle(styleForTier(next) as any);
+        toast.push(
+          next === 'osm'
+            ? 'OpenFreeMap unavailable — using OpenStreetMap raster.'
+            : 'Tiles unavailable — districts on a dark canvas.',
+          'warn'
+        );
+      } catch (err) {
+        console.error('[RiskMap] setStyle fallback failed', err);
+        setMapError(String(err));
+        setUseTableFallback(true);
+      } finally {
+        window.setTimeout(() => {
+          basemapFallbackLockRef.current = false;
+        }, 2500);
+      }
+    },
+    [toast]
+  );
+
+  const initMap = useCallback(() => {
+    if (!mapContainerRef.current) return;
+    if (!webglOk) {
+      setUseTableFallback(true);
+      setMapError('WebGL is unavailable. Showing the district table.');
+      return;
+    }
+    if (mapRef.current) {
+      mapRef.current.remove();
       mapRef.current = null;
       mapLoadedRef.current = false;
+      interactionsBoundRef.current = false;
+    }
+
+    setMapError(null);
+    setUseTableFallback(false);
+    setMapReady(false);
+    basemapTierRef.current = 'openfreemap';
+
+    const map = new maplibregl.Map({
+      container: mapContainerRef.current,
+      style: styleForTier('openfreemap') as any,
+      bounds: KARACHI_BOUNDS,
+      fitBoundsOptions: { padding: 40 },
+      minZoom: 5,
+      maxZoom: 18,
+      pitch: use3dRef.current ? 55 : 0,
+      bearing: use3dRef.current ? -20 : 0,
+      attributionControl: { compact: true },
+      cooperativeGestures: true,
+    });
+
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+    map.addControl(new maplibregl.FullscreenControl(), 'top-right');
+
+    map.on('error', (event) => {
+      const message = String(event.error?.message || event.error || 'Map error');
+      console.error('[RiskMap]', message, event.error);
+      const lower = message.toLowerCase();
+      // Only fall back on hard style/tile load failures — not transient render noise
+      // (broad "failed" matching previously blanked the map during hover/interaction).
+      const isBasemapFailure =
+        (lower.includes('style') && (lower.includes('load') || lower.includes('fetch') || lower.includes('ajax'))) ||
+        (lower.includes('tile') && (lower.includes('404') || lower.includes('403') || lower.includes('failed'))) ||
+        lower.includes('failed to fetch') ||
+        lower.includes('ajaxerror');
+      if (isBasemapFailure) {
+        toast.push(message, 'warn');
+        applyBasemapFallback(map, message);
+      }
+    });
+
+    map.on('load', () => onStyleReady(map));
+    map.on('style.load', () => onStyleReady(map));
+
+    mapRef.current = map;
+  }, [applyBasemapFallback, onStyleReady, toast, webglOk]);
+
+  useEffect(() => {
+    initMap();
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        mapLoadedRef.current = false;
+        interactionsBoundRef.current = false;
+      }
+      setMapReady(false);
     };
+    // StrictMode-safe: remove on cleanup; recreate on remount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Update Zones Data when zones query or severity filter changes
   useEffect(() => {
-    if (!mapRef.current || !mapLoadedRef.current || !filteredZonesGeoJSON) return;
-    const source = mapRef.current.getSource('zones-source') as maplibregl.GeoJSONSource | undefined;
-    if (source) {
-      source.setData(filteredZonesGeoJSON as any);
-    }
-  }, [filteredZonesGeoJSON]);
+    const node = mapContainerRef.current;
+    if (!node || !mapRef.current) return;
+    const ro = new ResizeObserver(() => {
+      requestAnimationFrame(() => mapRef.current?.resize());
+    });
+    ro.observe(node);
+    requestAnimationFrame(() => mapRef.current?.resize());
+    return () => ro.disconnect();
+  }, [mapReady, selectedZoneId, useTableFallback, legendOpen]);
 
-  // Update Facilities Data when facilities query changes
   useEffect(() => {
-    if (!mapRef.current || !mapLoadedRef.current || !facilitiesResponse?.data) return;
-    const source = mapRef.current.getSource('facilities-source') as maplibregl.GeoJSONSource | undefined;
-    if (source) {
-      source.setData(facilitiesResponse.data as any);
+    if (!mapRef.current || !mapLoadedRef.current) return;
+    syncSources(mapRef.current);
+    const b = boundsFromFeatures(filteredZones);
+    if (b && filteredZones.features.length > 0 && !selectedZoneId) {
+      try {
+        mapRef.current.fitBounds(b, {
+          padding: 48,
+          duration: shouldReduceMotion ? 0 : 600,
+          maxZoom: 11.5,
+        });
+      } catch {
+        /* ignore */
+      }
     }
-  }, [facilitiesResponse]);
+  }, [filteredZones, shouldReduceMotion, mapReady, syncSources, selectedZoneId]);
 
-  // Update Selected Zone Highlight
+  useEffect(() => {
+    if (!mapRef.current || !mapLoadedRef.current) return;
+    syncSources(mapRef.current);
+  }, [facilitiesResponse, mapReady, syncSources]);
+
   useEffect(() => {
     if (!mapRef.current || !mapLoadedRef.current) return;
     try {
-      if (selectedZoneId) {
-        mapRef.current.setFilter('zones-selected', ['==', ['get', 'zone_id'], selectedZoneId]);
-      } else {
-        mapRef.current.setFilter('zones-selected', ['==', ['get', 'zone_id'], '']);
-      }
+      mapRef.current.setFilter('zones-selected', ['==', ['get', 'zone_id'], selectedZoneId || '']);
     } catch {
-      // Safe fallback if layer not ready
+      /* ignore */
     }
-  }, [selectedZoneId]);
+  }, [selectedZoneId, mapReady]);
 
-  // Fly to selected zone if available
   useEffect(() => {
-    if (!mapRef.current || !selectedZoneId || !zonesGeoJSON) return;
-    const feat = zonesGeoJSON.features.find((f) => f.properties.zone_id === selectedZoneId);
-    if (feat && feat.geometry && feat.geometry.coordinates) {
-      try {
-        const coords = feat.geometry.coordinates[0];
-        if (coords && coords.length > 0) {
-          const lons = coords.map((c: number[]) => c[0]);
-          const lats = coords.map((c: number[]) => c[1]);
-          const minLon = Math.min(...lons);
-          const maxLon = Math.max(...lons);
-          const minLat = Math.min(...lats);
-          const maxLat = Math.max(...lats);
-
-          mapRef.current.fitBounds(
-            [
-              [minLon, minLat],
-              [maxLon, maxLat],
-            ],
-            { padding: 80, maxZoom: 12.5, duration: 800 }
-          );
+    if (!mapRef.current || !mapLoadedRef.current || !selectedZoneId) return;
+    const feat = filteredZones.features.find((f) => f.properties.zone_id === selectedZoneId);
+    if (!feat?.geometry) return;
+    try {
+      const coords =
+        feat.geometry.type === 'Polygon'
+          ? feat.geometry.coordinates[0]
+          : feat.geometry.coordinates[0][0];
+      const lons = coords.map((c: number[]) => c[0]);
+      const lats = coords.map((c: number[]) => c[1]);
+      mapRef.current.fitBounds(
+        [
+          [Math.min(...lons), Math.min(...lats)],
+          [Math.max(...lons), Math.max(...lats)],
+        ],
+        {
+          padding: 80,
+          maxZoom: 12.5,
+          duration: shouldReduceMotion ? 0 : 800,
+          pitch: use3d ? 55 : 0,
         }
-      } catch {
-        // Fallback gracefully
+      );
+      requestAnimationFrame(() => mapRef.current?.resize());
+    } catch {
+      /* ignore */
+    }
+  }, [selectedZoneId, filteredZones, shouldReduceMotion, use3d]);
+
+  useEffect(() => {
+    if (!mapRef.current || !mapLoadedRef.current) return;
+    const map = mapRef.current;
+    try {
+      localStorage.setItem('cs-map-mode', mapMode);
+      if (map.getLayer('zones-extrusion')) {
+        map.setLayoutProperty('zones-extrusion', 'visibility', use3d ? 'visible' : 'none');
       }
-    }
-  }, [selectedZoneId, zonesGeoJSON]);
-
-  const handleResetView = () => {
-    if (mapRef.current) {
-      mapRef.current.flyTo({
-        center: KARACHI_CENTER,
-        zoom: INITIAL_ZOOM,
-        duration: 800,
+      if (map.getLayer('zones-fill')) {
+        map.setPaintProperty('zones-fill', 'fill-opacity', use3d ? 0.22 : 0.65);
+      }
+      map.easeTo({
+        pitch: use3d ? 55 : 0,
+        bearing: use3d ? -20 : 0,
+        duration: shouldReduceMotion ? 0 : 800,
       });
+    } catch (err) {
+      console.error('[RiskMap] mode switch failed', err);
     }
-  };
-
-  const handleZoomIn = () => {
-    if (mapRef.current) mapRef.current.zoomIn();
-  };
-
-  const handleZoomOut = () => {
-    if (mapRef.current) mapRef.current.zoomOut();
-  };
-
-  const toggleFacilityType = (type: FacilityType) => {
-    setEnabledFacilityTypes((prev) => ({
-      ...prev,
-      [type]: !prev[type],
-    }));
-  };
+  }, [mapMode, use3d, shouldReduceMotion, mapReady]);
 
   const zoneDetail = zoneDetailResponse?.data;
+  const selectedProps =
+    filteredZones.features.find((f) => f.properties.zone_id === selectedZoneId)?.properties || null;
 
-  // Selected Zone properties from zones list (immediate fallback while detail loads)
-  const selectedZoneProps = useMemo(() => {
-    if (!selectedZoneId || !zonesGeoJSON) return null;
-    return zonesGeoJSON.features.find((f) => f.properties.zone_id === selectedZoneId)?.properties || null;
-  }, [selectedZoneId, zonesGeoJSON]);
+  const drawerTitle = selectedProps?.name || zoneDetail?.name || 'Selected district';
+  const drawerSubtitle = [
+    zoneDetail?.name || selectedProps?.name,
+    selectedZoneId ? `Zone ${selectedZoneId}` : null,
+    selectedProps?.hazard_type ? `Hazard: ${selectedProps.hazard_type}` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  const drawerRisk: RiskLevel =
+    selectedProps?.risk_level ||
+    zoneDetail?.vulnerability?.risk_level ||
+    'Low';
 
   return (
-    <motion.div
-      initial={shouldReduceMotion ? { opacity: 1 } : { opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.2 }}
-      className="flex flex-col w-full flex-1 min-h-[calc(100vh-140px)] overflow-hidden bg-background"
-    >
-      {/* ------------------------------------------------------------------ */}
-      {/* RESPONSIVE SINGLE CONTROL BAR (Requirement 5 & 8)                  */}
-      {/* ------------------------------------------------------------------ */}
-      <div className="bg-surface/95 dark:bg-surface-container-low/95 backdrop-blur-md border-b border-outline-variant/30 px-3 sm:px-6 py-2.5 shrink-0 z-20 shadow-xs flex flex-wrap items-center justify-between gap-3">
-        {/* Left Cluster: Hazard Mode Toggle */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div
-            className="inline-flex items-center bg-surface-container-high dark:bg-surface-container-highest/60 p-1 rounded-xl border border-outline-variant/40"
-            role="group"
-            aria-label="Hazard type selection"
-          >
-            <button
-              type="button"
-              onClick={() => setHazardMode('heat')}
-              className={`min-h-[44px] px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
-                hazardMode === 'heat'
-                  ? 'bg-primary text-on-primary font-bold shadow-xs'
-                  : 'text-on-surface-variant hover:text-on-surface'
-              }`}
+    <div className="w-full flex-1 min-h-0 flex flex-col overflow-hidden bg-background">
+      <div className="shrink-0 px-3 sm:px-4 pt-3">
+        <PageHeader
+          title="Risk Map"
+          subtitle="Pakistan-wide district exposure — height encodes warehouse metrics only."
+          badge={
+            <Badge
+              tone={
+                freshnessTone === 'Live'
+                  ? 'ok'
+                  : freshnessTone === 'Late'
+                    ? 'warn'
+                    : freshnessTone === 'Failed'
+                      ? 'danger'
+                      : 'neutral'
+              }
             >
-              <span className="material-symbols-outlined text-[16px] text-amber-400">thermostat</span>
-              <span>Heatwave</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setHazardMode('rain')}
-              className={`min-h-[44px] px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
-                hazardMode === 'rain'
-                  ? 'bg-primary text-on-primary font-bold shadow-xs'
-                  : 'text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[16px] text-cyan-400">rainy</span>
-              <span>Monsoon Rain</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setHazardMode('combined')}
-              className={`min-h-[44px] px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
-                hazardMode === 'combined'
-                  ? 'bg-primary text-on-primary font-bold shadow-xs'
-                  : 'text-on-surface-variant hover:text-on-surface'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[16px] text-error">warning</span>
-              <span>Combined Risk</span>
-            </button>
-          </div>
+              {freshnessTone}
+            </Badge>
+          }
+        />
+      </div>
 
-          {/* Severity Filter Chips (Rule 4: Always text labels) */}
-          <div className="flex items-center gap-1.5 flex-wrap" role="group" aria-label="Risk severity filter">
-            {(['all', 'Severe', 'High', 'Moderate', 'Low'] as SeverityFilter[]).map((level) => {
-              const isActive = severityFilter === level;
-              return (
-                <button
-                  key={level}
-                  type="button"
-                  onClick={() => setSeverityFilter(level)}
-                  className={`min-h-[44px] px-3 py-1.5 rounded-full text-xs font-mono font-medium transition-colors border flex items-center ${
-                    isActive
-                      ? level === 'Severe'
-                        ? 'bg-error text-on-error border-error font-bold shadow-xs'
-                        : level === 'High'
-                        ? 'bg-[#C2410C] text-white border-[#C2410C] font-bold shadow-xs'
-                        : level === 'Moderate'
-                        ? 'bg-[#B45309] text-white border-[#B45309] font-bold shadow-xs'
-                        : level === 'Low'
-                        ? 'bg-[#059669] text-white border-[#059669] font-bold shadow-xs'
-                        : 'bg-primary text-on-primary border-primary font-bold shadow-xs'
-                      : 'bg-surface-container dark:bg-surface-container-high/60 text-on-surface-variant border-outline-variant/30 hover:bg-surface-container-high'
-                  }`}
-                >
-                  {level === 'all'
-                    ? 'All Tiers'
-                    : level === 'Severe'
-                    ? 'Severe (Red)'
-                    : level === 'High'
-                    ? 'High (Orange)'
-                    : level === 'Moderate'
-                    ? 'Moderate (Yellow)'
-                    : 'Low (Green)'}
-                </button>
-              );
-            })}
-          </div>
+      {/* Compact control bar */}
+      <div className="shrink-0 border-b border-outline-variant/30 cs-glass px-3 sm:px-4 py-2 flex flex-wrap items-center gap-2 z-20">
+        <div className="hidden md:inline-flex items-center bg-surface-container-high p-1 rounded-xl border border-outline-variant/40">
+          {(['heat', 'rain', 'combined'] as HazardMode[]).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setHazardMode(mode)}
+              className={`min-h-[44px] px-3 rounded-lg text-xs font-semibold ${
+                hazardMode === mode ? 'bg-secondary text-on-secondary' : 'text-on-surface-variant'
+              }`}
+            >
+              {mode === 'heat' ? 'Heat' : mode === 'rain' ? 'Rain' : 'Combined'}
+            </button>
+          ))}
         </div>
 
-        {/* Right Cluster: Facilities Layer Toggles & Action Controls */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Facility Toggles */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <label className="min-h-[44px] flex items-center gap-1.5 cursor-pointer bg-surface-container dark:bg-surface-container-high/60 px-2.5 py-1.5 rounded-xl text-xs text-on-surface hover:bg-surface-container-high transition-colors border border-outline-variant/30 select-none">
-              <input
-                type="checkbox"
-                checked={enabledFacilityTypes.hospital}
-                onChange={() => toggleFacilityType('hospital')}
-                className="rounded text-error focus:ring-error w-4 h-4"
-              />
-              <span className="material-symbols-outlined text-[16px] text-error">local_hospital</span>
-              <span className="hidden sm:inline">Hospitals</span>
-            </label>
+        <label className="hidden md:flex items-center gap-1 text-xs text-on-surface-variant">
+          Severity
+          <select
+            className="min-h-[44px] rounded-lg border border-outline-variant/40 bg-surface-container-lowest px-2 text-xs text-on-surface"
+            value={severityFilter}
+            onChange={(e) => setSeverityFilter(e.target.value as SeverityFilter)}
+            aria-label="Severity filter"
+          >
+            <option value="all">All tiers</option>
+            <option value="Severe">Severe</option>
+            <option value="High">High</option>
+            <option value="Moderate">Moderate</option>
+            <option value="Low">Low</option>
+          </select>
+        </label>
 
-            <label className="min-h-[44px] flex items-center gap-1.5 cursor-pointer bg-surface-container dark:bg-surface-container-high/60 px-2.5 py-1.5 rounded-xl text-xs text-on-surface hover:bg-surface-container-high transition-colors border border-outline-variant/30 select-none">
-              <input
-                type="checkbox"
-                checked={enabledFacilityTypes.school}
-                onChange={() => toggleFacilityType('school')}
-                className="rounded text-blue-500 focus:ring-blue-500 w-4 h-4"
-              />
-              <span className="material-symbols-outlined text-[16px] text-blue-500">school</span>
-              <span className="hidden sm:inline">Schools</span>
-            </label>
-
-            <label className="min-h-[44px] flex items-center gap-1.5 cursor-pointer bg-surface-container dark:bg-surface-container-high/60 px-2.5 py-1.5 rounded-xl text-xs text-on-surface hover:bg-surface-container-high transition-colors border border-outline-variant/30 select-none">
-              <input
-                type="checkbox"
-                checked={enabledFacilityTypes.shelter}
-                onChange={() => toggleFacilityType('shelter')}
-                className="rounded text-emerald-500 focus:ring-emerald-500 w-4 h-4"
-              />
-              <span className="material-symbols-outlined text-[16px] text-emerald-500">night_shelter</span>
-              <span className="hidden sm:inline">Shelters</span>
-            </label>
-
-            <label className="min-h-[44px] flex items-center gap-1.5 cursor-pointer bg-surface-container dark:bg-surface-container-high/60 px-2.5 py-1.5 rounded-xl text-xs text-on-surface hover:bg-surface-container-high transition-colors border border-outline-variant/30 select-none">
-              <input
-                type="checkbox"
-                checked={enabledFacilityTypes.power_substation}
-                onChange={() => toggleFacilityType('power_substation')}
-                className="rounded text-amber-500 focus:ring-amber-500 w-4 h-4"
-              />
-              <span className="material-symbols-outlined text-[16px] text-amber-500">bolt</span>
-              <span className="hidden sm:inline">Power</span>
-            </label>
-
-            <label className="min-h-[44px] flex items-center gap-1.5 cursor-pointer bg-surface-container dark:bg-surface-container-high/60 px-2.5 py-1.5 rounded-xl text-xs text-on-surface hover:bg-surface-container-high transition-colors border border-outline-variant/30 select-none">
-              <input
-                type="checkbox"
-                checked={enabledFacilityTypes.drainage_culvert}
-                onChange={() => toggleFacilityType('drainage_culvert')}
-                className="rounded text-cyan-500 focus:ring-cyan-500 w-4 h-4"
-              />
-              <span className="material-symbols-outlined text-[16px] text-cyan-500">water_loss</span>
-              <span className="hidden sm:inline">Nullahs</span>
-            </label>
-          </div>
-
-          <div className="h-5 w-px bg-outline-variant/40 hidden md:block" />
-
-          {tilesOffline && (
-            <span className="font-mono text-[10px] bg-amber-500/20 text-amber-500 border border-amber-500/40 px-2.5 py-1 rounded-full shrink-0">
-              Vector Fallback Active
-            </span>
+        <div className="relative">
+          <Button variant="ghost" className="min-h-[44px] px-3 text-xs" onClick={() => setLayersOpen((v) => !v)}>
+            Layers
+          </Button>
+          {layersOpen && (
+            <div className="absolute left-0 mt-1 z-40 w-56 rounded-xl border border-outline-variant/40 cs-glass p-2 shadow-lg">
+              {(Object.keys(enabledFacilityTypes) as FacilityType[]).map((type) => (
+                <label key={type} className="flex items-center gap-2 min-h-[44px] px-2 text-xs capitalize">
+                  <input
+                    type="checkbox"
+                    checked={enabledFacilityTypes[type]}
+                    onChange={() =>
+                      setEnabledFacilityTypes((prev) => ({ ...prev, [type]: !prev[type] }))
+                    }
+                  />
+                  {type.replace(/_/g, ' ')}
+                </label>
+              ))}
+            </div>
           )}
+        </div>
 
-          {/* Action buttons */}
+        <div className="relative ml-auto flex items-center gap-1">
           <button
             type="button"
-            onClick={handleResetView}
-            className="min-h-[44px] flex items-center gap-1 px-3 py-1.5 rounded-xl bg-surface-container dark:bg-surface-container-high/60 hover:bg-surface-container-high text-on-surface text-xs font-medium transition-colors border border-outline-variant/30"
-            title="Reset map view to Karachi Division"
+            className="md:hidden min-h-[44px] px-3 rounded-xl border border-outline-variant/40 text-xs"
+            onClick={() => setFilterSheetOpen(true)}
           >
-            <span className="material-symbols-outlined text-[18px]">center_focus_strong</span>
-            <span className="hidden sm:inline">Reset</span>
+            Filters
           </button>
-          <button
-            type="button"
-            onClick={handleCopyLink}
-            className="min-h-[44px] flex items-center gap-1 px-3 py-1.5 rounded-xl bg-surface-container dark:bg-surface-container-high/60 hover:bg-surface-container-high text-on-surface text-xs font-medium transition-colors border border-outline-variant/30"
-            title="Share link with current filters and selected zone"
-          >
-            <span className="material-symbols-outlined text-[18px]">share</span>
-            <span>{copiedLink ? 'Copied!' : 'Share'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleDownloadGeoJSON}
-            className="min-h-[44px] flex items-center gap-1 px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary/90 text-on-primary text-xs font-semibold transition-colors shadow-xs"
-            title="Download GeoJSON FeatureCollection"
-          >
-            <span className="material-symbols-outlined text-[18px]">download</span>
-            <span className="hidden sm:inline">Export</span>
-          </button>
+          <Button variant="ghost" className="min-h-[44px] px-3 text-xs" onClick={() => setMoreOpen((v) => !v)}>
+            ···
+          </Button>
+          {moreOpen && (
+            <div className="absolute right-0 top-full mt-1 z-40 w-44 rounded-xl border border-outline-variant/40 cs-glass p-1 shadow-lg">
+              <button
+                type="button"
+                className="w-full text-left min-h-[44px] px-3 text-xs rounded-lg hover:bg-surface-container"
+                onClick={() => {
+                  const b = boundsFromFeatures(filteredZones) || KARACHI_BOUNDS;
+                  mapRef.current?.fitBounds(b, { padding: 40, duration: 600 });
+                  setMoreOpen(false);
+                }}
+              >
+                Reset view
+              </button>
+              <button
+                type="button"
+                className="w-full text-left min-h-[44px] px-3 text-xs rounded-lg hover:bg-surface-container"
+                onClick={() => {
+                  navigator.clipboard.writeText(window.location.href);
+                  toast.push('Link copied', 'ok');
+                  setMoreOpen(false);
+                }}
+              >
+                Share
+              </button>
+              <button
+                type="button"
+                className="w-full text-left min-h-[44px] px-3 text-xs rounded-lg hover:bg-surface-container"
+                onClick={() => {
+                  if (!zonesResponse?.data) return;
+                  const blob = new Blob([JSON.stringify(zonesResponse.data, null, 2)], {
+                    type: 'application/geo+json',
+                  });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `climateshield-zones-${hazardMode}.geojson`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                  setMoreOpen(false);
+                }}
+              >
+                Export GeoJSON
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/* MAP CANVAS VIEWPORT (Fills remaining height, legend & drawer float) */}
-      {/* ------------------------------------------------------------------ */}
-      <div className="relative flex-1 w-full h-[calc(100vh-140px)] min-h-[500px] overflow-hidden bg-[#0A1A2F]">
-        {/* Map Container Element */}
-        <div
-          ref={mapContainerRef}
-          className="absolute inset-0 w-full h-full"
-          role="region"
-          aria-label="Karachi Spatial Risk Map"
-        />
-
-        {/* Top-Left Floating Map Navigation Controls */}
-        <div className="absolute top-4 left-4 z-20 flex items-center gap-1.5 bg-surface/90 dark:bg-primary-container/90 backdrop-blur-md p-1.5 rounded-2xl shadow-xl border border-outline-variant/30">
-          <button
-            type="button"
-            onClick={handleZoomIn}
-            className="min-h-[44px] min-w-[44px] rounded-xl bg-surface-container/60 hover:bg-surface-container dark:bg-surface-container-highest/20 dark:hover:bg-surface-container-highest/40 text-on-surface dark:text-on-primary flex items-center justify-center transition-colors"
-            title="Zoom In"
-            aria-label="Zoom In"
-          >
-            <span className="material-symbols-outlined text-[20px]">add</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleZoomOut}
-            className="min-h-[44px] min-w-[44px] rounded-xl bg-surface-container/60 hover:bg-surface-container dark:bg-surface-container-highest/20 dark:hover:bg-surface-container-highest/40 text-on-surface dark:text-on-primary flex items-center justify-center transition-colors"
-            title="Zoom Out"
-            aria-label="Zoom Out"
-          >
-            <span className="material-symbols-outlined text-[20px]">remove</span>
-          </button>
-          <button
-            type="button"
-            onClick={handleResetView}
-            className="min-h-[44px] min-w-[44px] rounded-xl bg-surface-container/60 hover:bg-surface-container dark:bg-surface-container-highest/20 dark:hover:bg-surface-container-highest/40 text-on-surface dark:text-on-primary flex items-center justify-center transition-colors"
-            title="Reset View"
-            aria-label="Reset View"
-          >
-            <span className="material-symbols-outlined text-[18px]">center_focus_strong</span>
-          </button>
-        </div>
-
-        {/* Bottom-Left Floating Legend Pill (Rule 4: Always text labels) */}
-        <div className="absolute bottom-4 left-4 z-20 pointer-events-auto flex flex-col gap-1.5 max-w-[320px]">
-          <div className="bg-surface/95 dark:bg-primary/95 backdrop-blur-md p-3.5 rounded-2xl text-on-surface dark:text-on-primary shadow-xl border border-outline-variant/30 dark:border-primary-container">
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-mono text-[11px] uppercase tracking-wider text-on-surface-variant dark:text-on-primary-container font-semibold">
-                Zone Risk Level
-              </span>
-              <span className="font-mono text-[10px] text-secondary">
-                {hazardMode === 'heat' ? 'Heatwave' : hazardMode === 'rain' ? 'Monsoon' : 'Compound'}
-              </span>
-            </div>
-            <div className="grid grid-cols-4 gap-1 text-center font-mono text-[11px]">
-                <div className="flex flex-col items-center">
-                  <span className="w-full h-2 rounded bg-[#10B981] mb-1 shadow-xs" />
-                  <span className="text-[10px] text-emerald-300 font-medium">Low (Green)</span>
-                  <span className="text-[9px] text-on-primary-container">&lt;40%</span>
-                </div>
-                <div className="flex flex-col items-center">
-                  <span className="w-full h-2 rounded bg-[#F59E0B] mb-1 shadow-xs" />
-                  <span className="text-[10px] text-amber-300 font-medium">Moderate (Yellow)</span>
-                  <span className="text-[9px] text-on-primary-container">40-65%</span>
-                </div>
-                <div className="flex flex-col items-center">
-                  <span className="w-full h-2 rounded bg-[#EA580C] mb-1 shadow-xs" />
-                  <span className="text-[10px] text-orange-300 font-medium">High (Orange)</span>
-                  <span className="text-[9px] text-on-primary-container">65-80%</span>
-                </div>
-                <div className="flex flex-col items-center">
-                  <span className="w-full h-2 rounded bg-[#DC2626] mb-1 shadow-xs" />
-                  <span className="text-[10px] text-red-300 font-medium">Severe (Red)</span>
-                  <span className="text-[9px] text-on-primary-container">&gt;80%</span>
-                </div>
-              </div>
-
-              {/* Facility Marker Legend */}
-              <div className="mt-2.5 pt-2 border-t border-primary-container flex items-center justify-between text-[10px] font-mono text-on-primary-container">
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#EF4444]" /> Hospital
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#3B82F6]" /> School
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#10B981]" /> Shelter
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-[#F59E0B]" /> Grid
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Interactive Hover Tooltip */}
-          {hoveredZone && (
+      {/* Map + drawer */}
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
+        <div className="relative flex-1 min-h-[280px] min-w-0 bg-[#0B1224]">
+          {!useTableFallback && (
             <div
-              className="absolute z-30 pointer-events-none transform -translate-x-1/2 -translate-y-full mb-3"
-              style={{
-                left: `${hoveredZone.x}px`,
-                top: `${hoveredZone.y}px`,
-              }}
-            >
-              <div className="bg-surface-container-lowest text-on-surface rounded-xl shadow-2xl border border-outline-variant/40 p-3 min-w-[260px] max-w-[320px]">
-                <div className="flex items-center justify-between gap-2 border-b border-outline-variant/20 pb-1.5 mb-2">
-                  <span className="font-bold text-sm text-on-surface truncate">
-                    {hoveredZone.properties.name}
-                  </span>
-                  <RiskBadge
-                    level={hoveredZone.properties.risk_level}
-                    label={hoveredZone.properties.risk_level}
-                  />
-                </div>
+              ref={mapContainerRef}
+              className="absolute inset-0 w-full h-full isolate [transform:translateZ(0)] [&_.maplibregl-canvas]:!block [&_.maplibregl-ctrl-top-right]:top-4 [&_.maplibregl-ctrl-top-right]:right-4 [&_.maplibregl-ctrl-bottom-right]:bottom-4 [&_.maplibregl-ctrl-bottom-right]:right-4"
+              role="region"
+              aria-label="Pakistan spatial risk map"
+              data-testid="risk-map-canvas"
+            />
+          )}
 
-                <div className="flex flex-col gap-1.5 text-xs">
-                  {/* Probability with Uncertainty Interval (Rule 5) */}
-                  <div className="flex items-center justify-between">
-                    <span className="text-on-surface-variant">Forecast Probability:</span>
-                    <span className="font-mono font-bold text-on-surface">
-                      {Math.round(hoveredZone.properties.probability * 100)}%
-                    </span>
-                  </div>
+          {/* Custom 2D/3D control — top-right under nav controls */}
+          {!useTableFallback && (
+            <div className="absolute top-[120px] right-4 z-20 flex flex-col gap-1">
+              <button
+                type="button"
+                className={`min-h-[44px] min-w-[44px] rounded-lg bg-surface-container-lowest border border-outline-variant/40 text-xs font-bold ${
+                  mapMode === '2d' ? 'bg-secondary text-on-secondary' : ''
+                }`}
+                onClick={() => setMapMode('2d')}
+                aria-pressed={mapMode === '2d'}
+              >
+                2D
+              </button>
+              <button
+                type="button"
+                className={`min-h-[44px] min-w-[44px] rounded-lg bg-surface-container-lowest border border-outline-variant/40 text-xs font-bold ${
+                  mapMode === '3d' ? 'bg-secondary text-on-secondary' : ''
+                }`}
+                onClick={() => {
+                  setForce3d(true);
+                  setMapMode('3d');
+                }}
+                aria-pressed={mapMode === '3d'}
+                disabled={!webglOk}
+              >
+                3D
+              </button>
+            </div>
+          )}
 
-                  <div className="flex items-center justify-between text-[11px] font-mono text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded">
-                    <span>Likely Interval (P10–P90):</span>
-                    <span className="font-semibold text-on-surface">
-                      {Math.round(hoveredZone.properties.interval[0] * 100)}% –{' '}
-                      {Math.round(hoveredZone.properties.interval[1] * 100)}%
-                    </span>
-                  </div>
-
-                  {/* Baseline Comparison (Rule 5) */}
-                  <div className="flex items-center justify-between text-[11px]">
-                    <span className="text-on-surface-variant">Historical Baseline:</span>
-                    <span className="font-mono text-on-surface font-semibold">
-                      {Math.round(hoveredZone.properties.baseline_value * 100)}%
-                    </span>
-                  </div>
-
-                  {/* Exposed Population */}
-                  <div className="flex items-center justify-between pt-1 border-t border-outline-variant/20">
-                    <span className="text-on-surface-variant">Exposed Population:</span>
-                    <span className="font-bold text-on-surface">
-                      {hoveredZone.properties.exposed_population.toLocaleString()}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center justify-between text-[11px] text-on-surface-variant">
-                    <span>Critical Facilities:</span>
-                    <span className="font-semibold text-on-surface">
-                      {hoveredZone.properties.facilities_count} units
-                    </span>
-                  </div>
-
-                  <span className="font-mono text-[10px] text-secondary font-semibold pt-1 text-center">
-                    Click to inspect detailed zone dossier →
-                  </span>
-                </div>
+          {useTableFallback && (
+            <div className="absolute inset-0 overflow-auto p-4">
+              {mapError && (
+                <ErrorState
+                  title="Map unavailable"
+                  detail={mapError}
+                  onRetry={() => {
+                    setUseTableFallback(false);
+                    requestAnimationFrame(() => initMap());
+                  }}
+                />
+              )}
+              <div className="mt-3 rounded-xl border border-outline-variant/30 overflow-hidden" data-testid="risk-map-table">
+                <table className="w-full text-sm">
+                  <thead className="bg-surface-container text-xs">
+                    <tr>
+                      <th className="px-3 py-2 text-left">District</th>
+                      <th className="px-3 py-2 text-left">Risk</th>
+                      <th className="px-3 py-2 text-left">Population</th>
+                      <th className="px-3 py-2 text-left">Height metric</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredZones.features.map((f) => (
+                      <tr
+                        key={f.properties.zone_id}
+                        className="border-t border-outline-variant/20 hover:bg-surface-container/40 cursor-pointer"
+                        onClick={() => handleSelectZone(f.properties.zone_id)}
+                      >
+                        <td className="px-3 py-2">{f.properties.name}</td>
+                        <td className="px-3 py-2">
+                          <RiskBadge level={f.properties.risk_level} />
+                        </td>
+                        <td className="px-3 py-2 font-mono tabular-nums">
+                          {f.properties.exposed_population?.toLocaleString?.() ?? 'n/a'}
+                        </td>
+                        <td className="px-3 py-2 font-mono tabular-nums">
+                          {extrusionHeight(heightMetric, f.properties).toFixed(0)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
 
-          {/* Loading or Empty State Overlay */}
-          {isZonesLoading && (
-            <div className="absolute inset-0 z-40 bg-[#0A1A2F]/80 backdrop-blur-sm flex items-center justify-center">
-              <div className="flex flex-col items-center gap-2 text-on-primary">
-                <span className="w-8 h-8 border-3 border-secondary border-t-transparent rounded-full animate-spin" />
-                <span className="font-mono text-xs">Loading Karachi GIS Vector Grid...</span>
-              </div>
+          {isZonesLoading && !mapReady && !useTableFallback && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="cs-skeleton h-10 w-48 rounded-xl" />
             </div>
           )}
 
           {isZonesError && (
-            <div className="absolute inset-0 z-40 bg-[#0A1A2F]/90 flex items-center justify-center p-4">
-              <div className="max-w-md w-full bg-surface p-4 rounded-xl shadow-xl">
-                <EmptyState
-                  icon="radar"
-                  title="Spatial Grid Unavailable"
-                  description="Unable to fetch zone choropleth layers from /api/map/zones. Verify backend database service."
-                  actionText="Retry Connection"
-                  onAction={() => { refetchZones(); }}
-                />
-              </div>
+            <div className="absolute inset-4 z-30">
+              <ErrorState title="Zones failed to load" onRetry={() => refetchZones()} />
             </div>
           )}
 
-          {/* Floating Zone Detail Drawer inside Map Viewport (Requirement 5) */}
-          <AnimatePresence>
-            {selectedZoneId && (
-              <motion.aside
-                initial={shouldReduceMotion ? { opacity: 1 } : { x: 40, opacity: 0 }}
-                animate={shouldReduceMotion ? { opacity: 1 } : { x: 0, opacity: 1 }}
-                exit={shouldReduceMotion ? { opacity: 0 } : { x: 40, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="absolute top-4 right-4 bottom-4 w-[calc(100%-32px)] sm:w-[460px] xl:w-[500px] bg-surface/98 dark:bg-surface-container-lowest/98 backdrop-blur-2xl border border-outline-variant/40 rounded-2xl flex flex-col z-30 shadow-2xl overflow-hidden pointer-events-auto"
-                aria-label="Zone Detailed Dossier"
-              >
-                {/* Drawer Header */}
-                <div className="sticky top-0 z-20 bg-surface/95 dark:bg-surface-container-low/95 border-b border-outline-variant/30 p-4 shadow-xs flex flex-col gap-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex flex-col min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap mb-1">
-                        {zoneDetail?.vulnerability?.risk_level ? (
-                          <RiskBadge level={zoneDetail.vulnerability.risk_level} />
-                        ) : selectedZoneProps?.risk_level ? (
-                          <RiskBadge level={selectedZoneProps.risk_level} />
-                        ) : null}
-                        <span className="font-mono text-[11px] bg-surface-container-highest text-on-surface-variant px-2 py-0.5 rounded">
-                          Town Code: {selectedZoneId}
-                        </span>
-                      </div>
-                      <h2 className="font-headline-md text-lg font-bold text-on-surface tracking-tight truncate">
-                        {zoneDetail?.name || selectedZoneProps?.name || selectedZoneId}
-                      </h2>
-                      <span className="text-xs text-on-surface-variant">
-                        Detailed Exposure Dossier · Karachi Division Municipal Ward
-                      </span>
-                    </div>
+          {isZonesSuccess &&
+            (zonesResponse?.data?.features?.length ?? 0) === 0 &&
+            filteredZones.features.length === 0 &&
+            !isZonesError && (
+            <div className="absolute inset-4 z-30 pointer-events-none">
+              <EmptyState
+                icon="map"
+                title="No district polygons"
+                description="No predictions yet for these filters, or geometry is missing from the warehouse."
+              />
+            </div>
+          )}
 
-                    {/* Close Drawer Button */}
-                    <button
-                      type="button"
-                      onClick={() => handleSelectZone(null)}
-                      className="min-h-[44px] min-w-[44px] rounded-xl hover:bg-surface-container-highest text-on-surface-variant flex items-center justify-center transition-colors shrink-0"
-                      title="Close Detail Drawer"
-                      aria-label="Close Detail Drawer"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">close</span>
-                    </button>
+          {/* Legend — bottom-left */}
+          <div className="absolute bottom-4 left-4 z-20 max-w-[min(320px,calc(100%-2rem))]">
+            <button
+              type="button"
+              className="min-h-[44px] px-3 mb-1 rounded-xl bg-surface-container-lowest border border-outline-variant/40 text-xs font-semibold"
+              onClick={() => setLegendOpen((v) => !v)}
+            >
+              {legendOpen ? 'Hide legend' : 'Show legend'}
+            </button>
+            {legendOpen && (
+              <div className="bg-surface-container-lowest/95 border border-outline-variant/40 rounded-2xl p-3 shadow-lg text-on-surface">
+                <p className="font-mono text-[10px] uppercase tracking-wider text-on-surface-variant mb-2">
+                  Zone risk level
+                </p>
+                <div className="grid grid-cols-4 gap-1 text-center text-[10px] font-mono mb-3">
+                  <div>
+                    <span className="block h-2 rounded bg-[#10B981] mb-1" />
+                    Low
                   </div>
-
-                  {/* Action Buttons: Export & GeoJSON */}
-                  <div className="flex items-center gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={handleCopyLink}
-                      className="min-h-[44px] flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl bg-surface-container dark:bg-surface-container-high/60 hover:bg-surface-container-highest text-on-surface text-xs font-medium transition-colors border border-outline-variant/30"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">link</span>
-                      <span>{copiedLink ? 'Copied URL!' : 'Share Dossier'}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleDownloadGeoJSON}
-                      className="min-h-[44px] flex items-center justify-center gap-1 py-1.5 px-3 rounded-xl bg-surface-container dark:bg-surface-container-high/60 hover:bg-surface-container-highest text-on-surface text-xs font-medium transition-colors border border-outline-variant/30"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">data_object</span>
-                      <span>Export</span>
-                    </button>
+                  <div>
+                    <span className="block h-2 rounded bg-[#F59E0B] mb-1" />
+                    Moderate
                   </div>
-
-                  {/* 4 Tabs Navigation Bar: Hazard, Exposure, Vulnerability, Evidence */}
-                  <div
-                    className="grid grid-cols-4 gap-1 bg-surface-container-high dark:bg-surface-container-highest/60 p-1 rounded-xl mt-1 border border-outline-variant/30"
-                    role="tablist"
-                    aria-label="Zone Dossier Sections"
+                  <div>
+                    <span className="block h-2 rounded bg-[#EA580C] mb-1" />
+                    High
+                  </div>
+                  <div>
+                    <span className="block h-2 rounded bg-[#DC2626] mb-1" />
+                    Severe
+                  </div>
+                </div>
+                <label className="block text-[10px] font-mono uppercase text-on-surface-variant">
+                  Height shows
+                  <select
+                    className="mt-1 w-full min-h-[44px] rounded-lg bg-surface-container-lowest border border-outline-variant/40 px-2 text-xs text-on-surface"
+                    value={heightMetric}
+                    onChange={(e) => setHeightMetric(e.target.value as HeightMetric)}
                   >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === 'hazard'}
-                  onClick={() => setActiveTab('hazard')}
-                  className={`py-1.5 px-1 rounded-lg text-xs font-medium text-center truncate transition-colors ${
-                    activeTab === 'hazard'
-                      ? 'bg-primary text-on-primary font-semibold shadow-xs'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  1. Hazard
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === 'exposure'}
-                  onClick={() => setActiveTab('exposure')}
-                  className={`py-1.5 px-1 rounded-lg text-xs font-medium text-center truncate transition-colors ${
-                    activeTab === 'exposure'
-                      ? 'bg-primary text-on-primary font-semibold shadow-xs'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  2. Exposure
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === 'vulnerability'}
-                  onClick={() => setActiveTab('vulnerability')}
-                  className={`py-1.5 px-1 rounded-lg text-xs font-medium text-center truncate transition-colors ${
-                    activeTab === 'vulnerability'
-                      ? 'bg-primary text-on-primary font-semibold shadow-xs'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  3. Vulnerability
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={activeTab === 'evidence'}
-                  onClick={() => setActiveTab('evidence')}
-                  className={`py-1.5 px-1 rounded-lg text-xs font-medium text-center truncate transition-colors ${
-                    activeTab === 'evidence'
-                      ? 'bg-primary text-on-primary font-semibold shadow-xs'
-                      : 'text-on-surface-variant hover:text-on-surface'
-                  }`}
-                >
-                  4. Evidence
-                </button>
+                    <option value="exposed_population">Exposed population</option>
+                    <option value="probability">Hazard probability</option>
+                    <option value="vulnerability_score">Vulnerability score</option>
+                  </select>
+                </label>
+                <p className="mt-2 text-[10px] text-on-surface-variant">{heightLegend(heightMetric)}</p>
+                <p className="mt-1 text-[10px] text-on-surface-variant">
+                  Height encodes the selected metric. Districts without data stay flat and grey.
+                </p>
+                {flatPreferred && mapMode !== '3d' && (
+                  <p className="mt-1 text-[10px] text-amber-500">3D disabled for performance — toggle 3D to override.</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {hoveredZone && (
+            <div
+              className="absolute z-30 pointer-events-none -translate-x-1/2 -translate-y-full"
+              style={{ left: hoveredZone.x, top: hoveredZone.y }}
+            >
+              {/* Solid panel — avoid backdrop-filter near the WebGL canvas (can blank the map on Windows). */}
+              <div className="bg-surface-container-lowest border border-outline-variant/40 rounded-xl p-3 min-w-[220px] text-xs shadow-xl">
+                <p className="font-semibold text-on-surface">{hoveredZone.properties.name}</p>
+                <RiskBadge level={hoveredZone.properties.risk_level} className="mt-1" />
+                <p className="mt-2 font-mono text-on-surface-variant tabular-nums">
+                  P: {(Number(hoveredZone.properties.probability) * 100).toFixed(1)}% · interval{' '}
+                  {hoveredZone.properties.interval_low}–{hoveredZone.properties.interval_high}
+                </p>
+                <p className="font-mono text-on-surface-variant tabular-nums">
+                  Exposed: {hoveredZone.properties.exposed_population?.toLocaleString?.() ?? 'n/a'}
+                </p>
               </div>
             </div>
+          )}
+        </div>
 
-            {/* Drawer Body Content */}
-            <div className="p-space-md flex flex-col gap-4">
-              {isZoneDetailLoading ? (
-                <div className="p-8 flex flex-col items-center justify-center gap-2 text-on-surface-variant">
-                  <span className="w-7 h-7 border-3 border-secondary border-t-transparent rounded-full animate-spin" />
-                  <span className="font-mono text-xs">Loading Zone Dossier from DuckDB...</span>
-                </div>
-              ) : isZoneDetailError || !zoneDetail ? (
-                <EmptyState
-                  icon="error"
-                  title="Zone Details Missing"
-                  description="Could not load the detailed telemetry records for this zone."
-                  actionText="Retry"
-                  onAction={() => { refetchZoneDetail(); }}
-                />
-              ) : (
-                <>
-                  {/* TAB 1: HAZARD */}
-                  {activeTab === 'hazard' && (
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-sm text-on-surface uppercase tracking-wide">
-                          Meteorological Hazard &amp; Forecast
-                        </h3>
-                        <span className="font-mono text-[11px] text-on-surface-variant font-semibold">
-                          Zone exposure index
-                        </span>
-                      </div>
+        <AnimatePresence>
+          {selectedZoneId && (
+            <motion.aside
+              initial={shouldReduceMotion ? false : { x: 24, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={shouldReduceMotion ? undefined : { x: 24, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="hidden lg:flex w-[360px] shrink-0 border-l border-outline-variant/30 bg-surface-container-lowest flex-col min-h-0"
+              role="dialog"
+              aria-label="District dossier"
+            >
+              <DrawerBody
+                title={drawerTitle}
+                subtitle={drawerSubtitle}
+                zoneId={selectedZoneId}
+                risk={drawerRisk}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                loading={isZoneDetailLoading}
+                error={isZoneDetailError}
+                onRetry={() => refetchZoneDetail()}
+                onClose={() => handleSelectZone(null)}
+                zoneDetail={zoneDetail}
+                selectedProps={selectedProps}
+              />
+            </motion.aside>
+          )}
+        </AnimatePresence>
+      </div>
 
-                      {/* Primary Compound / Forecast Probability Card (Rule 5) */}
-                      <div className="bg-surface-container-low p-3.5 rounded-xl border border-outline-variant/30 flex flex-col gap-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-on-surface-variant">Forecast Probability</span>
-                          <span className="font-mono text-[11px] bg-primary/10 text-primary font-bold px-2 py-0.5 rounded">
-                            {zoneDetail.hazard.warning_label}
-                          </span>
-                        </div>
-                        <div className="flex items-baseline gap-2">
-                          <span className="font-mono text-3xl font-bold text-error">
-                            {zoneDetail.hazard.probability == null
-                              ? '—'
-                              : `${Math.round(zoneDetail.hazard.probability * 100)}%`}
-                          </span>
-                          <span className="text-xs text-on-surface-variant">
-                            {zoneDetail.hazard.probability == null
-                              ? 'No model forecast for this zone'
-                              : `Baseline ${zoneDetail.hazard.baseline_value ?? '—'} mm/h`}
-                          </span>
-                        </div>
-
-                        {/* Uncertainty Interval Range Bar (Rule 5) */}
-                        <div className="flex flex-col gap-1 bg-surface-container p-2.5 rounded-lg border border-outline-variant/20">
-                          <div className="flex items-center justify-between font-mono text-xs">
-                            <span className="text-on-surface-variant">
-                              P10: {zoneDetail.hazard.interval_low ?? '—'} mm/h
-                            </span>
-                            <span className="font-bold text-on-surface">Rain interval</span>
-                            <span className="text-on-surface-variant">
-                              P90: {zoneDetail.hazard.interval_high ?? '—'} mm/h
-                            </span>
-                          </div>
-                          <div className="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden relative">
-                            <div
-                              className="absolute top-0 bottom-0 bg-error rounded-full"
-                              style={{
-                                left: '0%',
-                                width: zoneDetail.hazard.interval_high == null ? '0%' : '40%',
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Hazard Sub-metrics: WBGT & Rainfall Burst */}
-                      <div className="grid grid-cols-2 gap-2.5">
-                        {/* WBGT Temperature */}
-                        <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/30 flex flex-col gap-1">
-                          <span className="text-xs text-on-surface-variant">Wet Bulb Globe Temp</span>
-                          <div className="flex items-baseline gap-1">
-                            <span className="font-mono text-2xl font-bold text-on-surface-variant">
-                              {zoneDetail.hazard.wbgt_celsius ?? '—'}
-                            </span>
-                            <span className="text-xs text-on-surface-variant">°C</span>
-                          </div>
-                          <span className="font-mono text-[10px] text-on-surface-variant">
-                            WBGT is not calculated
-                          </span>
-                        </div>
-
-                        {/* Peak 6h Monsoon Burst */}
-                        <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/30 flex flex-col gap-1">
-                          <span className="text-xs text-on-surface-variant">Peak 6h Rain Burst</span>
-                          <div className="flex items-baseline gap-1">
-                            <span className="font-mono text-2xl font-bold text-on-surface-variant">
-                              {zoneDetail.hazard.rainfall_6h_mm ?? '—'}
-                            </span>
-                            <span className="text-xs text-on-surface-variant">mm / 6h</span>
-                          </div>
-                          <span className="font-mono text-[10px] text-on-surface-variant">
-                            No 6-hour burst forecast
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Hazard Comparison Row */}
-                      <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/30 flex flex-col gap-2">
-                        <span className="text-xs font-semibold text-on-surface">Sub-Hazard Probabilities</span>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className="flex items-center justify-between p-2 rounded bg-surface-container">
-                            <span className="text-on-surface-variant">Heat Hazard:</span>
-                            <span className="font-mono font-bold text-on-surface">
-                              {zoneDetail.hazard.heat_probability !== undefined && zoneDetail.hazard.heat_probability !== null
-                                ? `${Math.round(zoneDetail.hazard.heat_probability * 100)}%`
-                                : '—'}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between p-2 rounded bg-surface-container">
-                            <span className="text-on-surface-variant">Heavy Rain:</span>
-                            <span className="font-mono font-bold text-on-surface">
-                              {zoneDetail.hazard.rain_probability !== undefined && zoneDetail.hazard.rain_probability !== null
-                                ? `${Math.round(zoneDetail.hazard.rain_probability * 100)}%`
-                                : '—'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* TAB 2: EXPOSURE */}
-                  {activeTab === 'exposure' && (
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-sm text-on-surface uppercase tracking-wide">
-                          Population &amp; Physical Exposure
-                        </h3>
-                        <span className="font-mono text-[11px] bg-surface-container-highest px-2 py-0.5 rounded text-on-surface-variant">
-                          Census 2023 Proj.
-                        </span>
-                      </div>
-
-                      {/* Headline Population Card */}
-                      <div className="bg-surface-container-low p-3.5 rounded-xl border border-outline-variant/30 flex items-center justify-between">
-                        <div className="flex flex-col">
-                          <span className="text-xs text-on-surface-variant">Total Exposed Population</span>
-                          <span className="font-mono text-2xl font-bold text-on-surface">
-                            {zoneDetail.exposure.exposed_population.toLocaleString()}
-                          </span>
-                          <span className="text-[11px] text-on-surface-variant">Municipal Zone Residents</span>
-                        </div>
-                        <div className="flex flex-col text-right">
-                          <span className="text-xs text-on-surface-variant">At-Risk Facilities</span>
-                          <span className="font-mono text-2xl font-bold text-secondary">
-                            {zoneDetail.exposure.facilities_count}
-                          </span>
-                          <span className="text-[11px] text-on-surface-variant">Registered Units</span>
-                        </div>
-                      </div>
-
-                      {/* Demographic Breakdown */}
-                      {zoneDetail.exposure.demographics && (
-                        <div className="grid grid-cols-2 gap-2.5">
-                          <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/30 flex flex-col gap-1">
-                            <span className="text-xs text-on-surface-variant">Children under 5</span>
-                            <span className="font-mono text-xl font-bold text-on-surface">
-                              {zoneDetail.exposure.demographics.children_under_5.toLocaleString()}
-                            </span>
-                            <span className="font-mono text-[10px] text-error font-medium">
-                              Elevated dehydration risk
-                            </span>
-                          </div>
-
-                          <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/30 flex flex-col gap-1">
-                            <span className="text-xs text-on-surface-variant">Elderly (Age 65+)</span>
-                            <span className="font-mono text-xl font-bold text-on-surface">
-                              {zoneDetail.exposure.demographics.elderly_65_plus.toLocaleString()}
-                            </span>
-                            <span className="font-mono text-[10px] text-error font-medium">
-                              Cardiovascular heat risk
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Informal Settlements Exposure */}
-                      {zoneDetail.exposure.demographics && (
-                        <div className="bg-surface-container-low p-3.5 rounded-xl border border-outline-variant/30 flex flex-col gap-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-on-surface">
-                              Informal Housing &amp; Corrugated Tin Thermal Trap
-                            </span>
-                            <span className="font-mono text-sm font-bold text-amber-600">
-                              {zoneDetail.exposure.demographics.informal_settlements_pct}%
-                            </span>
-                          </div>
-                          <div className="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-amber-500 rounded-full"
-                              style={{ width: `${zoneDetail.exposure.demographics.informal_settlements_pct}%` }}
-                            />
-                          </div>
-                          <p className="text-xs text-on-surface-variant">
-                            Corrugated sheets exacerbate radiant indoor temperature (+6°C), creating extreme thermal enclosures without cooling.
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Critical Facilities in Zone */}
-                      <div className="flex flex-col gap-2">
-                        <span className="font-mono text-xs uppercase font-semibold text-on-surface-variant">
-                          Critical Facilities in Zone ({zoneDetail.exposure.critical_facilities.length}):
-                        </span>
-                        {zoneDetail.exposure.critical_facilities.length === 0 ? (
-                          <div className="p-3 bg-surface-container-low rounded-lg text-xs text-on-surface-variant">
-                            No major tagged facility anchors within this immediate polygon.
-                          </div>
-                        ) : (
-                          <div className="flex flex-col gap-1.5 max-h-[220px] overflow-y-auto pr-1">
-                            {zoneDetail.exposure.critical_facilities.map((fac) => (
-                              <div
-                                key={fac.facility_id}
-                                className="flex items-center justify-between p-2.5 bg-surface-container-low rounded-lg border border-outline-variant/20 text-xs"
-                              >
-                                <div className="flex items-center gap-2 min-w-0">
-                                  <span
-                                    className={`material-symbols-outlined text-[18px] shrink-0 ${
-                                      fac.type === 'hospital'
-                                        ? 'text-error'
-                                        : fac.type === 'school'
-                                        ? 'text-blue-500'
-                                        : fac.type === 'shelter'
-                                        ? 'text-emerald-500'
-                                        : 'text-amber-500'
-                                    }`}
-                                  >
-                                    {fac.type === 'hospital'
-                                      ? 'local_hospital'
-                                      : fac.type === 'school'
-                                      ? 'school'
-                                      : fac.type === 'shelter'
-                                      ? 'night_shelter'
-                                      : 'domain'}
-                                  </span>
-                                  <div className="flex flex-col min-w-0">
-                                    <span className="font-semibold text-on-surface truncate">{fac.name}</span>
-                                    <span className="font-mono text-[10px] text-on-surface-variant uppercase">
-                                      {fac.type.replace('_', ' ')} · {fac.facility_id}
-                                    </span>
-                                  </div>
-                                </div>
-                                <span className="font-mono text-[10px] text-on-surface-variant shrink-0">
-                                  {fac.lat.toFixed(3)}, {fac.lon.toFixed(3)}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* TAB 3: VULNERABILITY */}
-                  {activeTab === 'vulnerability' && (
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-sm text-on-surface uppercase tracking-wide">
-                          Physical &amp; Systemic Vulnerability
-                        </h3>
-                        <RiskBadge level={zoneDetail.vulnerability.risk_level} />
-                      </div>
-
-                      {/* Vulnerability Score Card */}
-                      <div className="bg-surface-container-low p-3.5 rounded-xl border border-outline-variant/30 flex items-center justify-between">
-                        <div className="flex flex-col">
-                          <span className="text-xs text-on-surface-variant">Composite Vulnerability Score</span>
-                          <span className="font-mono text-3xl font-bold text-error">
-                            {zoneDetail.vulnerability.vulnerability_score.toFixed(2)}
-                          </span>
-                          <span className="text-[11px] text-on-surface-variant">Scaled Index [0.00 – 1.00]</span>
-                        </div>
-                        <div className="flex flex-col text-right text-xs gap-1">
-                          <span className="text-on-surface-variant">Heat Risk: <strong className="text-on-surface">{zoneDetail.vulnerability.heat_risk_level}</strong></span>
-                          <span className="text-on-surface-variant">Rain Risk: <strong className="text-on-surface">{zoneDetail.vulnerability.rain_risk_level}</strong></span>
-                        </div>
-                      </div>
-
-                      {/* Chokepoint Advisory */}
-                      {zoneDetail.vulnerability.chokepoint_notes && (
-                        <div className="bg-surface-container-low p-3 rounded-xl border border-outline-variant/30 flex flex-col gap-1">
-                          <div className="flex items-center gap-1.5 text-error text-xs font-semibold">
-                            <span className="material-symbols-outlined text-[18px]">warning</span>
-                            <span>Municipal Drainage &amp; Infrastructure Chokepoints</span>
-                          </div>
-                          <p className="text-xs text-on-surface-variant">
-                            {zoneDetail.vulnerability.chokepoint_notes}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Impact Indicators Table */}
-                      <div className="flex flex-col gap-2">
-                        <span className="font-mono text-xs uppercase font-semibold text-on-surface-variant">
-                          Verified Impact Indicators ({zoneDetail.vulnerability.indicators.length}):
-                        </span>
-                        {zoneDetail.vulnerability.indicators.length === 0 ? (
-                          <div className="p-3 bg-surface-container-low rounded-lg text-xs text-on-surface-variant">
-                            No domain-specific impact telemetry recorded for this zone yet.
-                          </div>
-                        ) : (
-                          <div className="flex flex-col gap-1.5">
-                            {zoneDetail.vulnerability.indicators.map((ind, idx) => (
-                              <div
-                                key={`${ind.indicator}-${idx}`}
-                                className="p-3 bg-surface-container-low rounded-lg border border-outline-variant/20 flex flex-col gap-1"
-                              >
-                                <div className="flex items-center justify-between text-xs">
-                                  <span className="font-semibold text-on-surface">{ind.indicator}</span>
-                                  <span className="font-mono font-bold text-error">{ind.value}</span>
-                                </div>
-                                <div className="flex items-center justify-between text-[11px] text-on-surface-variant">
-                                  <span>Area: {ind.impact_area}</span>
-                                  <span className="font-mono text-[10px] bg-surface-container px-1.5 py-0.5 rounded">
-                                    Evidence: {ind.evidence_strength}
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* TAB 4: EVIDENCE */}
-                  {activeTab === 'evidence' && (
-                    <div className="flex flex-col gap-3">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-bold text-sm text-on-surface uppercase tracking-wide">
-                          Evidence &amp; Provenance Audit
-                        </h3>
-                        <span className="font-mono text-[11px] bg-secondary-fixed text-on-secondary-fixed px-2 py-0.5 rounded font-semibold">
-                          ISO 19115 Traceable
-                        </span>
-                      </div>
-
-                      {/* Provenance Header Card */}
-                      <div className="bg-surface-container-low p-3.5 rounded-xl border border-outline-variant/30 flex flex-col gap-1.5 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="text-on-surface-variant">Simulation Engine:</span>
-                          <span className="font-mono font-semibold text-on-surface">
-                            {zoneDetail.evidence.model_provenance}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-on-surface-variant">Evidence Strength:</span>
-                          <span className="font-mono font-bold uppercase text-secondary">
-                            {zoneDetail.evidence.evidence_strength}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-on-surface-variant">Last Calibration:</span>
-                          <span className="font-mono text-on-surface">
-                            {zoneDetail.evidence.last_calibrated || 'Active Batch'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Sources and Row IDs List (Strict Requirement) */}
-                      <div className="flex flex-col gap-2">
-                        <span className="font-mono text-xs uppercase font-semibold text-on-surface-variant">
-                          Audit Trail Sources &amp; Row IDs ({zoneDetail.evidence.sources.length}):
-                        </span>
-                        <div className="flex flex-col gap-2">
-                          {zoneDetail.evidence.sources.map((src, i) => (
-                            <div
-                              key={`${src.source}-${src.row_ids}-${i}`}
-                              className="p-3 bg-surface-container-low rounded-lg border border-outline-variant/20 flex flex-col gap-1"
-                            >
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="font-semibold text-on-surface truncate pr-2">
-                                  {src.source}
-                                </span>
-                                <span className="font-mono text-[10px] bg-primary text-on-primary px-2 py-0.5 rounded shrink-0">
-                                  {src.row_ids}
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between text-[11px] text-on-surface-variant">
-                                <span className="truncate">Indicator: {src.indicator}</span>
-                                <span className="font-mono text-[10px] text-secondary">
-                                  Area: {src.impact_area}
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Official Verification Signoff */}
-                      <div className="p-3 bg-surface-container-high rounded-lg flex items-center justify-between text-on-surface-variant text-xs">
-                        <div className="flex items-center gap-1.5 font-mono text-[11px]">
-                          <span className="material-symbols-outlined text-secondary text-[18px]">verified</span>
-                          <span>Verified by: Sindh PDMA &amp; PMD Liaison Cell</span>
-                        </div>
-                        <span className="font-mono text-[10px] text-on-surface-variant">
-                          HASH: {selectedZoneId}-2026
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
+      <AnimatePresence>
+        {selectedZoneId && (
+          <motion.div
+            className="lg:hidden fixed inset-x-0 bottom-14 sm:bottom-0 z-40"
+            initial={shouldReduceMotion ? false : { y: '100%' }}
+            animate={{ y: 0 }}
+            exit={shouldReduceMotion ? undefined : { y: '100%' }}
+            transition={{ duration: 0.25 }}
+          >
+            <div className="mx-2 mb-2 h-[60vh] rounded-t-2xl border border-outline-variant/40 cs-glass flex flex-col overflow-hidden shadow-2xl">
+              <DrawerBody
+                title={drawerTitle}
+                subtitle={drawerSubtitle}
+                zoneId={selectedZoneId}
+                risk={drawerRisk}
+                activeTab={activeTab}
+                setActiveTab={setActiveTab}
+                loading={isZoneDetailLoading}
+                error={isZoneDetailError}
+                onRetry={() => refetchZoneDetail()}
+                onClose={() => handleSelectZone(null)}
+                zoneDetail={zoneDetail}
+                selectedProps={selectedProps}
+              />
             </div>
-          </motion.aside>
+          </motion.div>
         )}
       </AnimatePresence>
+
+      {filterSheetOpen && (
+        <div className="md:hidden fixed inset-0 z-50">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/50"
+            aria-label="Close filters"
+            onClick={() => setFilterSheetOpen(false)}
+          />
+          <div className="absolute inset-x-0 bottom-0 rounded-t-2xl cs-glass border border-outline-variant/40 p-4 pb-20 space-y-3">
+            <p className="font-semibold text-sm">Map filters</p>
+            <div className="flex flex-wrap gap-2">
+              {(['heat', 'rain', 'combined'] as HazardMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  className={`min-h-[44px] px-3 rounded-xl text-xs capitalize ${
+                    hazardMode === mode ? 'bg-secondary text-on-secondary' : 'bg-surface-container'
+                  }`}
+                  onClick={() => setHazardMode(mode)}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+            <select
+              className="w-full min-h-[44px] rounded-xl border border-outline-variant/40 bg-surface-container-lowest px-3"
+              value={severityFilter}
+              onChange={(e) => setSeverityFilter(e.target.value as SeverityFilter)}
+            >
+              <option value="all">All tiers</option>
+              <option value="Severe">Severe</option>
+              <option value="High">High</option>
+              <option value="Moderate">Moderate</option>
+              <option value="Low">Low</option>
+            </select>
+            <Button className="w-full min-h-[44px]" onClick={() => setFilterSheetOpen(false)}>
+              Done
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
-  </motion.div>
   );
 };
+
+function DrawerBody({
+  title,
+  subtitle,
+  zoneId,
+  risk,
+  activeTab,
+  setActiveTab,
+  loading,
+  error,
+  onRetry,
+  onClose,
+  zoneDetail,
+  selectedProps,
+}: {
+  title: string;
+  subtitle: string;
+  zoneId: string;
+  risk: RiskLevel;
+  activeTab: DrawerTab;
+  setActiveTab: (t: DrawerTab) => void;
+  loading: boolean;
+  error: boolean;
+  onRetry: () => void;
+  onClose: () => void;
+  zoneDetail?: ZoneDetailData;
+  selectedProps: ZoneFeatureProperties | null;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <>
+      <div className="sticky top-0 z-10 cs-glass border-b border-outline-variant/30 px-4 py-3 shrink-0">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <RiskBadge level={risk} />
+            <p className="mt-1 font-mono text-[10px] text-on-surface-variant">Zone {zoneId}</p>
+            <h2 className="font-display font-semibold text-on-surface truncate">{title}</h2>
+            <p className="text-xs text-on-surface-variant line-clamp-2">{subtitle}</p>
+          </div>
+          <button
+            type="button"
+            className="min-h-[44px] min-w-[44px] rounded-xl hover:bg-surface-container"
+            aria-label="Close district drawer"
+            onClick={onClose}
+          >
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        </div>
+        <div className="mt-3 flex gap-1 overflow-x-auto no-scrollbar">
+          {(
+            [
+              ['hazard', '1. Hazard'],
+              ['exposure', '2. Exposure'],
+              ['vulnerability', '3. Vulnerability'],
+              ['evidence', '4. Evidence'],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setActiveTab(id)}
+              className={`min-h-[44px] px-3 rounded-lg text-xs font-semibold shrink-0 ${
+                activeTab === id ? 'bg-secondary text-on-secondary' : 'bg-surface-container text-on-surface-variant'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 text-sm">
+        {loading && <div className="cs-skeleton h-24 rounded-xl" />}
+        {error && <ErrorState title="District detail failed" onRetry={onRetry} />}
+        {!loading && !error && activeTab === 'hazard' && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase text-on-surface-variant">Meteorological hazard</p>
+            <p className="text-on-surface-variant text-xs">
+              {zoneDetail?.hazard?.warning_label || 'No separate district forecast row.'}
+            </p>
+            <dl className="grid grid-cols-2 gap-2 text-xs">
+              <div className="rounded-xl bg-surface-container p-3">
+                <dt className="text-on-surface-variant">Probability</dt>
+                <dd className="font-mono tabular-nums font-semibold">
+                  {selectedProps?.probability != null
+                    ? `${(selectedProps.probability * 100).toFixed(1)}%`
+                    : zoneDetail?.hazard?.probability != null
+                      ? `${(zoneDetail.hazard.probability * 100).toFixed(1)}%`
+                      : 'n/a'}
+                </dd>
+              </div>
+              <div className="rounded-xl bg-surface-container p-3">
+                <dt className="text-on-surface-variant">Interval</dt>
+                <dd className="font-mono tabular-nums font-semibold">
+                  {selectedProps
+                    ? `${selectedProps.interval_low}–${selectedProps.interval_high}`
+                    : zoneDetail?.hazard?.interval_low != null
+                      ? `${zoneDetail.hazard.interval_low}–${zoneDetail.hazard.interval_high}`
+                      : 'n/a'}
+                </dd>
+              </div>
+            </dl>
+          </div>
+        )}
+        {!loading && !error && activeTab === 'exposure' && (
+          <dl className="space-y-2 text-xs">
+            <div className="rounded-xl bg-surface-container p-3">
+              <dt className="text-on-surface-variant">Exposed population</dt>
+              <dd className="font-mono tabular-nums text-base font-semibold">
+                {(
+                  zoneDetail?.exposure?.exposed_population ?? selectedProps?.exposed_population
+                )?.toLocaleString?.() ?? 'n/a'}
+              </dd>
+            </div>
+            <div className="rounded-xl bg-surface-container p-3">
+              <dt className="text-on-surface-variant">Facilities</dt>
+              <dd className="font-mono tabular-nums text-base font-semibold">
+                {zoneDetail?.exposure?.facilities_count ?? selectedProps?.facilities_count ?? 'n/a'}
+              </dd>
+            </div>
+          </dl>
+        )}
+        {!loading && !error && activeTab === 'vulnerability' && (
+          <div className="rounded-xl bg-surface-container p-3 text-xs">
+            <p className="text-on-surface-variant">Vulnerability score</p>
+            <p className="font-mono tabular-nums text-lg font-semibold">
+              {(
+                zoneDetail?.vulnerability?.vulnerability_score ?? selectedProps?.vulnerability_score
+              )?.toFixed?.(2) ?? 'n/a'}
+            </p>
+          </div>
+        )}
+        {!loading && !error && activeTab === 'evidence' && (
+          <div className="space-y-2 text-xs text-on-surface-variant">
+            {(zoneDetail?.evidence?.sources || []).length === 0 && (
+              <p>No evidence rows returned for this district.</p>
+            )}
+            {(zoneDetail?.evidence?.sources || []).map((src, idx) => (
+              <div key={`${src.source}-${idx}`} className="rounded-xl bg-surface-container p-3">
+                <p className="font-semibold text-on-surface">{src.source}</p>
+                <p className="font-mono break-all">{src.row_ids}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="h-8" aria-hidden />
+      </div>
+    </>
+  );
+}
+
+export default RiskMap;

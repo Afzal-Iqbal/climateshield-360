@@ -1,6 +1,6 @@
 """
 Unit tests for the /api/forecast endpoint.
-Ensures conformance with AGENT_RULES.md:
+Ensures conformance with doc/AGENT_RULES.md:
 - Rule 1: Never hard-code outputs. Every number comes from DuckDB.
 - Rule 2: Envelope returns {data, generated_at, is_sample}.
 - Rule 3: Times in UTC, formatted in PKT for display.

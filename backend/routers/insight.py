@@ -10,7 +10,9 @@ model and it does not invent a number when a table has no row.
 from __future__ import annotations
 
 import re
+import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
@@ -18,6 +20,13 @@ from fastapi import APIRouter, HTTPException
 from db import is_sample_database, safe_query
 from forecasting.coverage import impact_forecast_coverage
 from schemas import APIResponse, InsightAnswer, InsightCitation, InsightQuestion
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from src.rag.agent import answer as build_answer
+from src.rag.agent import classify, section_from_catalog_row
 
 router = APIRouter(prefix="/insight", tags=["Insight Agent"])
 
@@ -109,48 +118,47 @@ def _latest_weather(city: str) -> Optional[dict]:
     return rows[0] if rows else None
 
 
-def _heat_band(temp_c: float) -> str:
-    if temp_c >= 45:
-        return "at or above the 45°C severe monitoring threshold"
-    if temp_c >= 40:
-        return "at or above the 40°C danger monitoring threshold"
-    if temp_c >= 35:
-        return "at or above the 35°C caution monitoring threshold"
-    return "below the 35°C caution monitoring threshold"
-
-
-def _answer_heat(question: str, city: str) -> InsightAnswer:
-    row = _latest_weather(city)
-    temp = None if row is None else row.get("temperature_2m_c")
-    if temp is None:
-        return InsightAnswer(
-            question=question,
-            status="unavailable",
-            answer=f"No observed temperature is stored for {city}. Heat is not given a model forecast.",
-            limitations="Heat is compared with monitoring thresholds. There is no heat prediction model.",
-        )
-    when = _fmt_pkt(row.get("timestamp_utc"))
-    value = float(temp)
-    return InsightAnswer(
-        question=question,
-        status="answered",
-        answer=(
-            f"The latest observed air temperature in {city} is {value:.1f}°C at {when}. "
-            f"That reading is {_heat_band(value)}. "
-            "This is an observation from hourly weather, not a heat forecast."
-        ),
-        citations=[
-            InsightCitation(
-                source="weather_hourly",
-                detail=f"{city} temperature_2m_c at {when}",
-            )
-        ],
-        limitations="Heat is observed against 35/40/45°C thresholds and is not ML-predicted.",
+def _catalog_sections() -> list[dict]:
+    rows = safe_query(
+        "SELECT row_id, title, filename, doc_type, quality_flags FROM document_catalog"
     )
+    if not rows:
+        rows = safe_query("SELECT title, filename, quality_flags FROM document_catalog")
+    return [section_from_catalog_row(row) for row in rows]
 
 
-def _answer_rain(question: str, city: str) -> InsightAnswer:
-    weather = _latest_weather(city)
+def _weather_context(city: str) -> dict:
+    rows = safe_query(
+        """
+        SELECT row_id, timestamp_utc, temperature_2m_c, relative_humidity_pct,
+               precipitation_mm, rain_mm
+        FROM weather_hourly
+        WHERE lower(city) = lower(?)
+        ORDER BY timestamp_utc DESC
+        LIMIT 1
+        """,
+        [city],
+    )
+    if not rows:
+        return {"city": city, "has_weather": False, "sections": _catalog_sections()}
+    row = rows[0]
+    rain = row.get("precipitation_mm")
+    if rain is None:
+        rain = row.get("rain_mm")
+    return {
+        "city": city,
+        "zone": city,
+        "has_weather": True,
+        "temperature_c": None if row.get("temperature_2m_c") is None else float(row["temperature_2m_c"]),
+        "humidity_pct": None if row.get("relative_humidity_pct") is None else float(row["relative_humidity_pct"]),
+        "precipitation_mm": None if rain is None else float(rain),
+        "observed_at": _fmt_pkt(row.get("timestamp_utc")),
+        "row_id": None if row.get("row_id") is None else str(row["row_id"]),
+        "sections": _catalog_sections(),
+    }
+
+
+def _prediction_context(city: str) -> dict:
     preds = safe_query(
         """
         SELECT city, forecast_time, probability, interval_low, interval_high,
@@ -162,57 +170,30 @@ def _answer_rain(question: str, city: str) -> InsightAnswer:
         """,
         [city],
     )
-    parts: list[str] = []
-    citations: list[InsightCitation] = []
-    if weather is not None and (weather.get("precipitation_mm") is not None or weather.get("rain_mm") is not None):
-        raw = weather.get("precipitation_mm")
-        if raw is None:
-            raw = weather.get("rain_mm")
-        when = _fmt_pkt(weather.get("timestamp_utc"))
-        parts.append(
-            f"The latest observed precipitation in {city} is {float(raw):.2f} mm at {when}."
-        )
-        citations.append(InsightCitation(source="weather_hourly", detail=f"{city} precipitation at {when}"))
-    if preds:
-        pred = preds[0]
-        issued = _fmt_pkt(pred.get("generated_at"))
-        valid = _fmt_pkt(pred.get("forecast_time"))
-        median = 0.0 if pred.get("median") is None else float(pred.get("median"))
-        low = 0.0 if pred.get("interval_low") is None else float(pred.get("interval_low"))
-        high = 0.0 if pred.get("interval_high") is None else float(pred.get("interval_high"))
-        probability = None if pred.get("probability") is None else float(pred.get("probability"))
-        forecast_at = _as_utc(pred.get("forecast_time"))
-        stale = forecast_at is not None and forecast_at < _now()
-        prob_text = "unavailable" if probability is None else f"{probability:.4f}"
-        parts.append(
-            f"The saved rainfall model for {city} gives a 1-hour median of {median:.3f} mm/h "
-            f"(interval {low:.3f} to {high:.3f} mm/h) and P(rain >= 2.5 mm/h) of {prob_text}. "
-            f"Issued {issued}. Forecast time {valid}."
-            + (" This model row is stale because that forecast time has passed." if stale else "")
-        )
-        citations.append(
-            InsightCitation(
-                source="predictions",
-                detail=f"{city} heavy_rain {pred.get('model_version') or 'saved model'} issued {issued}",
-            )
-        )
-    if not parts:
-        return InsightAnswer(
-            question=question,
-            status="unavailable",
-            answer=f"No observed precipitation and no rainfall model row are stored for {city}.",
-            limitations="This assistant does not estimate rainfall when both tables are empty.",
-        )
-    return InsightAnswer(
-        question=question,
-        status="answered",
-        answer=" ".join(parts),
-        citations=citations,
-        limitations=(
-            "The model horizon is 1 hour. A 24-hour or 7-day rainfall series is not stored. "
-            "Observed millimetres and the model median are different quantities."
-        ),
+    context = _weather_context(city)
+    if not preds:
+        return context
+    pred = preds[0]
+    forecast_at = _as_utc(pred.get("forecast_time"))
+    context.update(
+        {
+            "median": 0.0 if pred.get("median") is None else float(pred["median"]),
+            "interval_low": 0.0 if pred.get("interval_low") is None else float(pred["interval_low"]),
+            "interval_high": 0.0 if pred.get("interval_high") is None else float(pred["interval_high"]),
+            "probability": None if pred.get("probability") is None else float(pred["probability"]),
+            "baseline_value": None if pred.get("baseline_value") is None else float(pred["baseline_value"]),
+            "model_version": pred.get("model_version"),
+            "issued_at": _fmt_pkt(pred.get("generated_at")),
+            "forecast_time": _fmt_pkt(pred.get("forecast_time")),
+            "stale": forecast_at is not None and forecast_at < _now(),
+            "prediction_key": f"predictions|{city}|heavy_rain|{pred.get('forecast_time')}",
+        }
     )
+    return context
+
+
+def _as_insight(payload: dict) -> InsightAnswer:
+    return InsightAnswer(**payload)
 
 
 def _answer_pipeline(question: str) -> InsightAnswer:
@@ -403,26 +384,13 @@ def _answer_emergency(question: str) -> InsightAnswer:
     )
 
 
-def _classify(question: str) -> str:
-    if any(word in question for word in ("emergency", "pdma", "rescue", "1122", "1736", "helpline")):
-        return "emergency"
-    if any(word in question for word in ("document", "pdf", "ndma", "parsed", "strategy", "bulletin")):
-        return "documents"
-    if any(word in question for word in ("mae", "baseline", "brier", "accuracy", "model eval", "evaluation")):
-        return "model"
-    if any(word in question for word in ("impact area", "eight impact", "agriculture", "economic", "infrastructure", "which forecast", "forecast coverage")):
-        return "coverage"
-    if any(word in question for word in ("temperature", "heat", "hot", "celsius", "wbgt")) and "rain" not in question:
-        return "heat"
-    if any(word in question for word in ("rain", "rainfall", "precipitation", "shower")) or "forecast" in question:
-        return "rain"
-    if any(word in question for word in ("ingest", "pipeline", "fresh", "hourly", "last run", "stale", "update")):
-        return "pipeline"
-    if "model" in question:
-        return "model"
-    if "health" in question or "hospital" in question:
-        return "coverage"
-    return "unknown"
+def _grounded(question: str, city: str, family: str) -> InsightAnswer:
+    if family == "rain":
+        context = _prediction_context(city)
+    else:
+        context = _weather_context(city)
+    context["family"] = family
+    return _as_insight(build_answer(question, context))
 
 
 @router.post("/ask", response_model=APIResponse[InsightAnswer])
@@ -433,20 +401,9 @@ def ask_insight(body: InsightQuestion) -> APIResponse[InsightAnswer]:
     if len(question) > 500:
         raise HTTPException(status_code=400, detail="Question is longer than 500 characters.")
 
-    kind = _classify(question.lower())
+    kind = classify(question.lower())
     if kind == "unknown":
-        return _envelope(
-            InsightAnswer(
-                question=question,
-                status="unknown",
-                answer=(
-                    "I can only answer from hourly weather, the rainfall model, pipeline runs, "
-                    "model evaluation, the document catalog, and the declared forecast coverage. "
-                    "That question is outside those tables, so I will not estimate a number."
-                ),
-                limitations="An unsupported question gets no guessed value.",
-            )
-        )
+        return _envelope(_as_insight(build_answer(question, {"family": "unknown"})))
 
     if kind == "emergency":
         return _envelope(_answer_emergency(question))
@@ -457,19 +414,18 @@ def ask_insight(body: InsightQuestion) -> APIResponse[InsightAnswer]:
 
     cities = _cities()
     city, unknown = _city_from_question(question.lower(), cities)
-    if kind in {"heat", "rain"} and unknown:
+    if kind in {"heat", "rain", "weather", "heat_health"} and unknown:
         return _envelope(
             InsightAnswer(
                 question=question,
                 status="unavailable",
                 answer=f"No weather rows are stored for {unknown}. Nothing was substituted from another city.",
                 limitations="City names have to match weather_hourly.",
+                supported=False,
             )
         )
-    if kind == "heat":
-        return _envelope(_answer_heat(question, city or "Karachi"))
-    if kind == "rain":
-        return _envelope(_answer_rain(question, city or "Karachi"))
+    if kind in {"heat", "rain", "weather", "heat_health"}:
+        return _envelope(_grounded(question, city or "Karachi", kind))
     if kind == "pipeline":
         return _envelope(_answer_pipeline(question))
     return _envelope(_answer_model(question, city if unknown is None else None))

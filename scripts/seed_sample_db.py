@@ -356,7 +356,7 @@ def seed_database(db_path: Path = SAMPLE_DB_PATH):
             )
 
     # 8. model_eval(group_type, group_value, metric, baseline_score, model_score)
-    # Stratified model evaluation with groups matching DESIGN.md:
+    # Stratified model evaluation with groups matching doc/frontend/DESIGN.md:
     # Karachi Coastal Fringe has highest MAE (1.48C) -> Weakest group!
     conn.execute(
         """

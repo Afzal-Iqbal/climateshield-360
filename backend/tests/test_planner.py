@@ -1,6 +1,6 @@
 """
 Tests for Emergency Action Planner API endpoint (GET /api/planner).
-Verifies all requirements from AGENT_RULES.md and user specifications:
+Verifies all requirements from doc/AGENT_RULES.md and user specifications:
 1. Standard envelope {data, generated_at, is_sample}
 2. Ranking order: risk level (Severe > High > Moderate > Low), then vulnerability, then exposed population
 3. Reason fields: forecast probability, interval [low, high], baseline, population, facilities count, vulnerability score

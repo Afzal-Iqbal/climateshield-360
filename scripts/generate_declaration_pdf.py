@@ -10,7 +10,10 @@ import os
 import subprocess
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-PDF_PATH = os.path.join(BASE_DIR, "Dataset_Declaration.pdf")
+DOC_DIR = os.path.join(BASE_DIR, "doc")
+PDF_PATH = os.path.join(DOC_DIR, "Dataset_Declaration.pdf")
+# Also publish under frontend/public so the About page download link works.
+PUBLIC_PDF_PATH = os.path.join(BASE_DIR, "frontend", "public", "Dataset_Declaration.pdf")
 HTML_TEMP = "/tmp/Dataset_Declaration_clean.html"
 
 HTML_CONTENT = """<!DOCTYPE html>
@@ -230,18 +233,25 @@ def main():
     with open(HTML_TEMP, "w", encoding="utf-8") as f:
         f.write(HTML_CONTENT)
 
+    os.makedirs(DOC_DIR, exist_ok=True)
     cmd = [
         "libreoffice",
         "--headless",
         "--convert-to", "pdf",
         HTML_TEMP,
-        "--outdir", BASE_DIR
+        "--outdir", DOC_DIR
     ]
     subprocess.run(cmd, check=True)
-    temp_pdf = os.path.join(BASE_DIR, "Dataset_Declaration_clean.pdf")
+    temp_pdf = os.path.join(DOC_DIR, "Dataset_Declaration_clean.pdf")
     if os.path.exists(temp_pdf):
         os.replace(temp_pdf, PDF_PATH)
+    public_dir = os.path.dirname(PUBLIC_PDF_PATH)
+    os.makedirs(public_dir, exist_ok=True)
+    if os.path.exists(PDF_PATH):
+        import shutil
+        shutil.copy2(PDF_PATH, PUBLIC_PDF_PATH)
     print(f"Generated clean PDF: {PDF_PATH}")
+    print(f"Copied for frontend download: {PUBLIC_PDF_PATH}")
 
 if __name__ == "__main__":
     main()
