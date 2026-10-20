@@ -284,6 +284,45 @@ function parseAnswerContent(text: string, incomingMetrics?: AnswerMetric[]): Par
   return { summary, groups, guidanceText, missingText };
 }
 
+// Local storage keys for preserving chat history and preferences locally
+const CHAT_STORAGE_KEY = 'climateshield_chat_history_v1';
+const CHAT_FEEDBACK_KEY = 'climateshield_chat_feedback_v1';
+const CHAT_LAST_Q_KEY = 'climateshield_chat_last_q_v1';
+
+function loadStoredMessages(): ChatMessage[] {
+  try {
+    const raw = localStorage.getItem(CHAT_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((m: any) => ({
+      ...m,
+      // Deserialized dates must be actual Date objects so .toLocaleTimeString() works
+      timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+    }));
+  } catch (err) {
+    console.warn('[InsightAgent] Failed to read chat history from localStorage:', err);
+    return [];
+  }
+}
+
+function loadStoredFeedback(): Record<string, 'up' | 'down'> {
+  try {
+    const raw = localStorage.getItem(CHAT_FEEDBACK_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function loadStoredLastQuestion(): string {
+  try {
+    return localStorage.getItem(CHAT_LAST_Q_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
 export const InsightAgent: React.FC<InsightAgentProps> = ({ isSample = true }) => {
   const [searchParams] = useSearchParams();
   const shouldReduceMotion = useReducedMotion();
@@ -293,12 +332,12 @@ export const InsightAgent: React.FC<InsightAgentProps> = ({ isSample = true }) =
   const selectedZone = KARACHI_ZONES.find((z) => z.id === currentZoneId) || KARACHI_ZONES[0];
   const zoneQueryParam = selectedZone.id === 'all' ? undefined : selectedZone.id;
 
-  // Session Chat State
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // Session Chat State with localStorage persistence
+  const [messages, setMessages] = useState<ChatMessage[]>(() => loadStoredMessages());
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [lastQuestion, setLastQuestion] = useState<string>('');
-  const [showSuggestions, setShowSuggestions] = useState(true);
+  const [lastQuestion, setLastQuestion] = useState<string>(() => loadStoredLastQuestion());
+  const [showSuggestions, setShowSuggestions] = useState<boolean>(() => loadStoredMessages().length === 0);
 
   // In-flight abort controller for Stop generation
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -325,9 +364,46 @@ export const InsightAgent: React.FC<InsightAgentProps> = ({ isSample = true }) =
   // Marker and Source Chip hover sync
   const [hoveredCitationKey, setHoveredCitationKey] = useState<string | null>(null);
 
-  // Copy feedback and User Ratings (local only)
+  // Copy feedback and User Ratings (persisted in localStorage)
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<Record<string, 'up' | 'down'>>({});
+  const [feedback, setFeedback] = useState<Record<string, 'up' | 'down'>>(() => loadStoredFeedback());
+
+  // Automatically preserve chat history in local storage as soon as messages update
+  useEffect(() => {
+    try {
+      if (messages.length > 0) {
+        localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages));
+      } else {
+        localStorage.removeItem(CHAT_STORAGE_KEY);
+      }
+    } catch (err) {
+      console.warn('[InsightAgent] Could not save messages to localStorage:', err);
+    }
+  }, [messages]);
+
+  // Synchronize feedback ratings to localStorage
+  useEffect(() => {
+    try {
+      if (Object.keys(feedback).length > 0) {
+        localStorage.setItem(CHAT_FEEDBACK_KEY, JSON.stringify(feedback));
+      } else {
+        localStorage.removeItem(CHAT_FEEDBACK_KEY);
+      }
+    } catch (err) {
+      console.warn('[InsightAgent] Could not save feedback to localStorage:', err);
+    }
+  }, [feedback]);
+
+  // Synchronize last question for Up-Arrow recall
+  useEffect(() => {
+    try {
+      if (lastQuestion) {
+        localStorage.setItem(CHAT_LAST_Q_KEY, lastQuestion);
+      }
+    } catch (err) {
+      console.warn('[InsightAgent] Could not save lastQuestion to localStorage:', err);
+    }
+  }, [lastQuestion]);
 
   // Auto-scroll on new message or status change
   const scrollToBottom = useCallback(() => {
@@ -574,9 +650,17 @@ export const InsightAgent: React.FC<InsightAgentProps> = ({ isSample = true }) =
     } as Record<string, 'up' | 'down'>));
   };
 
-  // Clear chat handler
+  // Clear chat handler - clears both component state and browser localStorage
   const handleConfirmClear = () => {
     setMessages([]);
+    setFeedback({});
+    try {
+      localStorage.removeItem(CHAT_STORAGE_KEY);
+      localStorage.removeItem(CHAT_FEEDBACK_KEY);
+      localStorage.removeItem(CHAT_LAST_Q_KEY);
+    } catch (err) {
+      // ignore
+    }
     setShowClearConfirm(false);
     setShowSuggestions(true);
     if (textareaRef.current) {
@@ -672,13 +756,24 @@ export const InsightAgent: React.FC<InsightAgentProps> = ({ isSample = true }) =
               <span className="font-semibold">{selectedZone.name}</span>
             </div>
 
+            {/* Saved Locally Status Badge */}
+            {messages.length > 0 && (
+              <div
+                className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 font-mono text-[11px] text-emerald-600 dark:text-emerald-400"
+                title="Your chat history is automatically preserved in your local browser storage"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Saved locally</span>
+              </div>
+            )}
+
             {/* Clear Chat Button */}
             {messages.length > 0 && (
               <button
                 type="button"
                 onClick={() => setShowClearConfirm(true)}
                 className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-outline-variant/40 hover:bg-surface-container dark:hover:bg-surface-container-high text-xs text-on-surface-variant transition-colors min-h-[36px]"
-                title="Clear current session chat history"
+                title="Clear preserved chat history"
                 aria-label="Clear chat history"
               >
                 <span className="material-symbols-outlined text-[16px]">delete_sweep</span>
