@@ -22,7 +22,11 @@ Object.defineProperty(window, 'matchMedia', {
   }),
 });
 
-// WebGL probe used by mapHeight.supportsWebGL
-HTMLCanvasElement.prototype.getContext = function getContext() {
-  return {} as any;
+// WebGL probe used by mapHeight / RiskMap.checkWebGLSupport
+(window as any).WebGLRenderingContext = (window as any).WebGLRenderingContext || function WebGLRenderingContext() {};
+HTMLCanvasElement.prototype.getContext = function getContext(type?: string) {
+  if (type === 'webgl' || type === 'experimental-webgl' || type === 'webgl2') {
+    return {} as any;
+  }
+  return null;
 } as any;

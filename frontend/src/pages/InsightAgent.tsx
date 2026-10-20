@@ -16,6 +16,18 @@ interface ChatTurn {
   error?: string;
 }
 
+interface StoredChatTurn {
+  id: number;
+  question: string;
+  askedAt: string;
+  latencyMs?: number;
+  answer?: InsightAnswer;
+  error?: string;
+}
+
+const STORAGE_KEY = 'cs-insight-chat-v1';
+const MAX_STORED_TURNS = 40;
+
 const SUGGESTED = [
   'What is the latest observed temperature in Karachi?',
   "What's the weather today in Karachi?",
@@ -24,6 +36,41 @@ const SUGGESTED = [
   'When was the last successful hourly ingest?',
   'How does the rainfall model compare with its baseline?',
 ];
+
+function loadStoredTurns(): ChatTurn[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as StoredChatTurn[];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.slice(-MAX_STORED_TURNS).map((item) => ({
+      id: item.id,
+      question: item.question,
+      askedAt: new Date(item.askedAt),
+      latencyMs: item.latencyMs,
+      answer: item.answer,
+      error: item.error,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function persistTurns(turns: ChatTurn[]) {
+  try {
+    const payload: StoredChatTurn[] = turns.slice(-MAX_STORED_TURNS).map((turn) => ({
+      id: turn.id,
+      question: turn.question,
+      askedAt: turn.askedAt.toISOString(),
+      latencyMs: turn.latencyMs,
+      answer: turn.answer,
+      error: turn.error,
+    }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    /* quota / private mode */
+  }
+}
 
 function formatPktClock(date: Date): string {
   return date.toLocaleTimeString('en-PK', {
@@ -114,10 +161,10 @@ const SourceCard: React.FC<{ citation: InsightCitation; index: number }> = ({ ci
     <div className="h-full min-w-0 rounded-xl border border-outline-variant/30 bg-surface-container-low p-3 flex gap-2">
       <span className="shrink-0 font-mono text-[11px] font-bold text-secondary">[{index}]</span>
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-semibold text-on-surface line-clamp-2" title={title}>
+        <p className="text-xs font-semibold text-on-surface break-words" title={title}>
           {title}
         </p>
-        <p className="mt-0.5 text-[11px] text-on-surface-variant line-clamp-2" title={section}>
+        <p className="mt-0.5 text-[11px] text-on-surface-variant break-words" title={section}>
           {section}
         </p>
       </div>
@@ -152,7 +199,7 @@ const AnswerCard: React.FC<{ turn: ChatTurn }> = ({ turn }) => {
   const showSafety = isSafetyRelated(turn);
 
   return (
-    <div className="w-full rounded-2xl border border-outline-variant/30 bg-surface-container-lowest overflow-hidden">
+    <div className="w-full max-w-none rounded-2xl border border-outline-variant/30 bg-surface-container-lowest/90 backdrop-blur-sm overflow-hidden shadow-sm">
       <div className="px-4 pt-3 pb-2 flex items-center gap-2 flex-wrap">
         <span className="font-mono text-[10px] uppercase font-bold px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant">
           Evidence-based answer
@@ -213,7 +260,7 @@ const AnswerCard: React.FC<{ turn: ChatTurn }> = ({ turn }) => {
         {sourceCards.length > 0 && (
           <div>
             <p className="text-[10px] uppercase tracking-wide font-bold text-on-surface-variant mb-2">Sources</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
               {sourceCards.map((citation, index) => (
                 <SourceCard
                   key={`${citation.source}-${citation.title || citation.detail}-${index}`}
@@ -256,7 +303,7 @@ const AnswerCard: React.FC<{ turn: ChatTurn }> = ({ turn }) => {
           turn.latencyMs != null ? `${turn.latencyMs} ms` : null,
           `${citations.length} source${citations.length === 1 ? '' : 's'}`,
           `${dataRows.length} row${dataRows.length === 1 ? '' : 's'}`,
-          formatPktClock(new Date()),
+          formatPktClock(turn.askedAt),
         ]
           .filter(Boolean)
           .join(' · ')}
@@ -267,15 +314,36 @@ const AnswerCard: React.FC<{ turn: ChatTurn }> = ({ turn }) => {
 
 export const InsightAgent: React.FC<InsightAgentProps> = ({ isSample = false }) => {
   const [question, setQuestion] = useState('');
-  const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const [turns, setTurns] = useState<ChatTurn[]>(() => loadStoredTurns());
   const [pending, setPending] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
   const threadRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    persistTurns(turns);
+  }, [turns, hydrated]);
 
   useEffect(() => {
     const node = threadRef.current;
     if (!node) return;
-    node.scrollTop = node.scrollHeight;
+    node.scrollTo({ top: node.scrollHeight, behavior: 'smooth' });
   }, [turns, pending]);
+
+  const clearHistory = () => {
+    setTurns([]);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {
+      /* ignore */
+    }
+    inputRef.current?.focus();
+  };
 
   const ask = async (text: string) => {
     const trimmed = text.trim();
@@ -301,62 +369,84 @@ export const InsightAgent: React.FC<InsightAgentProps> = ({ isSample = false }) 
       );
     } finally {
       setPending(false);
+      inputRef.current?.focus();
     }
   };
 
+  const empty = turns.length === 0;
+
   return (
-    <div className="w-full flex-1 min-h-0 flex flex-col">
-      <div className="w-full max-w-[880px] mx-auto px-4 sm:px-5 flex-1 min-h-0 flex flex-col gap-4 py-4 sm:py-5">
+    <div className="w-full flex-1 min-h-0 flex flex-col overflow-hidden">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex-1 min-h-0 flex flex-col">
         <SampleBanner isSample={isSample} />
 
-        <header className="shrink-0 border-b border-outline-variant/30 pb-3">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
-            <div className="min-w-0">
-              <h1 className="font-display text-xl sm:text-2xl font-bold text-on-surface tracking-tight">
+        <header className="shrink-0 pt-3 pb-2 flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="font-display text-lg sm:text-xl font-bold text-on-surface tracking-tight">
                 AI Climate Assistant
               </h1>
-              <p className="text-sm text-on-surface-variant mt-1">
-                Answers come from hourly weather, the rainfall model, pipeline runs, model evaluation, and the document catalog. Official PDFs are catalogued and not parsed.
-              </p>
+              <span className="font-mono text-[10px] px-2 py-0.5 rounded-full bg-secondary/15 text-secondary border border-secondary/25 font-bold">
+                WAREHOUSE ONLY
+              </span>
             </div>
-            <span className="font-mono text-[11px] px-2.5 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed font-bold border border-secondary/20 shrink-0 self-start sm:self-auto">
-              WAREHOUSE ONLY
-            </span>
+            <p className="text-xs sm:text-sm text-on-surface-variant mt-1 max-w-4xl">
+              Hourly weather, rainfall model, pipeline runs, and catalogued docs — no invented answers.
+            </p>
           </div>
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            {SUGGESTED.map((prompt) => (
-              <button
-                key={prompt}
-                type="button"
-                onClick={() => ask(prompt)}
-                disabled={pending}
-                className="text-left text-xs px-3 py-2 rounded-full bg-surface-container text-on-surface border border-outline-variant/40 hover:bg-surface-container-high disabled:opacity-60"
-              >
-                {prompt}
-              </button>
-            ))}
-          </div>
+          {turns.length > 0 && (
+            <button
+              type="button"
+              onClick={clearHistory}
+              disabled={pending}
+              className="shrink-0 min-h-[40px] px-3 rounded-xl border border-outline-variant/40 bg-surface-container/70 text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high disabled:opacity-50"
+            >
+              Clear
+            </button>
+          )}
         </header>
 
         <div
           ref={threadRef}
-          className="flex-1 min-h-0 overflow-y-auto overscroll-contain pr-0.5"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain"
           aria-live="polite"
         >
-          <div className="flex flex-col gap-4 pb-2">
-            {turns.length === 0 && (
-              <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-low p-5 text-sm text-on-surface-variant">
-                Ask about an observed temperature, today&apos;s weather, the 1-hour rainfall model, heat-health guidance, pipeline status, or model scores. Questions outside those sources are refused instead of estimated.
+          <div className={`flex flex-col gap-4 py-2 ${empty ? 'min-h-full justify-center' : 'pb-4'}`}>
+            {empty && (
+              <div className="w-full rounded-3xl border border-outline-variant/25 bg-gradient-to-b from-surface-container-low to-surface-container-lowest p-5 sm:p-7 shadow-sm">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-2xl bg-secondary/15 text-secondary flex items-center justify-center">
+                    <span className="material-symbols-outlined text-[22px]">auto_awesome</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-on-surface">Ask the warehouse</p>
+                    <p className="text-xs text-on-surface-variant">Saved locally in this browser</p>
+                  </div>
+                </div>
+                <p className="text-sm text-on-surface-variant mb-4 max-w-3xl">
+                  Observed temperature, today’s weather, 1-hour rainfall, heat-health guidance, pipeline status, or model scores.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
+                  {SUGGESTED.map((prompt) => (
+                    <button
+                      key={prompt}
+                      type="button"
+                      onClick={() => ask(prompt)}
+                      disabled={pending}
+                      className="w-full text-left text-xs sm:text-sm px-3.5 py-3 rounded-2xl bg-background/80 text-on-surface border border-secondary/25 hover:border-secondary/50 hover:bg-secondary/10 disabled:opacity-60 transition-colors whitespace-normal break-words"
+                    >
+                      {prompt}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 
             {turns.map((turn) => (
-              <div key={turn.id} className="flex flex-col gap-4">
-                {/* User message */}
-                <div className="flex justify-end gap-2">
-                  <div className="max-w-[75%] min-w-0 flex flex-col items-end gap-1">
-                    <div className="rounded-2xl rounded-br-md bg-primary-container text-on-primary px-4 py-3 text-sm">
+              <div key={turn.id} className="flex flex-col gap-3 w-full">
+                <div className="flex justify-end gap-2 w-full">
+                  <div className="w-full sm:w-[min(100%,52rem)] min-w-0 flex flex-col items-end gap-1">
+                    <div className="w-full rounded-2xl rounded-br-md bg-primary text-on-primary px-4 py-2.5 text-sm shadow-sm whitespace-pre-wrap break-words">
                       {turn.question}
                     </div>
                     <div className="flex items-center gap-2 text-[10px] font-mono text-on-surface-variant">
@@ -368,25 +458,18 @@ export const InsightAgent: React.FC<InsightAgentProps> = ({ isSample = false }) 
                       <span>{formatPktClock(turn.askedAt)}</span>
                     </div>
                   </div>
-                  <div
-                    className="w-8 h-8 rounded-full bg-primary text-on-primary flex items-center justify-center text-[11px] font-bold shrink-0"
-                    aria-hidden="true"
-                  >
-                    You
-                  </div>
                 </div>
 
-                {/* Assistant message */}
-                <div className="flex justify-start gap-2">
+                <div className="flex justify-start gap-2 w-full">
                   <div
-                    className="w-8 h-8 rounded-full bg-secondary text-on-secondary flex items-center justify-center shrink-0"
+                    className="w-8 h-8 rounded-full bg-secondary text-on-secondary flex items-center justify-center shrink-0 mt-0.5"
                     aria-hidden="true"
                   >
                     <span className="material-symbols-outlined text-[18px]">psychology</span>
                   </div>
-                  <div className="min-w-0 flex-1 max-w-full">
+                  <div className="min-w-0 flex-1 w-full">
                     {turn.error ? (
-                      <div className="w-full rounded-2xl border border-error/30 bg-error-container/20 px-4 py-3 text-sm text-error">
+                      <div className="w-full rounded-2xl border border-error/30 bg-error-container/20 px-4 py-3 text-sm text-error break-words">
                         {turn.error}
                       </div>
                     ) : (
@@ -396,47 +479,65 @@ export const InsightAgent: React.FC<InsightAgentProps> = ({ isSample = false }) 
                 </div>
               </div>
             ))}
-
-            {pending && turns.every((turn) => turn.answer || turn.error) && (
-              <div className="flex justify-start gap-2">
-                <div className="w-8 h-8 rounded-full bg-secondary text-on-secondary flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-[18px]">psychology</span>
-                </div>
-                <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-lowest px-4 py-3 text-sm text-on-surface-variant">
-                  Checking the warehouse…
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
+        {/* Sticky composer — full content width, above mobile bottom nav */}
         <form
-          className="shrink-0 -mx-4 sm:-mx-5 px-4 sm:px-5 pt-3 pb-3 border-t border-outline-variant/30 bg-background"
+          className="shrink-0 sticky bottom-0 z-30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 pt-2 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-3 border-t border-outline-variant/25 bg-background/90 backdrop-blur-md mb-14 sm:mb-0"
           onSubmit={(event) => {
             event.preventDefault();
             ask(question);
           }}
         >
-          <div className="flex items-end gap-2">
-            <label className="flex-1 flex flex-col gap-1 min-w-0">
+          {!empty && (
+            <div className="mb-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {SUGGESTED.slice(0, 3).map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => ask(prompt)}
+                  disabled={pending}
+                  className="w-full text-left text-[11px] sm:text-xs px-3 py-2 rounded-xl border border-outline-variant/35 bg-surface-container/80 text-on-surface-variant hover:text-on-surface disabled:opacity-50 whitespace-normal break-words"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="flex items-end gap-2 w-full rounded-2xl border border-secondary/35 bg-surface-container-lowest shadow-[0_8px_30px_rgba(0,0,0,0.12)] focus-within:ring-2 focus-within:ring-secondary/35 px-2 py-2">
+            <label className="flex-1 flex flex-col min-w-0">
               <span className="sr-only">Question</span>
               <textarea
+                ref={inputRef}
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
-                rows={2}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    ask(question);
+                  }
+                }}
+                rows={1}
                 maxLength={500}
                 placeholder="Ask about observed weather, the rainfall model, or pipeline status"
-                className="w-full resize-none rounded-2xl border border-outline-variant/40 bg-surface-container-lowest text-on-surface px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-secondary/40"
+                className="w-full resize-none rounded-xl bg-transparent text-on-surface px-3 py-2.5 text-sm focus:outline-none placeholder:text-on-surface-variant/70 min-h-[44px] max-h-32"
               />
             </label>
             <button
               type="submit"
               disabled={pending || question.trim().length === 0}
-              className="min-h-[44px] min-w-[72px] px-4 rounded-2xl bg-secondary text-on-secondary text-sm font-semibold disabled:opacity-50 shrink-0"
+              className="min-h-[44px] min-w-[44px] rounded-xl bg-secondary text-on-secondary flex items-center justify-center disabled:opacity-45 shrink-0"
+              aria-label={pending ? 'Asking' : 'Ask'}
             >
-              {pending ? 'Asking…' : 'Ask'}
+              <span className="material-symbols-outlined text-[22px]">
+                {pending ? 'hourglass_top' : 'send'}
+              </span>
             </button>
           </div>
+          <p className="mt-1.5 text-[10px] font-mono text-on-surface-variant px-1">
+            Enter to send · Shift+Enter for newline · History kept in local storage
+          </p>
         </form>
       </div>
     </div>

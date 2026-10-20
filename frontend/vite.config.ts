@@ -9,7 +9,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: process.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000',
+        // Must match the live API (8002). Do not point at the stale :8000 listener.
+        target: process.env.VITE_BACKEND_URL || 'http://127.0.0.1:8002',
         changeOrigin: true,
       },
     },

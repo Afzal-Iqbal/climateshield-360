@@ -6,7 +6,7 @@ Provides cached queries (60s TTL) and safe query helpers that degrade gracefully
 to empty lists if tables are missing.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import os
 from pathlib import Path
 import threading
@@ -165,3 +165,92 @@ def get_last_run_summary() -> Optional[Dict[str, Any]]:
     if rows:
         return rows[0]
     return None
+
+
+def get_db_mtime() -> float:
+    """Return the current modified time (st_mtime) of the active database file."""
+    path = get_db_path()
+    if path.exists():
+        return path.stat().st_mtime
+    return 0.0
+
+
+def get_data_as_of() -> Optional[datetime]:
+    """Latest warehouse observation / prediction timestamp (UTC)."""
+    rows = safe_query("SELECT MAX(timestamp_utc) as max_ts FROM weather_hourly;")
+    if rows and rows[0].get("max_ts") is not None:
+        ts = rows[0]["max_ts"]
+        if hasattr(ts, "tzinfo") and ts.tzinfo is not None:
+            return ts.astimezone(timezone.utc)
+        return ts.replace(tzinfo=timezone.utc)
+
+    pred_rows = safe_query("SELECT MAX(forecast_time) as max_ts FROM predictions;")
+    if pred_rows and pred_rows[0].get("max_ts") is not None:
+        ts = pred_rows[0]["max_ts"]
+        if hasattr(ts, "tzinfo") and ts.tzinfo is not None:
+            return ts.astimezone(timezone.utc)
+        return ts.replace(tzinfo=timezone.utc)
+
+    return None
+
+
+def get_next_run_time() -> datetime:
+    """Next scheduled hourly ingest at :05 UTC (matches register_hourly task cadence)."""
+    now = datetime.now(timezone.utc)
+    target = now.replace(minute=5, second=0, microsecond=0)
+    if target <= now:
+        target += timedelta(hours=1)
+    return target
+
+
+def get_sources_freshness_meta() -> Tuple[List[Dict[str, Any]], bool]:
+    """
+    Source freshness rows + is_live flag.
+    is_live is True when every source with an expected interval is Fresh (age <= expected).
+    """
+    now_utc = datetime.now(timezone.utc)
+    rows = safe_query(
+        "SELECT source_name, publisher, licence, last_fetched_at, expected_every_minutes, status "
+        "FROM source_freshness ORDER BY last_fetched_at DESC;"
+    )
+    sources: List[Dict[str, Any]] = []
+    all_fresh = True
+    found_any = False
+
+    for r in rows:
+        found_any = True
+        last_dt = r.get("last_fetched_at")
+        if last_dt is not None:
+            if hasattr(last_dt, "tzinfo") and last_dt.tzinfo is not None:
+                last_dt = last_dt.astimezone(timezone.utc)
+            else:
+                last_dt = last_dt.replace(tzinfo=timezone.utc)
+            age_mins = max(0.0, (now_utc - last_dt).total_seconds() / 60.0)
+        else:
+            age_mins = 999999.0
+
+        expected_min = max(1, int(r.get("expected_every_minutes") or 60))
+        ratio = age_mins / expected_min
+        if ratio <= 1.0:
+            status = "Fresh"
+        elif ratio <= 3.0:
+            status = "Late"
+            all_fresh = False
+        else:
+            status = "Stale"
+            all_fresh = False
+
+        sources.append(
+            {
+                "source_name": r["source_name"],
+                "publisher": r.get("publisher"),
+                "licence": r.get("licence"),
+                "last_fetched_at": r.get("last_fetched_at"),
+                "last_data_timestamp": r.get("last_fetched_at"),
+                "expected_every_minutes": expected_min,
+                "age_minutes": round(age_mins, 1),
+                "status": status,
+            }
+        )
+
+    return sources, (found_any and all_fresh)

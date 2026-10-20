@@ -68,7 +68,8 @@ export const Layout: React.FC<LayoutProps> = ({ meta, isLoadingMeta = false }) =
   const status = statusRes?.data;
   const indicator = status?.status_indicator || 'unknown';
   const lastRun = status?.latest_successful_run?.started_at || meta?.last_run?.started_at || null;
-  const isLive = indicator === 'ok';
+  // Prefer /api/meta is_live (source freshness); fall back to pipeline status.
+  const isLive = meta?.is_live === true || (meta?.is_live !== false && indicator === 'ok');
 
   useEffect(() => {
     try {
@@ -87,6 +88,8 @@ export const Layout: React.FC<LayoutProps> = ({ meta, isLoadingMeta = false }) =
 
   const isRtl = i18n.language === 'ur';
   const isRiskMap = location.pathname.startsWith('/risk-map');
+  const isAssistant = location.pathname.startsWith('/ai-assistant');
+  const isImmersive = isRiskMap || isAssistant;
   const pageTitle =
     NAV_ITEMS.find((item) =>
       item.path === '/' ? location.pathname === '/' : location.pathname.startsWith(item.path)
@@ -103,7 +106,7 @@ export const Layout: React.FC<LayoutProps> = ({ meta, isLoadingMeta = false }) =
   return (
     <div
       className={`${
-        isRiskMap ? 'h-dvh max-h-dvh overflow-hidden' : 'min-h-screen'
+        isImmersive ? 'h-dvh max-h-dvh overflow-hidden' : 'min-h-screen'
       } bg-background text-on-surface flex flex-col cs-page-grid cs-noise ${
         isRtl ? 'font-urdu' : 'font-sans'
       } antialiased`}
@@ -212,7 +215,7 @@ export const Layout: React.FC<LayoutProps> = ({ meta, isLoadingMeta = false }) =
 
       <div
         className={`flex-1 flex flex-col min-w-0 min-h-0 ${
-          isRiskMap ? 'h-full overflow-hidden' : 'min-h-screen'
+          isImmersive ? 'h-full overflow-hidden' : 'min-h-screen'
         } ${
           isRtl ? (collapsed ? 'sm:mr-[72px]' : 'sm:mr-[72px] lg:mr-[250px]') : collapsed ? 'sm:ml-[72px]' : 'sm:ml-[72px] lg:ml-[250px]'
         }`}
@@ -266,7 +269,7 @@ export const Layout: React.FC<LayoutProps> = ({ meta, isLoadingMeta = false }) =
 
         <main
           className={`w-full flex-1 flex flex-col min-h-0 ${
-            isRiskMap ? 'overflow-hidden pb-0' : 'pb-4 sm:pb-6'
+            isImmersive ? 'overflow-hidden pb-0' : 'pb-4 sm:pb-6'
           }`}
         >
           <AnimatePresence mode="wait">
@@ -276,7 +279,7 @@ export const Layout: React.FC<LayoutProps> = ({ meta, isLoadingMeta = false }) =
               animate={{ opacity: 1, y: 0 }}
               exit={shouldReduceMotion ? undefined : { opacity: 0, y: -8 }}
               transition={{ duration: 0.2 }}
-              className={`w-full flex-1 flex flex-col min-h-0 ${isRiskMap ? 'overflow-hidden' : ''}`}
+              className={`w-full flex-1 flex flex-col min-h-0 ${isImmersive ? 'overflow-hidden' : ''}`}
             >
               <Outlet />
             </motion.div>
@@ -285,8 +288,8 @@ export const Layout: React.FC<LayoutProps> = ({ meta, isLoadingMeta = false }) =
 
         <footer
           className={`w-full bg-surface-container-high dark:bg-primary-container border-t border-outline-variant/30 py-3 px-4 sm:px-6 lg:px-8 mt-auto mb-14 sm:mb-0 relative z-20 ${
-            isRiskMap ? 'shrink-0' : ''
-          }`}
+            isImmersive ? 'shrink-0' : ''
+          } ${isAssistant ? 'hidden sm:block' : ''}`}
         >
           <div className="max-w-7xl mx-auto flex flex-col gap-1.5 text-xs text-on-surface-variant">
             <div className="flex items-start gap-2">

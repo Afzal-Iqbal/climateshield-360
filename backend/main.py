@@ -16,8 +16,11 @@ from fastapi.responses import JSONResponse
 
 from db import (
     get_connection,
+    get_data_as_of,
     get_db_path,
     get_last_run_summary,
+    get_next_run_time,
+    get_sources_freshness_meta,
     is_sample_database,
     safe_query,
 )
@@ -26,6 +29,7 @@ from schemas import (
     HealthData,
     LastRunSummary,
     MetaData,
+    SourceMetaInfo,
 )
 
 # Import routers
@@ -121,22 +125,45 @@ def health_check() -> APIResponse[HealthData]:
 @app.get("/api/meta", response_model=APIResponse[MetaData])
 def get_meta() -> APIResponse[MetaData]:
     """
-    Metadata endpoint returning app info, sample state, and latest pipeline run summary.
-    Envelope: {data, generated_at, is_sample}
+    Metadata endpoint returning app info, sample state, latest pipeline run,
+    data_as_of, next run, per-source freshness, and is_live (hourly warehouse).
     """
     now_utc = datetime.now(timezone.utc)
     is_sample = is_sample_database()
     last_run_raw = get_last_run_summary()
 
     last_run = None
+    last_run_at = None
+    last_run_status = None
     if last_run_raw:
+        s_at = last_run_raw.get("started_at")
+        f_at = last_run_raw.get("finished_at")
+        last_run_at = f_at or s_at
+        last_run_status = last_run_raw.get("status")
         last_run = LastRunSummary(
             run_id=last_run_raw.get("run_id"),
-            started_at=last_run_raw.get("started_at"),
-            finished_at=last_run_raw.get("finished_at"),
-            status=last_run_raw.get("status"),
+            started_at=s_at,
+            finished_at=f_at,
+            status=last_run_status,
             notes=last_run_raw.get("notes"),
         )
+
+    data_as_of = get_data_as_of()
+    next_run_at = get_next_run_time()
+    raw_sources, is_live = get_sources_freshness_meta()
+    source_meta_items = [
+        SourceMetaInfo(
+            source_name=s["source_name"],
+            age_minutes=s["age_minutes"],
+            status=s["status"],
+            expected_every_minutes=s["expected_every_minutes"],
+            publisher=s.get("publisher"),
+            licence=s.get("licence"),
+            last_fetched_at=s.get("last_fetched_at"),
+            last_data_timestamp=s.get("last_data_timestamp"),
+        )
+        for s in raw_sources
+    ]
 
     meta = MetaData(
         app_name="ClimateShield 360 Karachi",
@@ -146,6 +173,12 @@ def get_meta() -> APIResponse[MetaData]:
         timezone_display="PKT (UTC+5)",
         db_path=str(get_db_path()),
         last_run=last_run,
+        data_as_of=data_as_of,
+        last_run_at=last_run_at,
+        last_run_status=last_run_status,
+        next_run_at=next_run_at,
+        sources=source_meta_items,
+        is_live=is_live,
     )
 
     return APIResponse(

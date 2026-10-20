@@ -20,12 +20,17 @@ const PipelineFreshness = lazy(() =>
 );
 const AboutLimits = lazy(() => import('./pages/AboutLimits').then((m) => ({ default: m.AboutLimits })));
 
+// Match final app: data endpoints refresh on a live cadence; Risk Map zones use 120s.
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 30000,
-      retry: 1,
-      refetchOnWindowFocus: false,
+      refetchInterval: 120000,
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      refetchIntervalInBackground: false,
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     },
   },
 });
@@ -46,6 +51,7 @@ const AppRoutes: React.FC = () => {
   const { data: metaResponse, isLoading } = useQuery({
     queryKey: ['meta'],
     queryFn: api.getMeta,
+    refetchInterval: 60000,
   });
 
   const meta = metaResponse?.data || null;

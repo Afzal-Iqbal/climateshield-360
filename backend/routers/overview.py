@@ -14,6 +14,7 @@ from fastapi import APIRouter, Query
 
 from db import is_sample_database, safe_query
 from forecasting.live_forecast import upcoming_hours
+from hazard_levels import heat_level as _heat_level, rain_level as _rain_level
 from schemas import (
     APIResponse,
     FreshnessMetricSummary,
@@ -25,28 +26,6 @@ from schemas import (
 )
 
 router = APIRouter(tags=["Overview"])
-
-
-def _heat_level(temp_c: Optional[float]) -> str:
-    """Match the forecast page thresholds. A missing reading is not Severe."""
-    if temp_c is None or temp_c < 35:
-        return "Low"
-    if temp_c < 40:
-        return "Moderate"
-    if temp_c < 45:
-        return "High"
-    return "Severe"
-
-
-def _rain_level(max_hour_mm: Optional[float]) -> str:
-    """Match the heavy-rain hourly thresholds. A dry window is Low."""
-    if max_hour_mm is None or max_hour_mm < 1:
-        return "Low"
-    if max_hour_mm < 2.5:
-        return "Moderate"
-    if max_hour_mm < 10:
-        return "High"
-    return "Severe"
 
 
 def _action_title_for(hazard: str, level: str) -> str:
@@ -169,14 +148,20 @@ def get_overview(
             )
 
     observed_since = now_utc - timedelta(hours=window_hours)
-    latest_temp_rows = safe_query(
+    # Thermal card = latest hourly observation (what it is right now), not the day's peak.
+    temp_rows = safe_query(
         """
-        SELECT temperature_2m_c, timestamp_utc
+        SELECT
+            MAX(temperature_2m_c) AS max_temp_c,
+            ARG_MAX(temperature_2m_c, timestamp_utc) AS latest_temp_c,
+            MAX(timestamp_utc) AS latest_temp_at,
+            ARG_MAX(timestamp_utc, temperature_2m_c) AS max_temp_at
         FROM weather_hourly
-        WHERE lower(city) = 'karachi' AND temperature_2m_c IS NOT NULL
-        ORDER BY timestamp_utc DESC
-        LIMIT 1
-        """
+        WHERE lower(city) = 'karachi'
+          AND temperature_2m_c IS NOT NULL
+          AND timestamp_utc >= ?
+        """,
+        [observed_since],
     )
     rain_rows = safe_query(
         """
@@ -195,10 +180,12 @@ def get_overview(
         LIMIT 1
         """
     )
-    latest_temp = latest_temp_rows[0].get("temperature_2m_c") if latest_temp_rows else None
+    max_temp = temp_rows[0].get("max_temp_c") if temp_rows else None
+    latest_temp = temp_rows[0].get("latest_temp_c") if temp_rows else None
     rain_total = rain_rows[0].get("rain_mm") if rain_rows else None
     max_hour = rain_rows[0].get("max_hour_mm") if rain_rows else None
-    temp_time = latest_temp_rows[0].get("timestamp_utc") if latest_temp_rows else None
+    temp_time = temp_rows[0].get("latest_temp_at") if temp_rows else None
+    peak_time = temp_rows[0].get("max_temp_at") if temp_rows else None
     heat_hazard_level = _heat_level(None if latest_temp is None else float(latest_temp))
     rain_hazard_level = _rain_level(None if max_hour is None else float(max_hour))
     # Weather is stored for the city point, not for each district, so no district is marked severe from this series.
@@ -210,6 +197,12 @@ def get_overview(
         wet_time = last_wet_rows[0].get("timestamp_utc")
         if wet_mm is not None:
             last_wet = f" Last stored hour above 0 mm was {wet_mm} mm at {wet_time}."
+    peak_note = ""
+    if max_temp is not None and latest_temp is not None and float(max_temp) != float(latest_temp):
+        peak_note = (
+            f" 24h peak was {float(max_temp):.1f}°C"
+            + (f" at {peak_time}." if peak_time is not None else ".")
+        )
 
     overview_data = OverviewData(
         time_range=range,
@@ -225,11 +218,12 @@ def get_overview(
             headline_value=float(latest_temp) if latest_temp is not None else None,
             unit="°C",
             source=(
-                "Open-Meteo observed 2m air temperature"
+                "Open-Meteo latest hourly 2m air temperature"
                 + (f" at {temp_time}." if temp_time is not None else ".")
-                + " Not WBGT and not a forecast."
+                + peak_note
+                + " Thresholds: <35 Low, 35 Moderate, 40 High, 45 Severe. Not WBGT."
             ),
-            label="Latest observed air temperature, Karachi",
+            label="Current observed air temperature, Karachi",
             kind="observed",
         ),
         rain_summary=HazardMetricSummary(

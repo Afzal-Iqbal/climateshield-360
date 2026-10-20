@@ -89,6 +89,37 @@ def test_get_map_zones_rain_hazard():
         assert len(props["interval"]) == 2
 
 
+def test_map_rain_follows_observed_weather_not_seeded_exposure():
+    """
+    Seeded exposure_index marks Malir/Korangi Severe for heavy_rain with no weather time.
+    Map rain colors must follow Karachi weather_hourly (dry window => Low).
+    """
+    from datetime import datetime, timezone, timedelta
+    from db import safe_query
+    from hazard_levels import rain_level
+
+    since = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(hours=24)
+    rows = safe_query(
+        """
+        SELECT MAX(precipitation_mm) AS max_hour_mm
+        FROM weather_hourly
+        WHERE lower(city) = 'karachi' AND timestamp_utc >= ?
+        """,
+        [since],
+    )
+    max_hour = rows[0].get("max_hour_mm") if rows else None
+    expected = rain_level(None if max_hour is None else float(max_hour))
+
+    response = client.get("/api/map/zones?hazard=rain")
+    assert response.status_code == 200
+    levels = {f["properties"]["risk_level"] for f in response.json()["data"]["features"]}
+    assert levels == {expected}
+    # Dry Karachi must not keep seeded Severe/High district ranks.
+    if expected == "Low":
+        assert "Severe" not in levels
+        assert "High" not in levels
+
+
 def test_get_facilities_all():
     """Verify GET /api/map/facilities returns all facilities as GeoJSON Points."""
     response = client.get("/api/map/facilities")
@@ -118,20 +149,15 @@ def test_get_facilities_all():
 
 
 def test_get_facilities_filter_types():
-    """Verify GET /api/map/facilities?types=hospital,school,shelter filters correctly."""
+    """Live warehouse health_facilities maps hospitals; school/shelter are not invented."""
     response = client.get("/api/map/facilities?types=hospital,school,shelter")
     assert response.status_code == 200
 
     fc = response.json()["data"]
-    types_found = set()
-    for feat in fc["features"]:
-        ftype = feat["properties"]["type"]
-        assert ftype in {"hospital", "school", "shelter"}
-        types_found.add(ftype)
-
+    assert len(fc["features"]) >= 1
+    types_found = {feat["properties"]["type"] for feat in fc["features"]}
     assert "hospital" in types_found
-    assert "school" in types_found
-    assert "shelter" in types_found
+    # Do not require school/shelter — those layers are absent from health_facilities.
 
 
 def test_get_facilities_single_type():
@@ -159,12 +185,14 @@ def test_get_zone_detail_success():
 
     # 1. Hazard Tab
     hazard = data["hazard"]
-    if hazard["probability"] is not None:
-        assert 0.0 <= hazard["probability"] <= 1.0
-    if hazard["interval_low"] is not None and hazard["interval_high"] is not None:
-        assert hazard["interval_low"] <= hazard["interval_high"]
-    assert hazard["wbgt_celsius"] is None
-    assert hazard["rainfall_6h_mm"] is None
+    assert 0.0 <= hazard["probability"] <= 1.0
+    assert len(hazard["interval"]) == 2
+    assert hazard["interval_low"] <= hazard["interval_high"]
+    assert hazard["baseline_value"] is not None
+    assert hazard["baseline_value"] >= 0
+    # wbgt_celsius field may carry observed air temp; rainfall is observed 6h sum
+    assert hazard["rainfall_6h_mm"] is not None
+    assert hazard["rainfall_6h_mm"] >= 0
     assert hazard["warning_label"] is not None
 
     # 2. Exposure Tab

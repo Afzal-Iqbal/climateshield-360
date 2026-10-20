@@ -279,6 +279,17 @@ class LastRunSummary(BaseModel):
     notes: Optional[str] = None
 
 
+class SourceMetaInfo(BaseModel):
+    source_name: str
+    age_minutes: float
+    status: str
+    expected_every_minutes: int
+    publisher: Optional[str] = None
+    licence: Optional[str] = None
+    last_fetched_at: Optional[datetime] = None
+    last_data_timestamp: Optional[datetime] = None
+
+
 class MetaData(BaseModel):
     app_name: str = "ClimateShield 360"
     version: str = "0.1.0"
@@ -287,6 +298,12 @@ class MetaData(BaseModel):
     timezone_display: str = "PKT (UTC+5)"
     db_path: str
     last_run: Optional[LastRunSummary] = None
+    data_as_of: Optional[datetime] = None
+    last_run_at: Optional[datetime] = None
+    last_run_status: Optional[str] = None
+    next_run_at: Optional[datetime] = None
+    sources: List[SourceMetaInfo] = []
+    is_live: bool = False
 
 
 # --- Overview & Priorities Schemas ---
