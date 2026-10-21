@@ -11,11 +11,14 @@ Follows all conventions specified in doc/AGENT_RULES.md:
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 import logging
+import os
+from pathlib import Path
 
 import duckdb
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from db import (
     get_connection,
@@ -69,7 +72,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Configure CORS for local development frontend
+# Local + deployed frontends (Render free subdomain climateshield-360.onrender.com)
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -77,12 +80,22 @@ origins = [
     "http://127.0.0.1:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    "http://localhost:8002",
+    "http://127.0.0.1:8002",
+    "https://climateshield-360.onrender.com",
 ]
+_extra_origins = os.getenv("CLIMATESHIELD_CORS_ORIGINS", "")
+if _extra_origins.strip():
+    origins.extend([o.strip() for o in _extra_origins.split(",") if o.strip()])
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$",
+    allow_origin_regex=(
+        r"^https?://(localhost|127\.0\.0\.1)(:[0-9]+)?$|"
+        r"^https://climateshield-360\.onrender\.com$|"
+        r"^https://[a-z0-9-]+\.onrender\.com$"
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -218,3 +231,20 @@ app.include_router(forecast_router, prefix="/api")
 app.include_router(model_router, prefix="/api")
 app.include_router(planner_router, prefix="/api")
 app.include_router(methodology_router, prefix="/api")
+
+# Production: serve Vite build from the same origin as /api (Render free single service)
+_FRONTEND_DIST = Path(__file__).resolve().parent.parent / "frontend" / "dist"
+if _FRONTEND_DIST.is_dir():
+    _assets = _FRONTEND_DIST / "assets"
+    if _assets.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(_assets)), name="assets")
+
+    @app.get("/{full_path:path}")
+    def spa_fallback(full_path: str):
+        """SPA routes — never shadow /api/* (registered above)."""
+        if full_path.startswith("api/") or full_path == "api":
+            return JSONResponse(status_code=404, content={"error": "Not Found", "detail": full_path})
+        candidate = _FRONTEND_DIST / full_path
+        if full_path and candidate.is_file():
+            return FileResponse(candidate)
+        return FileResponse(_FRONTEND_DIST / "index.html")
