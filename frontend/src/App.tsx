@@ -24,8 +24,8 @@ const AboutLimits = lazy(() => import('./pages/AboutLimits').then((m) => ({ defa
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60000,
-      refetchInterval: 120000,
+      staleTime: 30000,
+      refetchInterval: 60000,
       refetchOnWindowFocus: false,
       refetchOnReconnect: true,
       refetchIntervalInBackground: false,

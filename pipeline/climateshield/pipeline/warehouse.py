@@ -98,7 +98,9 @@ def restore_contract_tables(con: duckdb.DuckDBPyConnection) -> dict[str, int]:
                 started = pd.to_datetime(group["fetch_time_utc"], utc=True).min().to_pydatetime()
                 finished = pd.to_datetime(group["fetch_time_utc"], utc=True).max().to_pydatetime()
                 statuses = {str(value).lower() for value in group["status"].fillna("")}
-                status = "failed" if statuses & {"failed", "error"} else "success"
+                weather_sub = group[group["source_id"] == "open_meteo_weather"]
+                weather_ok = not weather_sub.empty and (weather_sub["status"].iloc[0] in ("success", "partial", "unchanged"))
+                status = "success" if weather_ok else ("failed" if statuses & {"failed", "error"} else "success")
                 notes = (
                     "Loaded from hourly_ingest_log.csv after warehouse rebuild. "
                     f"connectors={len(group)}; statuses={', '.join(sorted(statuses))}."
