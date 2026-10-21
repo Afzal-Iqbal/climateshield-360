@@ -110,6 +110,52 @@ function getFallback<T>(cleanEndpoint: string): APIResponse<T> | null {
     return fallback as APIResponse<T>;
   }
 
+  if (key.startsWith('/forecast')) {
+    const params = new URLSearchParams(key.split('?')[1] || '');
+    const hazard = params.get('hazard') || 'heavy_rain';
+    const city = params.get('city') || 'Karachi';
+    const range = params.get('range') || '24h';
+
+    const candidates = [
+      `/forecast?hazard=${hazard}&city=${city}&range=${range}`,
+      `/forecast?hazard=${hazard}&range=${range}`,
+      `/forecast?hazard=${hazard}`,
+      `/forecast`,
+    ];
+    for (const c of candidates) {
+      if (c in apiSnapshots) {
+        return apiSnapshots[c] as APIResponse<T>;
+      }
+    }
+  }
+
+  if (key.startsWith('/priorities')) {
+    const params = new URLSearchParams(key.split('?')[1] || '');
+    const hazard = params.get('hazard');
+    const range = params.get('range') || '24h';
+    const candidates = [
+      hazard && hazard !== 'all'
+        ? `/priorities?range=${range}&hazard=${hazard}`
+        : `/priorities?range=${range}`,
+      `/priorities?range=${range}`,
+      `/priorities`,
+    ];
+    for (const c of candidates) {
+      if (c in apiSnapshots) {
+        return apiSnapshots[c] as APIResponse<T>;
+      }
+    }
+  }
+
+  if (key.startsWith('/overview')) {
+    const params = new URLSearchParams(key.split('?')[1] || '');
+    const range = params.get('range') || '24h';
+    const candidate = `/overview?range=${range}`;
+    if (candidate in apiSnapshots) {
+      return apiSnapshots[candidate] as APIResponse<T>;
+    }
+  }
+
   if (key in apiSnapshots) {
     return apiSnapshots[key] as APIResponse<T>;
   }

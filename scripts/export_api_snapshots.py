@@ -55,13 +55,6 @@ ENDPOINTS = [
     "/map/zones?hazard=heat",
     "/map/zones?hazard=heavy_rain",
     "/map/facilities",
-    "/forecast",
-    "/forecast?hazard=heavy_rain&range=24h",
-    "/forecast?hazard=heat&range=24h",
-    "/forecast?hazard=heavy_rain&range=48h",
-    "/forecast?hazard=heat&range=48h",
-    "/forecast?hazard=heavy_rain&range=7d",
-    "/forecast?hazard=heat&range=7d",
     "/model/summary",
     "/impacts",
     "/planner",
@@ -72,6 +65,22 @@ ENDPOINTS = [
     "/planner?hazard=all&range=7d",
     "/methodology",
 ]
+
+cities = [
+    "Karachi", "Lahore", "Faisalabad", "Rawalpindi", "Multan",
+    "Hyderabad", "Peshawar", "Quetta", "Islamabad", "Gilgit", "Gwadar", "Sukkur"
+]
+hazards = ["heavy_rain", "heat"]
+ranges = ["24h", "48h", "7d"]
+
+# Add all forecast permutations
+for h in hazards:
+    for r in ranges:
+        ENDPOINTS.append(f"/forecast?hazard={h}&range={r}")
+        for c in cities:
+            ENDPOINTS.append(f"/forecast?hazard={h}&city={c}&range={r}")
+
+ENDPOINTS.append("/forecast")
 
 zones = ["KHI-CENTRAL", "KHI-EAST", "KHI-KEAMARI", "KHI-KORANGI", "KHI-MALIR", "KHI-SOUTH", "KHI-WEST"]
 for z in zones:

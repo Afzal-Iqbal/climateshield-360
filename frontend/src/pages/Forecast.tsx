@@ -62,6 +62,7 @@ export const Forecast: React.FC<ForecastPageProps> = ({ isSample = false }) => {
         city: selectedCity,
         range: selectedRange,
       }),
+    refetchInterval: 60000,
   });
 
   // Fetch model evaluation summary from API
