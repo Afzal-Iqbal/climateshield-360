@@ -1,7 +1,7 @@
 # ClimateShield 360: Team Rehearsal & Speaking Script
 ## HackInsight 2026 Presentation (5–7 Minute Master Delivery)
 **Presenters:** 
-1. **Syed Muhammad Hunain** (Lead Full-Stack & Spatial Engineer) — Opens, Spatial 3D Map, & Concludes
+1. **Syed Muhammad Hunain** (AI Full Stack Developer & Machine Learning Specialist) — Opens, Spatial 3D Map, & Concludes
 2. **Muhammad Afzal** (Lead Data & ML Engineer) — Pipeline Architecture & Machine Learning
 3. **Makshoof Kamal Jilani** (Domain & AI Governance Lead) — 8 Impact Domains & Decision Planner
 

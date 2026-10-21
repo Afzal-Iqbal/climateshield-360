@@ -149,7 +149,7 @@ HTML_CONTENT = """<!DOCTYPE html>
   </div>
   <div class="meta-box">
     <div><span class="meta-tag">Deliverable: Summary.pdf (1-Page)</span></div>
-    <div><b>Team:</b> S. M. Hunain, M. Afzal, M. K. Jilani</div>
+    <div><b>Team:</b> S. M. Hunain (AI Full Stack & ML), M. Afzal, M. K. Jilani</div>
     <div><b>Date:</b> October 2026 | Karachi, Pakistan</div>
   </div>
 </div>

@@ -13,7 +13,7 @@
 - **Visual Style:** Full-bleed cinematic cover with dark topographic gridlines, a glowing 3D digital model of Karachi coastline, and subtle radar waves.
 - **Content Elements:**
   - HackInsight 2026: Climate Track (Data-to-Decision)
-  - Team: Syed Muhammad Hunain (Lead Full-Stack & Spatial), Muhammad Afzal (Data & ML Pipeline Lead), Makshoof Kamal Jilani (Domain & AI Governance Lead)
+  - Team: Syed Muhammad Hunain (AI Full Stack Developer & Machine Learning Specialist), Muhammad Afzal (Data & ML Pipeline Lead), Makshoof Kamal Jilani (Domain & AI Governance Lead)
   - Platform Mission: "Bridging the gap between raw multi-source climate telemetry and life-saving civic emergency decisions."
 - **Visme Layout Suggestion:** Large bold heading, 3 team member badge cards with avatar placeholders, and a "Live System" green status pill indicator.
 - **Presenter Notes:** "Respected judges, welcome to ClimateShield 360. In a megacity of over 16 million people like Karachi, an extreme weather event doesn't just disrupt traffic—it paralyses essential services, floods informal settlements, and claims lives. Today, we present an end-to-end operational platform that turns fragmented climate data into proactive civic emergency decisions."
