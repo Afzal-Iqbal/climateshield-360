@@ -25,7 +25,8 @@
     <a href="#-system-architecture"><b>🏗️ Architecture</b></a> •
     <a href="#-interactive-ui-gallery"><b>📸 UI Gallery</b></a> •
     <a href="#-ml-modeling-vs-declared-baseline"><b>🤖 ML Benchmarks</b></a> •
-    <a href="#-hackinsight-deliverables-compliance-matrix"><b>📋 Rubric Matrix</b></a> •
+    <a href="#-jury-evaluation-rubric--verifiable-evidence"><b>🎯 Scoring Rubric</b></a> •
+    <a href="#-hackinsight-deliverables-compliance-matrix"><b>📋 Deliverables Matrix</b></a> •
     <a href="#-team-credentials"><b>👥 The Team</b></a>
   </p>
 
@@ -170,6 +171,40 @@ In strict compliance with **Deliverable 3** of the HackInsight Guide, our predic
 </div>
 
 *Full interactive training code and reproducible evaluation tables are available in [`doc/step3_train_model.ipynb`](doc/step3_train_model.ipynb) and [`doc/MODEL_REPORT.md`](doc/MODEL_REPORT.md).*
+
+---
+
+## 🎯 Jury Evaluation Rubric & Verifiable Evidence
+
+The table below maps directly to **Section 3 ("How you are scored, and how to show each point")** of the official [`hackathonguide.pdf`](doc/hackathonguide.pdf). It specifies the maximum point allocations, official jury criteria, and exact repository implementation evidence for evaluation:
+
+### Core Evaluation Criteria (100 Base Points)
+
+| Criterion | Max Points | What the Jury Looks For (Official Guide) | How to Show It (Official Guide) | Repository Evidence & Verification |
+|---|:---:|---|---|---|
+| **Automatic Checks** | **40** | Improvement over your declared baseline, reproducibility, honesty of results. | Declare the baseline early, keep a clean make data, never hard-code outputs. | • **Declared 24h Baseline**: Tested in [`doc/MODEL_REPORT.md`](doc/MODEL_REPORT.md) & [`doc/step3_train_model.ipynb`](doc/step3_train_model.ipynb)<br>• **Reproducibility**: Clean root [`Makefile`](Makefile) (`make test` runs 82/82 backend tests)<br>• **Honest Live Outputs**: Real DuckDB queries in [`backend/routers/`](backend/routers/); zero synthetic data masqueraded as real |
+| **Dataset Selection, Integrity & Strength** | **20** | Credible sources, licences, documentation, checks, enough volume to be meaningful. | A complete manifest, a clear Dataset Declaration, and quality reports. | • **Volume**: 592,356+ hourly records across 12 Pakistani cities (2021–2026)<br>• **Dataset Declaration**: [`doc/Dataset_Declaration.pdf`](doc/Dataset_Declaration.pdf) & [`.md`](doc/Dataset_Declaration.md)<br>• **SHA-256 Manifest**: [`pipeline/data/hourly_manifest.csv`](pipeline/data/hourly_manifest.csv)<br>• **Licences**: Open-Meteo (CC BY 4.0), GloFAS, OSM (ODbL), PBS (Open Access) |
+| **Agentic Design & Automation** | **15** | Agents that really use tools and decide; a pipeline that runs on its own. | Show the agent's decision log and the Prefect run history. | • **Autonomous Pipeline**: Hourly cron daemon running via `climateshield ingest-hourly`<br>• **Quality Agent**: Pandera rule enforcement engine in [`pipeline/climateshield/quality/`](pipeline/climateshield/quality/)<br>• **Prefect Flow Log**: [`doc/prefect_runs.csv`](doc/prefect_runs.csv)<br>• **Decision Logs**: Logged in `quality_log` and `run_status` warehouse tables |
+| **Scientific Rigour** | **10** | Fair evaluation: no leakage, uncertainty, errors by group. | Time-based splits, intervals, per-group tables. | • **Strict Time-Split**: Train (2021–2024, 403k rows), Test (2025–2026, 189k rows) — zero lookahead leakage<br>• **Calibrated Intervals**: LightGBM Multi-Quantile ($Q_{10}, Q_{50}, Q_{90}$) with 97.42% coverage<br>• **Fairness Audit**: 12-city demographic and regional error breakdown in [`doc/MODEL_REPORT.md`](doc/MODEL_REPORT.md) |
+| **Usefulness & Responsible AI** | **10** | Value for the primary user; no invented numbers; cited claims. | Row IDs behind every number, citations, honest limits. | • **Municipal Decision Support**: Karachi PDMA 1736 & Rescue 1122 triage in [`EmergencyPlanner.tsx`](frontend/src/pages/EmergencyPlanner.tsx)<br>• **Grounded Citations**: Insight RAG engine cites specific warehouse row IDs; falls back to `"I don't know"`<br>• **AI Governance**: Honest agent assistance log in [`doc/AI_Use_Log.md`](doc/AI_Use_Log.md) |
+| **Viva & Demo** | **5** | Clear explanation and real understanding of the code. | Rehearsed talk; every member can answer questions. | • **Speaker Script**: Timed 5–7 min presentation script in [`doc/presentation/speaker_script.md`](doc/presentation/speaker_script.md)<br>• **Executive Pitch Decks**: Formatted for Gamma AI ([`gamma_ai_presentation.md`](doc/presentation/gamma_ai_presentation.md)) and Visme AI ([`visme_ai_presentation.md`](doc/presentation/visme_ai_presentation.md))<br>• **1-Page Executive Summary**: [`Summary.pdf`](Summary.pdf) |
+
+### Pakistan Impact Bonus (Up to +10 Extra Points)
+
+| Bonus Part | Max Points | Official Meaning (Guide Section 3) | Implementation in ClimateShield 360 |
+|---|:---:|---|---|
+| **Problem** | **+3** | The problem is genuinely about people in Pakistan. | Directly addresses Karachi's acute monsoon waterlogging and deadly coastal heatwaves affecting 17M+ citizens across Malir, Lyari, Korangi, and Central districts. |
+| **Data** | **+3** | The data reflects Pakistan: its places, seasons, institutions. | Real Pakistani data: 12-city PMD weather coordinates, GloFAS Indus/Malir river basins, PBS Census 2023 district demographics, and OpenStreetMap Karachi road/facility vectors. |
+| **Local Usability** | **+2** | A real person in Pakistan could use the output. Urdu output helps here. | Dual-language interface with one-click **Urdu Localization (اردو)** support, PKT (UTC+5) timestamps throughout, and direct hotline integrations for Sindh PDMA (1736) and Rescue 1122. |
+| **Local Validation** | **+2** | You checked results against a local source, report or expert. | Validated against historical PMD Karachi monsoon flood bulletins (2022 super floods, 2020 urban inundations) and Karachi Municipal Corporation (KMC) nullah choke point reports. |
+
+### Optional Extras Rewarded by the Jury
+
+- ✅ **Urdu Output (اردو)**: Full frontend locale toggle supporting Urdu typography (`font-urdu`), RTL layout direction, and localized disaster advisories.
+- ✅ **Data Enrichment Agent**: Automated background polling of Open-Meteo, GloFAS river discharge, and Geofabrik OpenStreetMap snapshots.
+- ✅ **Supervisor & Quality Agent**: Autonomous Pandera validator asserting physical boundaries and applying deterministic fix/fill/flag transformations.
+- ✅ **Drift & Freshness Monitor**: Real-time sensor lag telemetry, pipeline freshness monitoring on `/system-health`, and historical run verification.
+- ✅ **Human-in-the-Loop Triage**: Emergency Action Planner requires dispatcher verification before releasing pump deployment orders.
 
 ---
 
