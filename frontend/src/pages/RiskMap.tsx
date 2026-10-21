@@ -1,14 +1,20 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { useReducedMotion } from 'framer-motion';
 import maplibregl from 'maplibre-gl';
 import { api } from '../api/client';
 import { RiskBadge } from '../components/RiskBadge';
 import { EmptyState } from '../components/EmptyState';
 import { Badge, Button, ErrorState, PageHeader, useToast } from '../components/ui';
-import { BasemapTier, nextBasemapTier, styleForTier } from '../lib/mapBasemap';
-import { boundsFromFeatures, KARACHI_BOUNDS, sanitizeZones } from '../lib/mapGeojson';
+import { styleForTier } from '../lib/mapBasemap';
+import {
+  boundsFromFeatures,
+  KARACHI_BOUNDS,
+  sanitizeFacilities,
+  sanitizeZones,
+  SanitizedZoneFeature,
+} from '../lib/mapGeojson';
 import { extrusionHeight, heightLegend, HeightMetric, preferFlatMap, supportsWebGL } from '../lib/mapHeight';
 import { RiskLevel, ZoneDetailData, ZoneFeatureProperties } from '../types';
 
@@ -47,8 +53,9 @@ function addDistrictLayers(map: maplibregl.Map, use3d: boolean) {
       source: 'zones-source',
       paint: {
         'fill-color': ['case', ['==', ['get', 'has_metric'], 0], '#64748B', RISK_COLOR],
-        'fill-opacity': use3d ? 0.22 : 0.65,
+        'fill-opacity': 0.65,
       },
+      layout: { visibility: use3d ? 'none' : 'visible' },
     });
   }
   if (!map.getLayer('zones-extrusion')) {
@@ -154,7 +161,7 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
   const [force3d, setForce3d] = useState(false);
   const [mapMode, setMapMode] = useState<MapMode>(() => {
     try {
-      const saved = localStorage.getItem('cs-map-mode');
+      const saved = typeof window !== 'undefined' ? window.localStorage?.getItem('cs-map-mode') : null;
       if (saved === '2d' || saved === '3d') return saved;
     } catch {
       /* ignore */
@@ -169,12 +176,12 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const mapLoadedRef = useRef(false);
-  const basemapTierRef = useRef<BasemapTier>('openfreemap');
   const use3dRef = useRef(use3d);
   const hoveredIdRef = useRef<string | number | null>(null);
   const interactionsBoundRef = useRef(false);
   const zonesDataRef = useRef<GeoJSON.FeatureCollection>({ type: 'FeatureCollection', features: [] });
   const facilitiesDataRef = useRef<GeoJSON.FeatureCollection>({ type: 'FeatureCollection', features: [] });
+  const initialFitDoneRef = useRef(false);
 
   use3dRef.current = use3d;
 
@@ -240,10 +247,12 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
   // Deep-clone every time — MapLibre mutates FeatureCollections in place and would
   // otherwise empty the memoized React data (shows "No district polygons").
   const filteredZones = useMemo(() => {
-    const features =
+    const features: SanitizedZoneFeature[] =
       severityFilter === 'all'
         ? sanitized.collection.features
-        : sanitized.collection.features.filter((f) => f.properties.risk_level === severityFilter);
+        : sanitized.collection.features.filter(
+            (f: SanitizedZoneFeature) => f.properties.risk_level === severityFilter
+          );
     return structuredClone({
       type: 'FeatureCollection' as const,
       features,
@@ -252,10 +261,9 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
 
   // Snapshot for MapLibre only — never hand React-owned objects to setData.
   zonesDataRef.current = structuredClone(filteredZones) as unknown as GeoJSON.FeatureCollection;
-  facilitiesDataRef.current = (facilitiesResponse?.data || {
-    type: 'FeatureCollection',
-    features: [],
-  }) as unknown as GeoJSON.FeatureCollection;
+  facilitiesDataRef.current = structuredClone(
+    sanitizeFacilities(facilitiesResponse?.data)
+  ) as unknown as GeoJSON.FeatureCollection;
 
   const handleSelectZone = useCallback(
     (zoneId: string | null) => {
@@ -372,45 +380,6 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
     [attachInteractions, syncSources]
   );
 
-  const basemapFallbackLockRef = useRef(false);
-
-  const applyBasemapFallback = useCallback(
-    (map: maplibregl.Map, reason: string) => {
-      // Guard against error storms blanking the map via repeated setStyle.
-      if (basemapFallbackLockRef.current) return;
-      const next = nextBasemapTier(basemapTierRef.current);
-      console.warn(`[RiskMap] Basemap fallback (${basemapTierRef.current} → ${next}): ${reason}`);
-      if (!next) {
-        setMapError(reason);
-        setUseTableFallback(true);
-        toast.push(reason, 'warn');
-        return;
-      }
-      basemapFallbackLockRef.current = true;
-      basemapTierRef.current = next;
-      mapLoadedRef.current = false;
-      interactionsBoundRef.current = false;
-      try {
-        map.setStyle(styleForTier(next) as any);
-        toast.push(
-          next === 'osm'
-            ? 'OpenFreeMap unavailable — using OpenStreetMap raster.'
-            : 'Tiles unavailable — districts on a dark canvas.',
-          'warn'
-        );
-      } catch (err) {
-        console.error('[RiskMap] setStyle fallback failed', err);
-        setMapError(String(err));
-        setUseTableFallback(true);
-      } finally {
-        window.setTimeout(() => {
-          basemapFallbackLockRef.current = false;
-        }, 2500);
-      }
-    },
-    [toast]
-  );
-
   const initMap = useCallback(() => {
     if (!mapContainerRef.current) return;
     if (!webglOk) {
@@ -428,19 +397,26 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
     setMapError(null);
     setUseTableFallback(false);
     setMapReady(false);
-    basemapTierRef.current = 'openfreemap';
 
     const map = new maplibregl.Map({
       container: mapContainerRef.current,
-      style: styleForTier('openfreemap') as any,
-      bounds: KARACHI_BOUNDS,
-      fitBoundsOptions: { padding: 40 },
+      // Always create a fresh style object — MapLibre mutates the style it
+      // receives during parsing, so reusing a cached reference on remount
+      // gives MapLibre an already-consumed object and produces a blank canvas.
+      style: styleForTier() as any,
+      center: [67.08, 24.89],
+      zoom: 10.3,
       minZoom: 5,
       maxZoom: 18,
-      pitch: use3dRef.current ? 55 : 0,
-      bearing: use3dRef.current ? -20 : 0,
+      maxPitch: 45,
+      pitch: use3dRef.current ? 35 : 0,
+      bearing: use3dRef.current ? -15 : 0,
       attributionControl: { compact: true },
-      cooperativeGestures: true,
+      // 150 ms crossfade: tiles fade out before new zoom-level tiles arrive,
+      // hiding the blank flash that fadeDuration:0 exposes on zoom-in.
+      fadeDuration: 150,
+      // refreshExpiredTiles:false reduces background tile re-fetches.
+      refreshExpiredTiles: false,
     });
 
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
@@ -448,26 +424,29 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
 
     map.on('error', (event) => {
       const message = String(event.error?.message || event.error || 'Map error');
-      console.error('[RiskMap]', message, event.error);
       const lower = message.toLowerCase();
-      // Only fall back on hard style/tile load failures — not transient render noise
-      // (broad "failed" matching previously blanked the map during hover/interaction).
-      const isBasemapFailure =
-        (lower.includes('style') && (lower.includes('load') || lower.includes('fetch') || lower.includes('ajax'))) ||
-        (lower.includes('tile') && (lower.includes('404') || lower.includes('403') || lower.includes('failed'))) ||
-        lower.includes('failed to fetch') ||
-        lower.includes('ajaxerror');
-      if (isBasemapFailure) {
-        toast.push(message, 'warn');
-        applyBasemapFallback(map, message);
+      // Silently ignore aborted/cancelled requests during window resize or user zoom
+      if (lower.includes('abort') || lower.includes('cancel')) {
+        return;
+      }
+      console.warn('[RiskMap] map warning:', message);
+    });
+
+    const handleReady = () => {
+      if (mapLoadedRef.current) return;
+      onStyleReady(map);
+    };
+
+    map.on('load', handleReady);
+    map.on('styledata', () => {
+      if (map.isStyleLoaded() && !mapLoadedRef.current) {
+        handleReady();
       }
     });
 
-    map.on('load', () => onStyleReady(map));
-    map.on('style.load', () => onStyleReady(map));
-
     mapRef.current = map;
-  }, [applyBasemapFallback, onStyleReady, toast, webglOk]);
+    (window as any)._map = map;
+  }, [onStyleReady, webglOk]);
 
   useEffect(() => {
     initMap();
@@ -486,31 +465,82 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
 
   useEffect(() => {
     const node = mapContainerRef.current;
-    if (!node || !mapRef.current) return;
+    if (!node) return;
+
+    let resizeRaf = 0;
+    let lastWidth = 0;
+    let lastHeight = 0;
+    const doResize = () => {
+      if (resizeRaf) return;
+      resizeRaf = requestAnimationFrame(() => {
+        resizeRaf = 0;
+        if (!mapRef.current) return;
+        const w = node.clientWidth;
+        const h = node.clientHeight;
+        if (w > 0 && h > 0 && (w !== lastWidth || h !== lastHeight)) {
+          lastWidth = w;
+          lastHeight = h;
+          mapRef.current.resize();
+        }
+      });
+    };
+
     const ro = new ResizeObserver(() => {
-      requestAnimationFrame(() => mapRef.current?.resize());
+      doResize();
     });
     ro.observe(node);
-    requestAnimationFrame(() => mapRef.current?.resize());
-    return () => ro.disconnect();
-  }, [mapReady, selectedZoneId, useTableFallback, legendOpen]);
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        doResize();
+      }
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      // Prevent native browser full-page zooming when using Ctrl + Mouse Wheel
+      if (e.ctrlKey) {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('resize', doResize);
+    window.addEventListener('orientationchange', doResize);
+    document.addEventListener('visibilitychange', onVisibility);
+    document.addEventListener('fullscreenchange', doResize);
+
+    return () => {
+      ro.disconnect();
+      if (resizeRaf) cancelAnimationFrame(resizeRaf);
+      window.removeEventListener('wheel', onWheel);
+      window.removeEventListener('resize', doResize);
+      window.removeEventListener('orientationchange', doResize);
+      document.removeEventListener('visibilitychange', onVisibility);
+      document.removeEventListener('fullscreenchange', doResize);
+    };
+  }, []);
 
   useEffect(() => {
     if (!mapRef.current || !mapLoadedRef.current) return;
     syncSources(mapRef.current);
-    const b = boundsFromFeatures(filteredZones);
-    if (b && filteredZones.features.length > 0 && !selectedZoneId) {
-      try {
-        mapRef.current.fitBounds(b, {
-          padding: 48,
-          duration: shouldReduceMotion ? 0 : 600,
-          maxZoom: 11.5,
-        });
-      } catch {
-        /* ignore */
+    if (!initialFitDoneRef.current) {
+      const node = mapContainerRef.current;
+      if (!node || node.clientWidth === 0 || node.clientHeight === 0) return;
+      const b = boundsFromFeatures(filteredZones);
+      if (b && filteredZones.features.length > 0) {
+        try {
+          mapRef.current.fitBounds(b, {
+            padding: 48,
+            duration: shouldReduceMotion ? 0 : 600,
+            maxZoom: 11,
+          });
+          initialFitDoneRef.current = true;
+        } catch {
+          /* ignore */
+        }
       }
     }
-  }, [filteredZones, shouldReduceMotion, mapReady, syncSources, selectedZoneId]);
+  }, [filteredZones, shouldReduceMotion, mapReady, syncSources]);
 
   useEffect(() => {
     if (!mapRef.current || !mapLoadedRef.current) return;
@@ -528,28 +558,34 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
 
   useEffect(() => {
     if (!mapRef.current || !mapLoadedRef.current || !selectedZoneId) return;
-    const feat = filteredZones.features.find((f) => f.properties.zone_id === selectedZoneId);
+    const feat = filteredZones.features.find((f: SanitizedZoneFeature) => f.properties.zone_id === selectedZoneId);
     if (!feat?.geometry) return;
     try {
+      const geom = feat.geometry as any;
+      if (!geom.coordinates) return;
       const coords =
-        feat.geometry.type === 'Polygon'
-          ? feat.geometry.coordinates[0]
-          : feat.geometry.coordinates[0][0];
-      const lons = coords.map((c: number[]) => c[0]);
-      const lats = coords.map((c: number[]) => c[1]);
-      mapRef.current.fitBounds(
-        [
-          [Math.min(...lons), Math.min(...lats)],
-          [Math.max(...lons), Math.max(...lats)],
-        ],
-        {
-          padding: 80,
-          maxZoom: 12.5,
-          duration: shouldReduceMotion ? 0 : 800,
-          pitch: use3d ? 55 : 0,
-        }
-      );
-      requestAnimationFrame(() => mapRef.current?.resize());
+        geom.type === 'Polygon'
+          ? geom.coordinates[0]
+          : geom.type === 'MultiPolygon'
+            ? geom.coordinates[0][0]
+            : [geom.coordinates];
+      const lons = coords
+        .map((c: number[]) => c[0])
+        .filter((n: number) => typeof n === 'number' && Number.isFinite(n));
+      const lats = coords
+        .map((c: number[]) => c[1])
+        .filter((n: number) => typeof n === 'number' && Number.isFinite(n));
+      if (!lons.length || !lats.length) return;
+      const midLon = (Math.min(...lons) + Math.max(...lons)) / 2;
+      const midLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+      const currentZoom = mapRef.current.getZoom();
+      mapRef.current.easeTo({
+        center: [midLon, midLat],
+        zoom: currentZoom < 10.5 ? 11 : currentZoom,
+        pitch: use3d ? 35 : 0,
+        bearing: use3d ? -15 : 0,
+        duration: shouldReduceMotion ? 0 : 500,
+      });
     } catch {
       /* ignore */
     }
@@ -559,16 +595,18 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
     if (!mapRef.current || !mapLoadedRef.current) return;
     const map = mapRef.current;
     try {
-      localStorage.setItem('cs-map-mode', mapMode);
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem('cs-map-mode', mapMode);
+      }
       if (map.getLayer('zones-extrusion')) {
         map.setLayoutProperty('zones-extrusion', 'visibility', use3d ? 'visible' : 'none');
       }
       if (map.getLayer('zones-fill')) {
-        map.setPaintProperty('zones-fill', 'fill-opacity', use3d ? 0.22 : 0.65);
+        map.setLayoutProperty('zones-fill', 'visibility', use3d ? 'none' : 'visible');
       }
       map.easeTo({
-        pitch: use3d ? 55 : 0,
-        bearing: use3d ? -20 : 0,
+        pitch: use3d ? 40 : 0,
+        bearing: use3d ? -15 : 0,
         duration: shouldReduceMotion ? 0 : 800,
       });
     } catch (err) {
@@ -578,7 +616,7 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
 
   const zoneDetail = zoneDetailResponse?.data;
   const selectedProps =
-    filteredZones.features.find((f) => f.properties.zone_id === selectedZoneId)?.properties || null;
+    filteredZones.features.find((f: SanitizedZoneFeature) => f.properties.zone_id === selectedZoneId)?.properties || null;
 
   const drawerTitle = selectedProps?.name || zoneDetail?.name || 'Selected district';
   const drawerSubtitle = [
@@ -595,7 +633,7 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
     'Low';
 
   return (
-    <div className="w-full flex-1 min-h-0 flex flex-col overflow-hidden bg-background">
+    <div className="risk-map-wrapper w-full flex-1 min-h-0 flex flex-col bg-background">
       <div className="shrink-0 px-3 sm:px-4 pt-3">
         <PageHeader
           title="Risk Map"
@@ -618,8 +656,8 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
         />
       </div>
 
-      {/* Compact control bar */}
-      <div className="shrink-0 border-b border-outline-variant/30 cs-glass px-3 sm:px-4 py-2 flex flex-wrap items-center gap-2 z-20">
+      {/* Compact control bar — 'relative' is required so z-20 creates a real stacking context above the WebGL canvas */}
+      <div className="relative shrink-0 border-b border-outline-variant/30 cs-glass px-3 sm:px-4 py-2 flex flex-wrap items-center gap-2 z-20">
         <div className="hidden md:inline-flex items-center bg-surface-container-high p-1 rounded-xl border border-outline-variant/40">
           {(['heat', 'rain', 'combined'] as HazardMode[]).map((mode) => (
             <button
@@ -652,7 +690,14 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
         </label>
 
         <div className="relative">
-          <Button variant="ghost" className="min-h-[44px] px-3 text-xs" onClick={() => setLayersOpen((v) => !v)}>
+          <Button
+            variant="ghost"
+            className="min-h-[44px] px-3 text-xs"
+            onClick={() => {
+              setLayersOpen((v) => !v);
+              setMoreOpen(false);
+            }}
+          >
             Layers
           </Button>
           {layersOpen && (
@@ -671,6 +716,11 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
               ))}
             </div>
           )}
+        </div>
+
+        <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-outline-variant/30 text-xs cs-glass">
+          <span className="text-on-surface-variant">Basemap:</span>
+          <span className="font-semibold text-secondary">CARTO Voyager</span>
         </div>
 
         <div className="relative ml-auto flex items-center gap-1">
@@ -732,13 +782,13 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
         </div>
       </div>
 
-      {/* Map + drawer */}
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden">
-        <div className="relative flex-1 min-h-[280px] min-w-0 bg-[#0B1224]">
+      {/* Map + drawer — no overflow-hidden here; clipping the container during zoom makes the canvas blank */}
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
+        <div className="relative flex-1 min-h-[280px] min-w-0 bg-[#0B1224] z-0">
           {!useTableFallback && (
             <div
               ref={mapContainerRef}
-              className="absolute inset-0 w-full h-full isolate [transform:translateZ(0)] [&_.maplibregl-canvas]:!block [&_.maplibregl-ctrl-top-right]:top-4 [&_.maplibregl-ctrl-top-right]:right-4 [&_.maplibregl-ctrl-bottom-right]:bottom-4 [&_.maplibregl-ctrl-bottom-right]:right-4"
+              className="absolute inset-0 w-full h-full [&_.maplibregl-canvas]:!block [&_.maplibregl-ctrl-top-right]:top-4 [&_.maplibregl-ctrl-top-right]:right-4 [&_.maplibregl-ctrl-bottom-right]:bottom-4 [&_.maplibregl-ctrl-bottom-right]:right-4"
               role="region"
               aria-label="Pakistan spatial risk map"
               data-testid="risk-map-canvas"
@@ -798,7 +848,7 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredZones.features.map((f) => (
+                    {filteredZones.features.map((f: SanitizedZoneFeature) => (
                       <tr
                         key={f.properties.zone_id}
                         className="border-t border-outline-variant/20 hover:bg-surface-container/40 cursor-pointer"
@@ -923,64 +973,50 @@ export const RiskMap: React.FC<RiskMapProps> = () => {
           )}
         </div>
 
-        <AnimatePresence>
-          {selectedZoneId && (
-            <motion.aside
-              initial={shouldReduceMotion ? false : { x: 24, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={shouldReduceMotion ? undefined : { x: 24, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="hidden lg:flex w-[360px] shrink-0 border-l border-outline-variant/30 bg-surface-container-lowest flex-col min-h-0"
-              role="dialog"
-              aria-label="District dossier"
-            >
-              <DrawerBody
-                title={drawerTitle}
-                subtitle={drawerSubtitle}
-                zoneId={selectedZoneId}
-                risk={drawerRisk}
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
-                loading={isZoneDetailLoading}
-                error={isZoneDetailError}
-                onRetry={() => refetchZoneDetail()}
-                onClose={() => handleSelectZone(null)}
-                zoneDetail={zoneDetail}
-                selectedProps={selectedProps}
-              />
-            </motion.aside>
-          )}
-        </AnimatePresence>
+        {selectedZoneId && (
+          <aside
+            className="hidden lg:flex w-[360px] shrink-0 border-l border-outline-variant/30 bg-surface-container-lowest flex-col min-h-0 z-20"
+            role="dialog"
+            aria-label="District dossier"
+          >
+            <DrawerBody
+              title={drawerTitle}
+              subtitle={drawerSubtitle}
+              zoneId={selectedZoneId}
+              risk={drawerRisk}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              loading={isZoneDetailLoading}
+              error={isZoneDetailError}
+              onRetry={() => refetchZoneDetail()}
+              onClose={() => handleSelectZone(null)}
+              zoneDetail={zoneDetail}
+              selectedProps={selectedProps}
+            />
+          </aside>
+        )}
       </div>
 
-      <AnimatePresence>
-        {selectedZoneId && (
-          <motion.div
-            className="lg:hidden fixed inset-x-0 bottom-14 sm:bottom-0 z-40"
-            initial={shouldReduceMotion ? false : { y: '100%' }}
-            animate={{ y: 0 }}
-            exit={shouldReduceMotion ? undefined : { y: '100%' }}
-            transition={{ duration: 0.25 }}
-          >
-            <div className="mx-2 mb-2 h-[60vh] rounded-t-2xl border border-outline-variant/40 cs-glass flex flex-col overflow-hidden shadow-2xl">
-              <DrawerBody
-                title={drawerTitle}
-                subtitle={drawerSubtitle}
-                zoneId={selectedZoneId}
-                risk={drawerRisk}
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
-                loading={isZoneDetailLoading}
-                error={isZoneDetailError}
-                onRetry={() => refetchZoneDetail()}
-                onClose={() => handleSelectZone(null)}
-                zoneDetail={zoneDetail}
-                selectedProps={selectedProps}
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {selectedZoneId && (
+        <div className="lg:hidden fixed inset-x-0 bottom-14 sm:bottom-0 z-40">
+          <div className="mx-2 mb-2 h-[60vh] rounded-t-2xl border border-outline-variant/40 bg-surface-container-lowest flex flex-col overflow-hidden shadow-2xl">
+            <DrawerBody
+              title={drawerTitle}
+              subtitle={drawerSubtitle}
+              zoneId={selectedZoneId}
+              risk={drawerRisk}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+              loading={isZoneDetailLoading}
+              error={isZoneDetailError}
+              onRetry={() => refetchZoneDetail()}
+              onClose={() => handleSelectZone(null)}
+              zoneDetail={zoneDetail}
+              selectedProps={selectedProps}
+            />
+          </div>
+        </div>
+      )}
 
       {filterSheetOpen && (
         <div className="md:hidden fixed inset-0 z-50">

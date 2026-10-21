@@ -53,6 +53,20 @@
     -webkit-backdrop-filter: blur(14px);
   }
 
+  /* Never use backdrop-filter over or near WebGL map canvases.
+     On Linux Mesa (Intel/AMD) and Windows D3D11, backdrop blur over WebGL forces
+     continuous synchronous glReadPixels calls which crash the GPU command buffer
+     and cause the map to go completely blank on zoom, pan, or click. */
+  .risk-map-wrapper .cs-glass,
+  .risk-map-wrapper [class*="cs-glass"],
+  body:has(.risk-map-wrapper) header.cs-glass,
+  body:has([data-testid="risk-map-canvas"]) header.cs-glass,
+  .cs-glass-solid {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgb(15 23 42 / 0.95) !important;
+  }
+
   .cs-hairline {
     height: 1px;
     background: var(--cs-hairline);

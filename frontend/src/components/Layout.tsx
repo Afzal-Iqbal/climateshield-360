@@ -266,44 +266,51 @@ export const Layout: React.FC<LayoutProps> = ({ meta, isLoadingMeta = false }) =
 
         <main
           className={`w-full flex-1 flex flex-col min-h-0 ${
-            isRiskMap ? 'overflow-hidden pb-0' : 'pb-4 sm:pb-6'
+            isRiskMap ? 'pb-0' : 'pb-4 sm:pb-6'
           }`}
         >
           <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={shouldReduceMotion ? undefined : { opacity: 0, y: -8 }}
-              transition={{ duration: 0.2 }}
-              className={`w-full flex-1 flex flex-col min-h-0 ${isRiskMap ? 'overflow-hidden' : ''}`}
-            >
-              <Outlet />
-            </motion.div>
+            {isRiskMap ? (
+              <div
+                key={location.pathname}
+                className="w-full flex-1 flex flex-col min-h-0"
+              >
+                <Outlet />
+              </div>
+            ) : (
+              <motion.div
+                key={location.pathname}
+                initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={shouldReduceMotion ? undefined : { opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
+                className="w-full flex-1 flex flex-col min-h-0"
+              >
+                <Outlet />
+              </motion.div>
+            )}
           </AnimatePresence>
         </main>
 
-        <footer
-          className={`w-full bg-surface-container-high dark:bg-primary-container border-t border-outline-variant/30 py-3 px-4 sm:px-6 lg:px-8 mt-auto mb-14 sm:mb-0 relative z-20 ${
-            isRiskMap ? 'shrink-0' : ''
-          }`}
-        >
-          <div className="max-w-7xl mx-auto flex flex-col gap-1.5 text-xs text-on-surface-variant">
-            <div className="flex items-start gap-2">
-              <span className="material-symbols-outlined text-error text-[18px] shrink-0" aria-hidden>
-                warning
-              </span>
-              <p>
-                Information only, not professional advice. In an emergency contact official services (Sindh PDMA 1736 | Rescue 1122).
-              </p>
+        {!isRiskMap && (
+          <footer className="w-full bg-surface-container-high dark:bg-primary-container border-t border-outline-variant/30 py-3 px-4 sm:px-6 lg:px-8 mt-auto mb-14 sm:mb-0 relative z-20">
+            <div className="max-w-7xl mx-auto flex flex-col gap-1.5 text-xs text-on-surface-variant">
+              <div className="flex items-start gap-2">
+                <span className="material-symbols-outlined text-error text-[18px] shrink-0" aria-hidden>
+                  warning
+                </span>
+                <p>
+                  Information only, not professional advice. In an emergency contact official services (Sindh PDMA 1736 | Rescue 1122).
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[10px]">
+                <span>v{meta?.version || '0.1.0'}</span>
+                <span>Source: Open-Meteo + DuckDB warehouse</span>
+                <span>Last refresh: {lastRun ? formatPKT(lastRun) : 'n/a'}</span>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[10px]">
-              <span>v{meta?.version || '0.1.0'}</span>
-              <span>Source: Open-Meteo + DuckDB warehouse</span>
-              <span>Last refresh: {lastRun ? formatPKT(lastRun) : 'n/a'}</span>
-            </div>
-          </div>
-        </footer>
+          </footer>
+        )}
       </div>
 
       <nav
