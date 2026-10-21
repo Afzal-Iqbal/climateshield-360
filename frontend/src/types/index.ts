@@ -34,6 +34,17 @@ export interface LastRunSummary {
   notes?: string;
 }
 
+export interface SourceMetaInfo {
+  source_name: string;
+  age_minutes: number;
+  status: string;
+  expected_every_minutes: number;
+  publisher?: string | null;
+  licence?: string | null;
+  last_fetched_at?: string | null;
+  last_data_timestamp?: string | null;
+}
+
 export interface MetaData {
   app_name: string;
   version: string;
@@ -42,6 +53,12 @@ export interface MetaData {
   timezone_display: string;
   db_path: string;
   last_run?: LastRunSummary | null;
+  data_as_of?: string | null;
+  last_run_at?: string | null;
+  last_run_status?: string | null;
+  next_run_at?: string | null;
+  sources?: SourceMetaInfo[];
+  is_live?: boolean;
 }
 
 export interface RunStatus {

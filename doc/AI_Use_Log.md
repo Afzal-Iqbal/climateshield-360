@@ -23,7 +23,7 @@ In compliance with HackInsight 2026 regulations (Chapter 4: Permitted AI Use & D
 - **AI Tool / Agent:** Antigravity Agentic Coding Assistant & Camber Cloud Compute
 - **Scope & Deliverables:** Deliverable 3 (Predictive Model vs Declared Baseline)
 - **Activities:**
-  - Implemented `src/models/train_and_evaluate.py` and interactive notebook `step3_train_model.ipynb`.
+  - Implemented `src/models/train_and_evaluate.py` and interactive notebook `doc/step3_train_model.ipynb`.
   - Built honest time-based split: Train (2021–2024, 403,188 rows) vs Test (2025–2026, 188,988 rows).
   - Fitted LightGBM Regressor and evaluated against declared 24h persistence baseline.
   - Implemented multi-quantile prediction intervals ($Q_{10}, Q_{50}, Q_{90}$) yielding 99.44% empirical coverage.

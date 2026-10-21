@@ -26,7 +26,7 @@ logging.basicConfig(
 logger = logging.getLogger("export_prefect_runs")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-OUTPUT_CSV = PROJECT_ROOT / "prefect_runs.csv"
+OUTPUT_CSV = PROJECT_ROOT / "doc" / "prefect_runs.csv"
 
 
 async def fetch_runs_via_api() -> List[Dict[str, Any]]:

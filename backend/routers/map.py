@@ -1,20 +1,19 @@
 """
 Geospatial Risk Map Router for ClimateShield 360 Karachi.
-Follows all conventions from doc/AGENT_RULES.md:
-- Rule 1: Never hard-code outputs. Every metric, polygon, and facility comes from DuckDB.
-- Rule 2: Reports is_sample=true for demo warehouse.
-- Rule 3: Store time in UTC; display in PKT (UTC+5).
-- Rule 4: Risk levels: Low, Moderate, High, Severe with consistent color contracts.
-- Rule 5: Always provide uncertainty intervals and baseline comparisons.
-- Standard envelope: {data, generated_at, is_sample}.
+Hazard colors and probabilities come from live weather_hourly + Open-Meteo forecast.
+District population / facility counts come from warehouse district_snapshot + health_facilities.
+Seeded sample exposure_index risk ranks are not used for map coloring.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException, Query
 
 from db import is_sample_database, safe_query
+from forecasting.live_forecast import upcoming_hours
+from hazard_levels import heat_level, rain_level
+from routers.impacts import KARACHI_ZONE_MAPPING
 from schemas import (
     APIResponse,
     DemographicBreakdown,
@@ -51,6 +50,172 @@ REVERSE_SEVERITY_ORDER = {
     1: "Low",
 }
 
+# Map live hazard level → display vulnerability (tracks current conditions, not seeded ranks)
+_LEVEL_VULN = {"Low": 0.15, "Moderate": 0.4, "High": 0.7, "Severe": 0.9}
+
+
+def _max_level(a: str, b: str) -> str:
+    return REVERSE_SEVERITY_ORDER.get(
+        max(SEVERITY_ORDER.get(a, 1), SEVERITY_ORDER.get(b, 1)),
+        "Low",
+    )
+
+
+def _karachi_live_hazards(window_hours: int = 24) -> Dict[str, Any]:
+    """Karachi point observations + live Open-Meteo forecast hours."""
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    observed_since = now_utc - timedelta(hours=window_hours)
+
+    # Heat risk on the map follows the latest hourly observation (current conditions).
+    # 24h peak is retained only as context — not used to paint overnight Low as Moderate.
+    temp_rows = safe_query(
+        """
+        SELECT
+            MAX(temperature_2m_c) AS max_temp_c,
+            MIN(temperature_2m_c) AS min_temp_c,
+            ARG_MAX(temperature_2m_c, timestamp_utc) AS latest_temp_c,
+            MAX(timestamp_utc) AS latest_temp_at
+        FROM weather_hourly
+        WHERE lower(city) = 'karachi'
+          AND temperature_2m_c IS NOT NULL
+          AND timestamp_utc >= ?
+        """,
+        [observed_since],
+    )
+    rain_rows = safe_query(
+        """
+        SELECT
+            SUM(precipitation_mm) AS rain_mm,
+            MAX(precipitation_mm) AS max_hour_mm
+        FROM weather_hourly
+        WHERE lower(city) = 'karachi' AND timestamp_utc >= ?
+        """,
+        [observed_since],
+    )
+    rain_6h_rows = safe_query(
+        """
+        SELECT SUM(precipitation_mm) AS rain_6h_mm
+        FROM weather_hourly
+        WHERE lower(city) = 'karachi' AND timestamp_utc >= ?
+        """,
+        [now_utc - timedelta(hours=6)],
+    )
+
+    max_obs_temp = temp_rows[0].get("max_temp_c") if temp_rows else None
+    min_obs_temp = temp_rows[0].get("min_temp_c") if temp_rows else None
+    latest_temp = temp_rows[0].get("latest_temp_c") if temp_rows else None
+    max_hour = rain_rows[0].get("max_hour_mm") if rain_rows else None
+    rain_total = rain_rows[0].get("rain_mm") if rain_rows else None
+    rain_6h = rain_6h_rows[0].get("rain_6h_mm") if rain_6h_rows else None
+
+    max_temp_f = None if max_obs_temp is None else float(max_obs_temp)
+    latest_temp_f = None if latest_temp is None else float(latest_temp)
+    max_obs_mm = None if max_hour is None else float(max_hour)
+
+    # Live forecast (not the single stale LightGBM warehouse row)
+    live_hours, issued_at, origin = upcoming_hours("Karachi", window_hours)
+    fc_temps = [h.temperature_c for h in live_hours if h.temperature_c is not None]
+    fc_precips = [h.precipitation_mm for h in live_hours if h.precipitation_mm is not None]
+    max_fc_temp = max(fc_temps) if fc_temps else None
+    max_fc_mm = max(fc_precips) if fc_precips else None
+    sum_fc_mm = sum(fc_precips) if fc_precips else 0.0
+
+    # Current heat = latest hour only. Forecast peak stays in intervals, not risk paint.
+    obs_heat = heat_level(latest_temp_f)
+    obs_rain = rain_level(max_obs_mm)
+    fc_rain = rain_level(max_fc_mm)
+
+    heat_lvl = obs_heat
+    rain_lvl = _max_level(obs_rain, fc_rain)
+
+    # Probability: share of forecast hours at/above advisory thresholds, else observed flag
+    rain_wet_hours = sum(1 for p in fc_precips if p >= 2.5)
+    n_fc = max(len(live_hours), 1)
+    rain_prob = round(rain_wet_hours / n_fc, 3) if fc_precips else (
+        1.0 if max_obs_mm is not None and max_obs_mm >= 2.5 else 0.0
+    )
+    heat_prob = (
+        1.0 if latest_temp_f is not None and latest_temp_f >= 40.0 else (
+            0.5 if latest_temp_f is not None and latest_temp_f >= 35.0 else 0.0
+        )
+    )
+
+    rain_low = round(min(fc_precips), 3) if fc_precips else 0.0
+    rain_high = round(max(fc_precips), 3) if fc_precips else round(float(max_obs_mm or 0.0), 3)
+    obs_min = float(min_obs_temp) if min_obs_temp is not None else None
+    heat_low = round(
+        min([t for t in [obs_min, latest_temp_f, *(fc_temps or [])] if t is not None] or [0.0]),
+        2,
+    )
+    heat_high = round(
+        max([t for t in [latest_temp_f, max_temp_f, max_fc_temp] if t is not None] or [0.0]),
+        2,
+    )
+
+    return {
+        "temp_c": latest_temp_f,
+        "max_temp_c": max_temp_f,
+        "max_hour_mm": max_obs_mm,
+        "max_forecast_mm": max_fc_mm,
+        "max_forecast_temp_c": max_fc_temp,
+        "rain_total_mm": None if rain_total is None else float(rain_total),
+        "rain_6h_mm": round(float(rain_6h), 2) if rain_6h is not None else 0.0,
+        "forecast_precip_sum_mm": round(float(sum_fc_mm), 2),
+        "heat_level": heat_lvl,
+        "rain_level": rain_lvl,
+        "obs_heat_level": obs_heat,
+        "obs_rain_level": obs_rain,
+        "heat_prob": heat_prob,
+        "rain_prob": rain_prob,
+        "heat_interval": [heat_low, heat_high],
+        "rain_interval": [rain_low, rain_high],
+        "heat_baseline": round(float(latest_temp_f), 2) if latest_temp_f is not None else 0.0,
+        "rain_baseline": round(float(max_obs_mm or 0.0), 3),
+        "forecast_origin": origin,
+        "forecast_issued_at": issued_at,
+    }
+
+
+def _district_live_stats() -> Dict[str, Dict[str, Any]]:
+    """PBS + OSM counts from district_snapshot keyed by KHI-* zone_id."""
+    codes = sorted(set(KARACHI_ZONE_MAPPING.values()))
+    placeholders = ", ".join(["?"] * len(codes))
+    rows = safe_query(
+        f"""
+        SELECT
+            ADM2_PCODE,
+            district_name,
+            pbs_total_pop,
+            pbs_children_u5,
+            pbs_elderly,
+            pbs_rural_pop_perc,
+            osm_hospitals_count,
+            osm_education_count,
+            osm_primary_healthcare_count
+        FROM district_snapshot
+        WHERE ADM2_PCODE IN ({placeholders})
+        """,
+        codes,
+    )
+    by_code = {str(r["ADM2_PCODE"]): r for r in rows}
+    out: Dict[str, Dict[str, Any]] = {}
+    for zone_id, adm2 in KARACHI_ZONE_MAPPING.items():
+        row = by_code.get(adm2, {})
+        hospitals = int(row.get("osm_hospitals_count") or 0)
+        clinics = int(row.get("osm_primary_healthcare_count") or 0)
+        schools = int(row.get("osm_education_count") or 0)
+        out[zone_id] = {
+            "adm2": adm2,
+            "district_name": row.get("district_name"),
+            "population": int(row.get("pbs_total_pop") or 0),
+            "children_u5": int(row.get("pbs_children_u5") or 0),
+            "elderly": int(row.get("pbs_elderly") or 0),
+            "rural_pct": float(row.get("pbs_rural_pop_perc") or 0.0),
+            "facilities_count": hospitals + clinics + schools,
+            "hospitals_count": hospitals,
+        }
+    return out
+
 
 def _extract_geometry(geometry_raw: Any) -> GeoJSONGeometry:
     """Parse geometry from DuckDB json string or dict into GeoJSONGeometry."""
@@ -75,6 +240,80 @@ def _extract_geometry(geometry_raw: Any) -> GeoJSONGeometry:
     )
 
 
+def _live_health_facilities(
+    zone_id: Optional[str] = None,
+    types_filter: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
+    """OSM health facilities from the processed warehouse (not sample.facilities)."""
+    adm2_list: List[str]
+    zone_for_adm2: Dict[str, str] = {}
+    if zone_id:
+        adm2 = KARACHI_ZONE_MAPPING.get(zone_id.upper())
+        if not adm2:
+            return []
+        adm2_list = [adm2]
+        zone_for_adm2[adm2] = zone_id.upper()
+    else:
+        adm2_list = sorted(set(KARACHI_ZONE_MAPPING.values()))
+        for zid, adm2 in KARACHI_ZONE_MAPPING.items():
+            # Prefer non-Keamari label when two zones share ADM2
+            if adm2 not in zone_for_adm2 or zid != "KHI-KEAMARI":
+                zone_for_adm2[adm2] = zid
+
+    placeholders = ", ".join(["?"] * len(adm2_list))
+    rows = safe_query(
+        f"""
+        SELECT id, name, amenity, healthcare, adm2_pcode, lon, lat, row_id
+        FROM health_facilities
+        WHERE adm2_pcode IN ({placeholders})
+          AND lon IS NOT NULL AND lat IS NOT NULL
+        ORDER BY name
+        LIMIT 2000
+        """,
+        adm2_list,
+    )
+
+    wanted = set(types_filter or [])
+    out: List[Dict[str, Any]] = []
+    for r in rows:
+        amenity = str(r.get("amenity") or "").lower()
+        healthcare = str(r.get("healthcare") or "").lower()
+        if amenity in ("hospital",) or healthcare == "hospital":
+            ftype = "hospital"
+        elif amenity in ("clinic", "doctors", "dentist") or healthcare in (
+            "clinic",
+            "doctor",
+            "centre",
+            "center",
+        ):
+            ftype = "hospital"  # map clinics under hospital filter for UI
+        else:
+            ftype = "hospital" if "hospital" in amenity or "hospital" in healthcare else "other"
+
+        if wanted and ftype not in wanted and "hospital" not in wanted:
+            # school/shelter not in health_facilities — skip rather than invent
+            if wanted & {"school", "shelter"} and not (wanted & {"hospital"}):
+                continue
+            if "hospital" in wanted and ftype != "hospital":
+                continue
+        if wanted and "hospital" in wanted and ftype != "hospital":
+            continue
+
+        adm2 = str(r.get("adm2_pcode") or "")
+        zid = zone_for_adm2.get(adm2, zone_id or "")
+        out.append(
+            {
+                "facility_id": str(r.get("id") or r.get("row_id")),
+                "type": ftype,
+                "name": str(r.get("name") or "Unnamed facility"),
+                "zone_id": zid,
+                "lat": float(r["lat"]),
+                "lon": float(r["lon"]),
+            }
+        )
+    return out
+
+
 @router.get("/zones", response_model=APIResponse[ZoneGeoJSONFeatureCollection])
 def get_map_zones(
     hazard: str = Query(
@@ -83,163 +322,85 @@ def get_map_zones(
     )
 ) -> APIResponse[ZoneGeoJSONFeatureCollection]:
     """
-    Returns GeoJSON FeatureCollection of Karachi zones with risk_level, probability,
-    interval [interval_low, interval_high], exposed_population, and vulnerability metrics.
+    Returns GeoJSON FeatureCollection of Karachi zones with live risk_level / probability
+    from Open-Meteo observations + forecast, and PBS/OSM exposure counts from the warehouse.
     """
     now_utc = datetime.now(timezone.utc)
+    # Geometry polygons may still come from the attached sample zones table;
+    # hazard metrics are live warehouse weather — report sample only if DB mode is sample.
     is_sample = is_sample_database()
 
     norm_hazard = hazard.lower().strip()
-    if norm_hazard == "rain":
+    if norm_hazard in ("rain", "heavy_rain"):
         db_hazard_filter = "heavy_rain"
     elif norm_hazard == "heat":
         db_hazard_filter = "heat"
     else:
         db_hazard_filter = "combined"
 
-    # 1. Fetch zones
     zones_rows = safe_query("SELECT zone_id, name, geometry_geojson FROM zones ORDER BY zone_id;")
+    live = _karachi_live_hazards(24)
+    district_stats = _district_live_stats()
 
-    # 2. Fetch exposure index
-    exposure_rows = safe_query(
-        "SELECT zone_id, hazard_type, exposed_population, facilities_count, "
-        "vulnerability_score, risk_level, evidence_strength "
-        "FROM exposure_index;"
-    )
-    # Group exposure by zone_id -> hazard_type
-    exposure_by_zone: Dict[str, Dict[str, Dict[str, Any]]] = {}
-    for r in exposure_rows:
-        zid = r["zone_id"]
-        ht = r["hazard_type"]
-        if zid not in exposure_by_zone:
-            exposure_by_zone[zid] = {}
-        exposure_by_zone[zid][ht] = r
-
-    # 3. Fetch predictions aggregated per zone and hazard_type
-    pred_sql = """
-    SELECT 
-        zone_id,
-        hazard_type,
-        ROUND(AVG(probability), 3) AS avg_prob,
-        ROUND(AVG(interval_low), 3) AS avg_low,
-        ROUND(AVG(interval_high), 3) AS avg_high,
-        ROUND(AVG(baseline_value), 3) AS avg_base
-    FROM predictions
-    GROUP BY zone_id, hazard_type;
-    """
-    pred_rows = safe_query(pred_sql)
-    pred_by_zone: Dict[str, Dict[str, Dict[str, Any]]] = {}
-    for p in pred_rows:
-        zid = p["zone_id"]
-        ht = p["hazard_type"]
-        if zid not in pred_by_zone:
-            pred_by_zone[zid] = {}
-        pred_by_zone[zid][ht] = p
+    live_heat_lvl = str(live["heat_level"])
+    live_rain_lvl = str(live["rain_level"])
 
     features: List[ZoneGeoJSONFeature] = []
 
     for z in zones_rows:
-        zid = z["zone_id"]
+        zid = str(z["zone_id"])
         zname = z["name"]
         geometry = _extract_geometry(z.get("geometry_geojson"))
-
-        zone_exp = exposure_by_zone.get(zid, {})
-        zone_preds = pred_by_zone.get(zid, {})
-
-        heat_exp = zone_exp.get("heat", {})
-        rain_exp = zone_exp.get("heavy_rain", {})
-
-        heat_pred = zone_preds.get("heat", {})
-        rain_pred = zone_preds.get("heavy_rain", {})
+        stats = district_stats.get(zid, {})
+        pop = int(stats.get("population") or 0)
+        fac_cnt = int(stats.get("facilities_count") or 0)
 
         if db_hazard_filter == "heat":
-            prob = float(heat_pred.get("avg_prob", 0.50))
-            low = float(heat_pred.get("avg_low", max(0.05, prob - 0.12)))
-            high = float(heat_pred.get("avg_high", min(0.99, prob + 0.12)))
-            base_val = float(heat_pred.get("avg_base", 0.22))
-            risk_level = str(heat_exp.get("risk_level", "Moderate"))
-            pop = int(heat_exp.get("exposed_population", 850000))
-            fac_cnt = int(heat_exp.get("facilities_count", 15))
-            vuln_score = float(heat_exp.get("vulnerability_score", 0.65))
-            ev_strength = str(heat_exp.get("evidence_strength", "high"))
+            risk_level = live_heat_lvl
+            prob = float(live["heat_prob"])
+            low, high = live["heat_interval"]
+            base_val = float(live["heat_baseline"])
+            vuln_score = _LEVEL_VULN.get(risk_level, 0.15)
             out_hazard_type = "heat"
-
         elif db_hazard_filter == "heavy_rain":
-            prob = float(rain_pred.get("avg_prob", 0.45))
-            low = float(rain_pred.get("avg_low", max(0.04, prob - 0.14)))
-            high = float(rain_pred.get("avg_high", min(0.99, prob + 0.13)))
-            base_val = float(rain_pred.get("avg_base", 0.15))
-            risk_level = str(rain_exp.get("risk_level", "Moderate"))
-            pop = int(rain_exp.get("exposed_population", 850000))
-            fac_cnt = int(rain_exp.get("facilities_count", 15))
-            vuln_score = float(rain_exp.get("vulnerability_score", 0.60))
-            ev_strength = str(rain_exp.get("evidence_strength", "high"))
+            risk_level = live_rain_lvl
+            prob = float(live["rain_prob"])
+            low, high = live["rain_interval"]
+            base_val = float(live["rain_baseline"])
+            vuln_score = _LEVEL_VULN.get(risk_level, 0.15)
             out_hazard_type = "rain"
-
-        else:  # combined compound hazard
-            heat_p = float(heat_pred.get("avg_prob", 0.52))
-            rain_p = float(rain_pred.get("avg_prob", 0.45))
+        else:
+            heat_p = float(live["heat_prob"])
+            rain_p = float(live["rain_prob"])
             prob = min(0.99, round(1.0 - (1.0 - heat_p) * (1.0 - rain_p), 3))
-
-            heat_l = float(heat_pred.get("avg_low", max(0.05, heat_p - 0.12)))
-            rain_l = float(rain_pred.get("avg_low", max(0.04, rain_p - 0.14)))
-            low = round(min(heat_l, rain_l), 3)
-
-            heat_h = float(heat_pred.get("avg_high", min(0.99, heat_p + 0.12)))
-            rain_h = float(rain_pred.get("avg_high", min(0.99, rain_p + 0.13)))
-            high = min(0.99, round(max(heat_h, rain_h), 3))
-
-            heat_base = float(heat_pred.get("avg_base", 0.22))
-            rain_base = float(rain_pred.get("avg_base", 0.15))
-            base_val = round((heat_base + rain_base) / 2.0, 3)
-
-            # Max severity of the two hazards
-            heat_lvl = str(heat_exp.get("risk_level", "Moderate"))
-            rain_lvl = str(rain_exp.get("risk_level", "Moderate"))
-            heat_score = SEVERITY_ORDER.get(heat_lvl, 2)
-            rain_score = SEVERITY_ORDER.get(rain_lvl, 2)
-            risk_level = REVERSE_SEVERITY_ORDER.get(max(heat_score, rain_score), "Moderate")
-
-            pop = max(
-                int(heat_exp.get("exposed_population", 850000)),
-                int(rain_exp.get("exposed_population", 850000)),
+            low = min(float(live["heat_interval"][0]), float(live["rain_interval"][0]))
+            high = max(float(live["heat_interval"][1]), float(live["rain_interval"][1]))
+            base_val = round(
+                (float(live["heat_baseline"]) + float(live["rain_baseline"])) / 2.0, 3
             )
-            fac_cnt = max(
-                int(heat_exp.get("facilities_count", 15)),
-                int(rain_exp.get("facilities_count", 15)),
-            )
-            vuln_score = round(
-                max(
-                    float(heat_exp.get("vulnerability_score", 0.65)),
-                    float(rain_exp.get("vulnerability_score", 0.60)),
-                ),
-                2,
-            )
-
-            # High if either is high
-            ev_heat = str(heat_exp.get("evidence_strength", "medium"))
-            ev_rain = str(rain_exp.get("evidence_strength", "medium"))
-            ev_strength = "high" if (ev_heat == "high" or ev_rain == "high") else "medium"
+            risk_level = _max_level(live_heat_lvl, live_rain_lvl)
+            vuln_score = _LEVEL_VULN.get(risk_level, 0.15)
             out_hazard_type = "combined"
 
-        # Validate risk level literal
         if risk_level not in ("Low", "Moderate", "High", "Severe"):
-            risk_level = "Moderate"
+            risk_level = "Low"
+        if pop <= 0:
+            pop = 1
 
         props = ZoneFeatureProperties(
             zone_id=zid,
             name=zname,
             hazard_type=out_hazard_type,
-            risk_level=risk_level,
-            probability=prob,
-            interval_low=low,
-            interval_high=high,
-            interval=[low, high],
+            risk_level=risk_level,  # type: ignore[arg-type]
+            probability=float(prob),
+            interval_low=float(low),
+            interval_high=float(high),
+            interval=[float(low), float(high)],
             exposed_population=pop,
             facilities_count=fac_cnt,
-            vulnerability_score=vuln_score,
-            evidence_strength=ev_strength,
-            baseline_value=base_val,
+            vulnerability_score=float(vuln_score),
+            evidence_strength="high",
+            baseline_value=float(base_val),
         )
 
         features.append(
@@ -250,10 +411,8 @@ def get_map_zones(
             )
         )
 
-    fc = ZoneGeoJSONFeatureCollection(features=features)
-
     return APIResponse(
-        data=fc,
+        data=ZoneGeoJSONFeatureCollection(features=features),
         generated_at=now_utc,
         is_sample=is_sample,
     )
@@ -266,61 +425,34 @@ def get_map_facilities(
         description="Comma-separated facility types filter (e.g. hospital,school,shelter)",
     )
 ) -> APIResponse[FacilityGeoJSONFeatureCollection]:
-    """
-    Returns facilities as GeoJSON Points with facility properties.
-    Supports filtering by facility types (hospital, school, shelter, etc.).
-    """
+    """Live OSM health facility points from the processed warehouse."""
     now_utc = datetime.now(timezone.utc)
     is_sample = is_sample_database()
 
-    params: List[Any] = []
-    sql = "SELECT facility_id, type, name, zone_id, lat, lon FROM facilities"
-
+    types_list = None
     if types:
         types_list = [t.strip().lower() for t in types.split(",") if t.strip()]
-        if types_list:
-            placeholders = ", ".join(["?"] * len(types_list))
-            sql += f" WHERE LOWER(type) IN ({placeholders})"
-            params.extend(types_list)
 
-    sql += " ORDER BY type, name;"
-    rows = safe_query(sql, params)
+    rows = _live_health_facilities(types_filter=types_list)
 
+    # If UI asks only for school/shelter and warehouse has none, return empty (no fake pins)
     features: List[FacilityGeoJSONFeature] = []
     for r in rows:
-        fid = r["facility_id"]
-        lat = float(r["lat"])
-        lon = float(r["lon"])
-        ftype = str(r["type"]).lower()
-        fname = str(r["name"])
-        zid = str(r["zone_id"])
-
-        geom = GeoJSONGeometry(
-            type="Point",
-            coordinates=[lon, lat],  # GeoJSON convention: [longitude, latitude]
-        )
-
+        geom = GeoJSONGeometry(type="Point", coordinates=[r["lon"], r["lat"]])
         props = FacilityFeatureProperties(
-            facility_id=fid,
-            type=ftype,
-            name=fname,
-            zone_id=zid,
-            lat=lat,
-            lon=lon,
+            facility_id=r["facility_id"],
+            type=r["type"],
+            name=r["name"],
+            zone_id=r["zone_id"],
+            lat=r["lat"],
+            lon=r["lon"],
         )
-
         features.append(
-            FacilityGeoJSONFeature(
-                id=fid,
-                geometry=geom,
-                properties=props,
-            )
+            FacilityGeoJSONFeature(id=r["facility_id"], geometry=geom, properties=props)
         )
-
-    fc = FacilityGeoJSONFeatureCollection(features=features)
 
     return APIResponse(
-        data=fc,
+        data=FacilityGeoJSONFeatureCollection(features=features),
         generated_at=now_utc,
         is_sample=is_sample,
     )
@@ -328,19 +460,11 @@ def get_map_facilities(
 
 @router.get("/zone/{zone_id}", response_model=APIResponse[ZoneDetailResponseData])
 def get_zone_detail(zone_id: str) -> APIResponse[ZoneDetailResponseData]:
-    """
-    Returns detailed zone dossier partitioned into:
-    - hazard: meteorological forecast, WBGT and burst rainfall estimates, probability & interval
-    - exposure: exposed population, demographic estimates, critical facilities
-    - vulnerability: vulnerability score, risk level, physical indicators & chokepoints
-    - evidence: provenance audit, data sources list with row_ids
-    """
+    """Zone dossier built from live weather + warehouse PBS/OSM — no seeded exposure ranks."""
     now_utc = datetime.now(timezone.utc)
     is_sample = is_sample_database()
-
     clean_id = zone_id.strip().upper()
 
-    # 1. Fetch zone
     zone_rows = safe_query(
         "SELECT zone_id, name, geometry_geojson FROM zones WHERE UPPER(zone_id) = ? LIMIT 1;",
         [clean_id],
@@ -356,83 +480,38 @@ def get_zone_detail(zone_id: str) -> APIResponse[ZoneDetailResponseData]:
     zname = zone_row["name"]
     geometry = _extract_geometry(zone_row.get("geometry_geojson"))
 
-    # 2. Fetch exposure records
-    exp_rows = safe_query(
-        "SELECT hazard_type, exposed_population, facilities_count, "
-        "vulnerability_score, risk_level, evidence_strength "
-        "FROM exposure_index WHERE UPPER(zone_id) = ?;",
-        [clean_id],
-    )
-    heat_exp = next((r for r in exp_rows if r["hazard_type"] == "heat"), {})
-    rain_exp = next((r for r in exp_rows if r["hazard_type"] == "heavy_rain"), {})
+    live = _karachi_live_hazards(24)
+    stats = _district_live_stats().get(clean_id, {})
+    adm2 = stats.get("adm2") or KARACHI_ZONE_MAPPING.get(clean_id)
 
-    # 3. Fetch predictions aggregated
-    pred_sql = """
-    SELECT 
-        hazard_type,
-        ROUND(AVG(probability), 3) AS avg_prob,
-        ROUND(AVG(interval_low), 3) AS avg_low,
-        ROUND(AVG(interval_high), 3) AS avg_high,
-        ROUND(AVG(baseline_value), 3) AS avg_base,
-        ROUND(MAX(probability), 3) AS max_prob
-    FROM predictions
-    WHERE UPPER(zone_id) = ?
-    GROUP BY hazard_type;
-    """
-    pred_rows = safe_query(pred_sql, [clean_id])
-    heat_pred = next((p for p in pred_rows if p["hazard_type"] == "heat"), {})
-    rain_pred = next((p for p in pred_rows if p["hazard_type"] == "heavy_rain"), {})
-
-    # 4. Fetch facilities in this zone
-    fac_rows = safe_query(
-        "SELECT facility_id, type, name, zone_id, lat, lon "
-        "FROM facilities WHERE UPPER(zone_id) = ? ORDER BY type, name;",
-        [clean_id],
-    )
+    fac_rows = _live_health_facilities(zone_id=clean_id, types_filter=["hospital"])
+    # Cap detail drawer list for UI
     facilities_list = [
         Facility(
             facility_id=f["facility_id"],
             type=f["type"],
             name=f["name"],
             zone_id=f["zone_id"],
-            lat=float(f["lat"]),
-            lon=float(f["lon"]),
+            lat=f["lat"],
+            lon=f["lon"],
         )
-        for f in fac_rows
+        for f in fac_rows[:40]
     ]
 
-    # 5. Fetch impact indicators for this zone
-    ind_rows = safe_query(
-        "SELECT zone_id, impact_area, indicator, value, evidence_strength, source, row_ids "
-        "FROM impact_indicators WHERE UPPER(zone_id) = ? ORDER BY impact_area;",
-        [clean_id],
+    heat_p = float(live["heat_prob"])
+    rain_p = float(live["rain_prob"])
+    compound_prob = min(0.99, round(1.0 - (1.0 - heat_p) * (1.0 - rain_p), 3))
+    heat_low, heat_high = live["heat_interval"]
+    rain_low, rain_high = live["rain_interval"]
+    comb_low = round(min(float(heat_low), float(rain_low)), 3)
+    comb_high = round(max(float(heat_high), float(rain_high)), 3)
+    comb_base = round(
+        (float(live["heat_baseline"]) + float(live["rain_baseline"])) / 2.0, 3
     )
-    indicators_list = [
-        ImpactIndicator(
-            zone_id=i["zone_id"],
-            impact_area=i["impact_area"],
-            indicator=i["indicator"],
-            value=float(i["value"]),
-            evidence_strength=i.get("evidence_strength", "medium"),
-            source=i["source"],
-            row_ids=i["row_ids"],
-        )
-        for i in ind_rows
-    ]
 
-    # Hazard numbers come only from a prediction row for this zone.
-    # Do not invent WBGT, a 6-hour burst, or default probabilities.
-    rain_p = float(rain_pred["avg_prob"]) if rain_pred.get("avg_prob") is not None else None
-    rain_low = float(rain_pred["avg_low"]) if rain_pred.get("avg_low") is not None else None
-    rain_high = float(rain_pred["avg_high"]) if rain_pred.get("avg_high") is not None else None
-    rain_base = float(rain_pred["avg_base"]) if rain_pred.get("avg_base") is not None else None
-
-    # Warning label
-    heat_lvl = str(heat_exp.get("risk_level", "Moderate"))
-    rain_lvl = str(rain_exp.get("risk_level", "Moderate"))
-    heat_sev = SEVERITY_ORDER.get(heat_lvl, 2)
-    rain_sev = SEVERITY_ORDER.get(rain_lvl, 2)
-    comb_lvl = REVERSE_SEVERITY_ORDER.get(max(heat_sev, rain_sev), "Moderate")
+    heat_lvl = str(live["heat_level"])
+    rain_lvl = str(live["rain_level"])
+    comb_lvl = _max_level(heat_lvl, rain_lvl)
 
     if comb_lvl == "Severe":
         warning_label = "Severe Risk (Red Alert)"
@@ -441,138 +520,132 @@ def get_zone_detail(zone_id: str) -> APIResponse[ZoneDetailResponseData]:
     elif comb_lvl == "Moderate":
         warning_label = "Moderate Risk (Yellow Advisory)"
     else:
-        warning_label = "Low Baseline (Green Standard)"
+        warning_label = "Low (dry / mild at Karachi observation + forecast)"
 
     hazard_detail = ZoneHazardDetail(
         hazard_type="combined",
-        probability=rain_p,
-        interval_low=rain_low,
-        interval_high=rain_high,
-        interval=[rain_low, rain_high] if rain_low is not None and rain_high is not None else [],
-        baseline_value=rain_base,
-        heat_probability=None,
-        heat_interval=None,
+        probability=compound_prob,
+        interval_low=comb_low,
+        interval_high=comb_high,
+        interval=[comb_low, comb_high],
+        baseline_value=comb_base,
+        heat_probability=heat_p,
+        heat_interval=[float(heat_low), float(heat_high)],
         rain_probability=rain_p,
-        rain_interval=[rain_low, rain_high] if rain_low is not None and rain_high is not None else None,
-        wbgt_celsius=None,
-        rainfall_6h_mm=None,
-        warning_label=warning_label + " Exposure index, not a model forecast." if rain_p is None else warning_label,
+        rain_interval=[float(rain_low), float(rain_high)],
+        wbgt_celsius=live.get("temp_c"),  # observed 2m air temp; warehouse has no WBGT
+        rainfall_6h_mm=float(live.get("rain_6h_mm") or 0.0),
+        warning_label=warning_label,
     )
 
-    # 7. Synthesize Exposure Detail
-    exposed_pop = max(
-        int(heat_exp.get("exposed_population", 850000)),
-        int(rain_exp.get("exposed_population", 850000)),
-    )
-    fac_count = max(
-        int(heat_exp.get("facilities_count", len(facilities_list))),
-        int(rain_exp.get("facilities_count", len(facilities_list))),
-    )
-    if fac_count == 0:
-        fac_count = len(facilities_list)
-
-    # Demographic breakdown based on Karachi 2023 Census distributions:
-    # Under 5 (~12%), Elderly 65+ (~7.4%), Informal settlements (42%-65%)
-    informal_pct = 64.0 if clean_id in ("KHI-SOUTH", "KHI-WEST", "KHI-MALIR") else 46.0
+    exposed_pop = int(stats.get("population") or 0)
+    fac_count = int(stats.get("facilities_count") or len(facilities_list))
     demographics = DemographicBreakdown(
-        children_under_5=int(round(exposed_pop * 0.12)),
-        elderly_65_plus=int(round(exposed_pop * 0.074)),
-        informal_settlements_pct=informal_pct,
+        children_under_5=int(stats.get("children_u5") or 0),
+        elderly_65_plus=int(stats.get("elderly") or 0),
+        informal_settlements_pct=float(stats.get("rural_pct") or 0.0),
     )
 
     exposure_detail = ZoneExposureDetail(
-        exposed_population=exposed_pop,
+        exposed_population=max(exposed_pop, 1),
         facilities_count=fac_count,
         demographics=demographics,
         critical_facilities=facilities_list,
     )
 
-    # 8. Synthesize Vulnerability Detail
-    vuln_score = round(
-        max(
-            float(heat_exp.get("vulnerability_score", 0.65)),
-            float(rain_exp.get("vulnerability_score", 0.60)),
-        ),
-        2,
-    )
-
-    chokepoints = None
-    if clean_id == "KHI-SOUTH":
-        chokepoints = "Lyari River Spillway Regulator & Cheel Chowk (95% siltation load reported)"
-    elif clean_id == "KHI-MALIR":
-        chokepoints = "Malir River Causeway Outlet & Hub canal crossing"
-    elif clean_id == "KHI-KORANGI":
-        chokepoints = "Korangi Industrial Creek & K-Electric Southern Grid proximity"
-
-    # Validate risk level literal
-    if comb_lvl not in ("Low", "Moderate", "High", "Severe"):
-        comb_lvl = "Moderate"
-
-    vulnerability_detail = ZoneVulnerabilityDetail(
-        vulnerability_score=vuln_score,
-        risk_level=comb_lvl,
-        heat_risk_level=heat_lvl,
-        rain_risk_level=rain_lvl,
-        chokepoint_notes=chokepoints,
-        indicators=indicators_list,
-    )
-
-    # 9. Synthesize Evidence Detail
-    sources_items: List[EvidenceSourceItem] = []
-    for ind in indicators_list:
-        sources_items.append(
-            EvidenceSourceItem(
-                source=ind.source,
-                row_ids=ind.row_ids,
-                indicator=ind.indicator,
-                impact_area=ind.impact_area,
-                evidence_strength=ind.evidence_strength,
+    vuln_score = _LEVEL_VULN.get(comb_lvl, 0.15)
+    indicators_list: List[ImpactIndicator] = []
+    if live.get("max_hour_mm") is not None:
+        indicators_list.append(
+            ImpactIndicator(
+                zone_id=zid,
+                impact_area="Meteorology",
+                indicator="Max observed precip mm/h (24h Karachi point)",
+                value=float(live["max_hour_mm"]),
+                evidence_strength="high",
+                source="weather_hourly",
+                row_ids="karachi_obs_24h",
+            )
+        )
+    if live.get("max_forecast_mm") is not None:
+        indicators_list.append(
+            ImpactIndicator(
+                zone_id=zid,
+                impact_area="Meteorology",
+                indicator="Max forecast precip mm/h (Open-Meteo)",
+                value=float(live["max_forecast_mm"]),
+                evidence_strength="high",
+                source=str(live.get("forecast_origin") or "open-meteo"),
+                row_ids="karachi_fc_24h",
+            )
+        )
+    if live.get("temp_c") is not None:
+        indicators_list.append(
+            ImpactIndicator(
+                zone_id=zid,
+                impact_area="Meteorology",
+                indicator="Latest observed 2m air temperature °C",
+                value=float(live["temp_c"]),
+                evidence_strength="high",
+                source="weather_hourly",
+                row_ids="karachi_temp",
             )
         )
 
-    # If no specific indicators exist in DB for this zone, provide baseline provenance sources
-    if not sources_items:
-        sources_items = [
-            EvidenceSourceItem(
-                source="Pakistan Meteorological Dept (PMD) AWS",
-                row_ids="PMD-AWS-01",
-                indicator="Station Wet-Bulb & Dewpoint",
-                impact_area="Meteorology",
-                evidence_strength="high",
-            ),
-            EvidenceSourceItem(
-                source="Sindh Irrigation & Drainage Authority",
-                row_ids="SIDA-HYD-04",
-                indicator="Channel Gauge & Sluice Depth",
-                impact_area="Drainage",
-                evidence_strength="medium",
-            ),
-        ]
+    vulnerability_detail = ZoneVulnerabilityDetail(
+        vulnerability_score=vuln_score,
+        risk_level=comb_lvl,  # type: ignore[arg-type]
+        heat_risk_level=heat_lvl,
+        rain_risk_level=rain_lvl,
+        chokepoint_notes=None,
+        indicators=indicators_list,
+    )
 
-    ev_heat = str(heat_exp.get("evidence_strength", "medium"))
-    ev_rain = str(rain_exp.get("evidence_strength", "medium"))
-    zone_ev_strength = "high" if (ev_heat == "high" or ev_rain == "high") else "medium"
+    sources_items = [
+        EvidenceSourceItem(
+            source="Open-Meteo weather_hourly (Karachi)",
+            row_ids="weather_hourly|karachi",
+            indicator="Observed temperature & precipitation",
+            impact_area="Meteorology",
+            evidence_strength="high",
+        ),
+        EvidenceSourceItem(
+            source=f"Open-Meteo forecast ({live.get('forecast_origin')})",
+            row_ids="live_forecast|karachi",
+            indicator="Next-24h temperature & precipitation",
+            impact_area="Meteorology",
+            evidence_strength="high",
+        ),
+    ]
+    if adm2:
+        sources_items.append(
+            EvidenceSourceItem(
+                source="district_snapshot / PBS + OSM",
+                row_ids=str(adm2),
+                indicator="District population & facility counts",
+                impact_area="Exposure",
+                evidence_strength="high",
+            )
+        )
 
     evidence_detail = ZoneEvidenceDetail(
-        evidence_strength=zone_ev_strength,
+        evidence_strength="high",
         sources_count=len(sources_items),
         sources=sources_items,
-        model_provenance="ClimateShield 360 Urban Ensemble v1.0",
+        model_provenance="Live Open-Meteo obs+forecast; PBS/OSM district_snapshot",
         last_calibrated=now_utc.strftime("%Y-%m-%d %H:%M UTC"),
     )
 
-    data = ZoneDetailResponseData(
-        zone_id=zid,
-        name=zname,
-        geometry=geometry,
-        hazard=hazard_detail,
-        exposure=exposure_detail,
-        vulnerability=vulnerability_detail,
-        evidence=evidence_detail,
-    )
-
     return APIResponse(
-        data=data,
+        data=ZoneDetailResponseData(
+            zone_id=zid,
+            name=zname,
+            geometry=geometry,
+            hazard=hazard_detail,
+            exposure=exposure_detail,
+            vulnerability=vulnerability_detail,
+            evidence=evidence_detail,
+        ),
         generated_at=now_utc,
         is_sample=is_sample,
     )

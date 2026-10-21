@@ -1,37 +1,56 @@
-# Implementation Plan: Permanent Map Fix & CARTO Purge
+# Implementation Plan: HackInsight 2026 Deliverables Audit & Submission README
 
 ## Overview
-CARTO recently began watermarking anonymous raster tile requests with grey "API Key Required" tiles, which caused the street basemap to disappear and leave only floating 3D district polygon blocks. This plan completely purges CARTO from the project, switches the primary basemap to OpenFreeMap Dark (`https://tiles.openfreemap.org/styles/dark` — 100% free, zero API keys, Cloudflare Karachi KHI edge CDN), and configures OpenStreetMap raster as the safe secondary fallback.
+Deliver an executive-grade submission package and root `README.md` for **ClimateShield 360** (Karachi Extreme Weather & Crisis Platform) for the HackInsight 2026 judging panel (Climate Track: Data-to-Decision). The package is strictly aligned with the official HackInsight Participant Guide (`hackathonguide.pdf`), verifying all 5 core deliverables, organizing project artifacts, integrating the project logo, and presenting a complete rubric compliance matrix.
 
-## Architecture Decisions
-- **Purge CARTO entirely**: Delete all CARTO references and endpoints from `mapBasemap.ts` to guarantee no "API Key Required" watermarks can ever appear.
-- **OpenFreeMap Dark as Primary Tier**:
-  - Style URL: `https://tiles.openfreemap.org/styles/dark`
-  - Zero API keys, completely open-source, served through Cloudflare with an edge node right in Karachi (`cf-ray: ...-KHI`).
-  - Native dark theme matches ClimateShield 360's UI.
-- **OpenStreetMap (OSM) as Secondary Tier**:
-  - Community-maintained raster tiles (`https://tile.openstreetmap.org/{z}/{x}/{y}.png`).
-  - Reliable fallback if OpenFreeMap is ever unreachable.
-- **Dark Canvas as Final Tier**:
-  - `#0b0f19` solid vector canvas if completely offline.
-- **Harden Error Handlers**:
-  - Filter out transient tile 404s and network warnings so individual tile drops never trigger basemap fallback storms or canvas resets.
+---
+
+## Architecture & Presentation Decisions
+- **Logo Asset Management**: Copy `/home/hunain/Downloads/Gemini_Generated_Image_l5ku91l5ku91l5ku.jpeg` to `doc/assets/logo.jpeg` and `frontend/public/logo.jpeg` for version-controlled, high-availability rendering in markdown and web.
+- **Strict Grounding in `hackathonguide.pdf`**:
+  - Deliverable 1: Warehouse & Manifest (`climateshield.duckdb`, `hourly_manifest.csv`, `Dataset_Declaration.pdf`).
+  - Deliverable 2: Data Quality Agent (`pandera` validation, fix/fill/flag decision matrix, `quality_log`).
+  - Deliverable 3: Predictive ML Model vs Declared Baseline (LightGBM quantile regression $Q_{10}, Q_{50}, Q_{90}$, 35.1% MAE improvement over 24h persistence, group fairness breakdown across 12 Pakistani cities).
+  - Deliverable 4: Insight Agent (RAG with gold table row citations, fallback to "I don't know" for unsupported queries).
+  - Deliverable 5: Hourly Pipeline & Dashboard (Daemon scheduling, `prefect_runs.csv`, freshness radar, 3D Risk Map).
+  - Chapters 9, 12, 14: Business Model, Optimization Log, AI Use Log (`AI_Use_Log.md`).
+- **Visual Assets**: Embed high-resolution screenshots from `frontend/design/` (Risk Map, Executive Overview, 8 Impacts Matrix, Pipeline Freshness, Trust Radar, Insight Agent) and evaluation figures from `pipeline/reports/figures/`. No animated GIF files.
+- **Zero Hallucination Constraint**: Every metric, table count, and benchmark figure in `README.md` must match the DuckDB warehouse and verified test reports.
+
+---
 
 ## Task List
 
-### Phase 1: Basemap & Error Hardening
-- [ ] Task 1: Update `frontend/src/lib/mapBasemap.ts` to remove CARTO and configure OpenFreeMap Dark (`styles/dark`), OSM raster, and dark canvas.
-- [ ] Task 2: Update `frontend/src/pages/RiskMap.tsx` to initialize with the new primary tier and update toast fallback descriptions.
+### Phase 1: Asset Preparation & Deliverable Directory Audit
+- [ ] Task 1: Prepare Logo and Asset Directory (`doc/assets/logo.jpeg` and `frontend/public/logo.jpeg`).
+- [ ] Task 2: Audit and verify all 5 HackInsight deliverables and supplementary documentation in `doc/` against `hackathonguide.pdf`.
 
-### Phase 2: Verification & Delivery
-- [ ] Task 3: Verify frontend build (`npm run build`) and backend tests (`pytest`).
-- [ ] Task 4: Commit and push changes to branch `Hunain` on GitHub using `git` and `gh` CLI.
+### Checkpoint: Foundation
+- [ ] Logo file accessible in repository.
+- [ ] All 5 deliverables present, organized, and confirmed in `doc/`.
+
+### Phase 2: Root Submission README Creation
+- [ ] Task 3: Author the comprehensive HackInsight Judging Submission `README.md` with badges, centered logo, executive abstract, and team roles.
+- [ ] Task 4: Embed architectural diagrams, interactive UI screenshots, and ML benchmark tables ($Q_{10}/Q_{50}/Q_{90}$, MAE reduction, group fairness).
+- [ ] Task 5: Add complete HackInsight Rubric Compliance Matrix and 2-command Judge Quickstart guide.
+
+### Checkpoint: Deliverable Completeness
+- [ ] `README.md` rendered cleanly at repository root.
+- [ ] All screenshot and deliverable file links are valid and relative.
+
+### Phase 3: Verification & Live Health Check
+- [ ] Task 6: Run backend test suite (`pytest backend/tests`) to ensure 82/82 tests pass.
+- [ ] Task 7: Verify frontend build (`npm run build`) and confirm live daemon health (FastAPI port 8002, Vite port 5173).
+
+### Checkpoint: Complete
+- [ ] All acceptance criteria met.
+- [ ] System is 100% submission-ready for the HackInsight jury.
+
+---
 
 ## Risks and Mitigations
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| OpenFreeMap vector style takes a couple seconds to load on slow networks | Low | TanStack query caching + loading spinner keeps UI clean; Cloudflare Karachi edge caches assets |
-| MapLibre setStyle resets custom district layers on fallback | Med | `onStyleReady` re-adds district layers automatically on `style.load` |
-
-## Open Questions
-None — Confirmed in interview session.
+| Relative image path broken in GitHub markdown | Medium | Use standard repository-relative paths (`doc/assets/logo.jpeg`, `frontend/design/...`) verified locally |
+| Metric discrepancy between README and DuckDB | High | Pull verified figures directly from `doc/MODEL_REPORT.md` and DuckDB `model_eval` table |
+| Judge port collision | Low | Document explicit port mappings (FastAPI: 8002, Vite: 5173) and curl verification commands |
