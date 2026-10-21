@@ -62,7 +62,91 @@ export async function triggerHourlyWeatherSync(): Promise<void> {
   }
 }
 
-function getFallback<T>(cleanEndpoint: string): APIResponse<T> | null {
+function matchInsightQA(rawQuestion: string): APIResponse<InsightAnswer> | null {
+  const qa = apiSnapshots['insight_qa'] as Record<string, APIResponse<InsightAnswer>> | undefined;
+  if (!qa) {
+    return (apiSnapshots['/insight/ask'] as APIResponse<InsightAnswer>) || null;
+  }
+
+  const rawLower = (rawQuestion || '').toLowerCase().trim();
+  const q = rawLower.replace(/[?!.,'"]/g, '');
+  if (!q) {
+    return (apiSnapshots['/insight/ask'] as APIResponse<InsightAnswer>) || null;
+  }
+
+  // 1. Direct match with or without punctuation
+  if (qa[rawLower]) return qa[rawLower];
+  for (const [key, val] of Object.entries(qa)) {
+    const cleanKey = key.replace(/[?!.,'"]/g, '');
+    if (cleanKey === q || key === rawLower) {
+      return val;
+    }
+  }
+
+  // 2. City-specific temperature / weather
+  const cities = [
+    'lahore', 'islamabad', 'rawalpindi', 'multan', 'peshawar', 
+    'quetta', 'hyderabad', 'faisalabad', 'gilgit', 'gwadar', 'sukkur'
+  ];
+  for (const city of cities) {
+    if (q.includes(city)) {
+      const matchKey = `what is the temperature in ${city}?`;
+      if (qa[matchKey]) return qa[matchKey];
+    }
+  }
+
+  // 3. Keyword-based matching
+  if (q.includes('ingest') || q.includes('pipeline') || q.includes('freshness') || q.includes('last run') || q.includes('hourly ingest') || q.includes('sync')) {
+    return qa['when was the last successful hourly ingest?'] || null;
+  }
+  if (q.includes('baseline') || q.includes('model') || q.includes('eval') || q.includes('brier') || q.includes('roc') || q.includes('accuracy') || q.includes('compare')) {
+    return qa['how does the rainfall model compare with its baseline?'] || null;
+  }
+  if (q.includes('stroke') || q.includes('heat risk') || q.includes('heatwave') || q.includes('heat-wave') || q.includes('health risk') || q.includes('hot')) {
+    return qa['heat stroke risk with current karachi temperature?'] || null;
+  }
+  if (q.includes('forecast') || q.includes('next hour') || q.includes('next-hour') || q.includes('prediction')) {
+    return qa['what is the next-hour rainfall forecast for karachi?'] || null;
+  }
+  if (q.includes('rain') || q.includes('raining') || q.includes('precipitation') || q.includes('drizzle')) {
+    return qa['is it raining in karachi?'] || qa['what is the rainfall forecast for karachi?'] || null;
+  }
+  if (q.includes('flood') || q.includes('waterlogging') || q.includes('inundation') || q.includes('nullah')) {
+    return qa['what is the flood risk?'] || null;
+  }
+  if (q.includes('source') || q.includes('data') || q.includes('catalog') || q.includes('method') || q.includes('where')) {
+    return qa['what data sources are used?'] || null;
+  }
+  if (q.includes('weather') || q.includes('today') || q.includes('current weather') || q.includes('condition')) {
+    return qa["what's the weather today in karachi?"] || null;
+  }
+  if (q.includes('temp') || q.includes('degree') || q.includes('celsius')) {
+    return qa['what is the latest observed temperature in karachi?'] || null;
+  }
+
+  // 4. Overlap scoring across all available questions
+  let bestScore = 0;
+  let bestKey = '';
+  const words = q.split(/\s+/).filter((w) => w.length > 2);
+  for (const key of Object.keys(qa)) {
+    let score = 0;
+    for (const w of words) {
+      if (key.includes(w)) score++;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestKey = key;
+    }
+  }
+  if (bestScore > 0 && bestKey && qa[bestKey]) {
+    return qa[bestKey];
+  }
+
+  // 5. Default grounded fallback
+  return (apiSnapshots['/insight/ask'] as APIResponse<InsightAnswer>) || null;
+}
+
+function getFallback<T>(cleanEndpoint: string, options?: RequestInit): APIResponse<T> | null {
   const key = cleanEndpoint.startsWith('/api') ? cleanEndpoint.slice(4) : cleanEndpoint;
   
   // Trigger background hourly check
@@ -78,6 +162,22 @@ function getFallback<T>(cleanEndpoint: string): APIResponse<T> | null {
   const diffMins = Math.max(0, Math.floor((now.getTime() - currentSlot.getTime()) / 60000));
   const nextSlot = new Date(currentSlot);
   nextSlot.setHours(nextSlot.getHours() + 1);
+
+  if (key === '/insight/ask') {
+    let questionText = '';
+    if (options?.body) {
+      try {
+        const bodyObj = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+        questionText = bodyObj?.question || '';
+      } catch {
+        /* ignore */
+      }
+    }
+    const matched = matchInsightQA(questionText);
+    if (matched) {
+      return matched as APIResponse<T>;
+    }
+  }
 
   if (key === '/status' && '/status' in apiSnapshots) {
     const fallback = JSON.parse(JSON.stringify(apiSnapshots['/status']));
@@ -122,6 +222,61 @@ function getFallback<T>(cleanEndpoint: string): APIResponse<T> | null {
       `/forecast?hazard=${hazard}`,
       `/forecast`,
     ];
+    for (const c of candidates) {
+      if (c in apiSnapshots) {
+        return apiSnapshots[c] as APIResponse<T>;
+      }
+    }
+  }
+
+  if (key.startsWith('/map/facilities')) {
+    const rawSnapshot = apiSnapshots['/map/facilities'] as APIResponse<FacilityGeoJSONFeatureCollection>;
+    if (rawSnapshot && rawSnapshot.data && Array.isArray(rawSnapshot.data.features)) {
+      const params = new URLSearchParams(key.split('?')[1] || '');
+      const typesParam = params.get('types');
+      if (typesParam) {
+        const allowedTypes = new Set(typesParam.split(',').map((t) => t.trim().toLowerCase()));
+        const filteredFeatures = rawSnapshot.data.features.filter((f: any) => {
+          const type = (f.properties?.facility_type || '').toLowerCase();
+          return allowedTypes.has(type);
+        });
+        return {
+          ...rawSnapshot,
+          data: {
+            ...rawSnapshot.data,
+            features: filteredFeatures,
+          },
+        } as APIResponse<T>;
+      }
+      return rawSnapshot as APIResponse<T>;
+    }
+  }
+
+  if (key.startsWith('/planner')) {
+    const params = new URLSearchParams(key.split('?')[1] || '');
+    const hazard = params.get('hazard') || 'all';
+    const range = params.get('range') || '24h';
+    const candidates = [
+      `/planner?hazard=${hazard}&range=${range}`,
+      `/planner?hazard=${hazard}&range=24h`,
+      `/planner?hazard=all&range=${range}`,
+      `/planner?hazard=all&range=24h`,
+      `/planner`,
+    ];
+    for (const c of candidates) {
+      if (c in apiSnapshots) {
+        return apiSnapshots[c] as APIResponse<T>;
+      }
+    }
+  }
+
+  if (key.startsWith('/quality/decisions')) {
+    const params = new URLSearchParams(key.split('?')[1] || '');
+    const action = params.get('action');
+    const candidates = [
+      action && action !== 'all' ? `/quality/decisions?action=${action}` : null,
+      `/quality/decisions`,
+    ].filter(Boolean) as string[];
     for (const c of candidates) {
       if (c in apiSnapshots) {
         return apiSnapshots[c] as APIResponse<T>;
@@ -209,7 +364,7 @@ export async function apiFetch<T>(
       return payload;
     }
 
-    const fallback = getFallback<T>(cleanEndpoint);
+    const fallback = getFallback<T>(cleanEndpoint, options);
     if (fallback) {
       return fallback;
     }
@@ -228,7 +383,7 @@ export async function apiFetch<T>(
     throw new ApiError(response.status, errorMsg, detailMsg);
   } catch (err: any) {
     clearTimeout(timeoutId);
-    const fallback = getFallback<T>(cleanEndpoint);
+    const fallback = getFallback<T>(cleanEndpoint, options);
     if (fallback) {
       return fallback;
     }

@@ -101,12 +101,41 @@ for ep in ENDPOINTS:
     else:
         print(f"✗ {ep} ({res.status_code})")
 
-# Add sample insight responses
-insight_q = "What is the rainfall forecast for Karachi?"
-res_insight = client.post("/api/insight/ask", json={"question": insight_q})
-if res_insight.status_code == 200:
-    snapshots["/insight/ask"] = res_insight.json()
-    print("✓ /insight/ask (200 OK)")
+# Add insight responses for all suggested and popular questions
+insight_questions = [
+    "What is the latest observed temperature in Karachi?",
+    "What's the weather today in Karachi?",
+    "What is the next-hour rainfall forecast for Karachi?",
+    "Heat stroke risk with current Karachi temperature?",
+    "When was the last successful hourly ingest?",
+    "How does the rainfall model compare with its baseline?",
+    "What is the temperature in Lahore?",
+    "What is the temperature in Islamabad?",
+    "What is the temperature in Rawalpindi?",
+    "What is the temperature in Multan?",
+    "What is the temperature in Peshawar?",
+    "What is the temperature in Quetta?",
+    "What is the temperature in Hyderabad?",
+    "What is the temperature in Faisalabad?",
+    "What is the temperature in Gilgit?",
+    "What is the temperature in Gwadar?",
+    "What is the temperature in Sukkur?",
+    "What is the rainfall forecast for Karachi?",
+    "Is it raining in Karachi?",
+    "What data sources are used?",
+    "What is the flood risk?",
+]
+
+insight_qa = {}
+for q in insight_questions:
+    res_insight = client.post("/api/insight/ask", json={"question": q})
+    if res_insight.status_code == 200:
+        insight_qa[q.lower().strip()] = res_insight.json()
+        print(f"✓ Insight QA: {q}")
+
+snapshots["insight_qa"] = insight_qa
+# Default fallback for /insight/ask
+snapshots["/insight/ask"] = client.post("/api/insight/ask", json={"question": "What is the latest observed temperature in Karachi?"}).json()
 
 output_path = REPO_ROOT / "frontend" / "src" / "api" / "apiSnapshots.json"
 output_path.parent.mkdir(parents=True, exist_ok=True)
