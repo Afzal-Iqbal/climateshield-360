@@ -1,15 +1,14 @@
 {
-  "generated_at_utc": "2026-10-20T22:00:06.659157+00:00",
-  "run_id": "2026-10-20T22-00-06Z",
-  "raw_run_dir": "data/raw/hourly_ingest/2026-10-20T22-00-06Z",
+  "generated_at_utc": "2026-10-21T06:50:55.694697+00:00",
+  "run_id": "2026-10-21T06-50-55Z",
+  "raw_run_dir": "data/raw/hourly_ingest/2026-10-21T06-50-55Z",
   "interval_seconds": 3600,
   "last_successful_fetch_utc": {
-    "open_meteo_weather": "2026-10-20T22:00:06.660159+00:00",
-    "open_meteo_flood_glofas": "2026-10-20T22:00:34.359634+00:00",
-    "geofabrik_pakistan_pbf_md5": "2026-10-20T22:00:44.978405+00:00",
-    "ndma_homepage": "2026-10-20T22:00:45.639164+00:00",
-    "pmd_ffd_homepage": "2026-10-20T22:00:46.903493+00:00",
-    "pbs_homepage": "2026-10-20T22:00:47.966883+00:00"
+    "open_meteo_weather": "2026-10-21T06:50:55.701389+00:00",
+    "open_meteo_flood_glofas": "2026-10-21T06:51:14.209419+00:00",
+    "ndma_homepage": "2026-10-21T06:52:59.656903+00:00",
+    "pmd_ffd_homepage": "2026-10-21T06:53:00.468182+00:00",
+    "pbs_homepage": "2026-10-21T06:53:02.580619+00:00"
   },
   "connectors": [
     {
@@ -21,19 +20,19 @@
       "impact_areas": "physical;environmental;public_health",
       "publication_frequency": "hourly",
       "live_observations": true,
-      "fetch_time_utc": "2026-10-20T22:00:06.660159+00:00",
-      "observation_time_min": "2026-10-18T00:00:00+00:00",
-      "observation_time_max": "2026-10-20T22:00:00+00:00",
-      "n_records_fetched": 852,
+      "fetch_time_utc": "2026-10-21T06:50:55.701389+00:00",
+      "observation_time_min": "2026-10-19T00:00:00+00:00",
+      "observation_time_max": "2026-10-21T06:00:00+00:00",
+      "n_records_fetched": 660,
       "n_new_records": 12,
-      "n_duplicates_skipped": 840,
+      "n_duplicates_skipped": 648,
       "newly_updated_observations": true,
       "status": "success",
       "http_status": 200,
-      "sha256": "659fbeb13f36f5eaaf5271b07aad45449a4b6232b5fabcb3bfffe4b1496960ed",
+      "sha256": "614f5886c5adef2d6079f151bf41f11ae19471466c6f52542b07742b1f01a6cb",
       "error": "",
       "notes": "Hourly Open-Meteo forecast API with past_days=2. Fetch time is not observation time. Hours after fetch_time are forecasts and are not labelled newly observed.",
-      "raw_files": "data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_weather/weather_faisalabad_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_weather/weather_gilgit_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_weather/weather_gwadar_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_weather/weather_hyderabad_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_weather/weather_islamabad_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_weather/weather_karachi_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_weather/weather_lahore_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_weather/weather_multan_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_weather/weather_peshawar_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_weather/weather_quetta_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_weather/weather_rawalpindi_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_weather/weather_sukkur_raw.json"
+      "raw_files": "data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_weather/weather_faisalabad_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_weather/weather_gilgit_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_weather/weather_gwadar_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_weather/weather_hyderabad_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_weather/weather_islamabad_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_weather/weather_karachi_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_weather/weather_lahore_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_weather/weather_multan_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_weather/weather_peshawar_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_weather/weather_quetta_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_weather/weather_rawalpindi_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_weather/weather_sukkur_raw.json"
     },
     {
       "source_id": "open_meteo_flood_glofas",
@@ -44,19 +43,19 @@
       "impact_areas": "environmental;emergency;physical",
       "publication_frequency": "daily",
       "live_observations": true,
-      "fetch_time_utc": "2026-10-20T22:00:34.359634+00:00",
-      "observation_time_min": "2026-10-15T00:00:00+00:00",
-      "observation_time_max": "2026-10-20T00:00:00+00:00",
+      "fetch_time_utc": "2026-10-21T06:51:14.209419+00:00",
+      "observation_time_min": "2026-10-16T00:00:00+00:00",
+      "observation_time_max": "2026-10-21T00:00:00+00:00",
       "n_records_fetched": 72,
       "n_new_records": 0,
       "n_duplicates_skipped": 72,
       "newly_updated_observations": false,
       "status": "success",
       "http_status": 200,
-      "sha256": "2a5cf359c865a973df0b170637f1255aeebf3fe9cd5060b7aa61784721ccea06",
+      "sha256": "bf87c459fe00477d8de9d8f243010a978af664171fa09ca324fa1cc4d1c13c3c",
       "error": "",
       "notes": "GloFAS river discharge is daily. Hourly pipeline runs do not create hourly discharge observations.",
-      "raw_files": "data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_flood/flood_faisalabad_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_flood/flood_gilgit_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_flood/flood_gwadar_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_flood/flood_hyderabad_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_flood/flood_islamabad_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_flood/flood_karachi_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_flood/flood_lahore_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_flood/flood_multan_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_flood/flood_peshawar_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_flood/flood_quetta_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_flood/flood_rawalpindi_raw.json|data/raw/hourly_ingest/2026-10-20T22-00-06Z/open_meteo_flood/flood_sukkur_raw.json"
+      "raw_files": "data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_flood/flood_faisalabad_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_flood/flood_gilgit_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_flood/flood_gwadar_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_flood/flood_hyderabad_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_flood/flood_islamabad_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_flood/flood_karachi_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_flood/flood_lahore_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_flood/flood_multan_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_flood/flood_peshawar_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_flood/flood_quetta_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_flood/flood_rawalpindi_raw.json|data/raw/hourly_ingest/2026-10-21T06-50-55Z/open_meteo_flood/flood_sukkur_raw.json"
     },
     {
       "source_id": "geofabrik_pakistan_pbf_md5",
@@ -67,19 +66,19 @@
       "impact_areas": "infrastructure",
       "publication_frequency": "daily_or_periodic_extract",
       "live_observations": false,
-      "fetch_time_utc": "2026-10-20T22:00:44.978405+00:00",
+      "fetch_time_utc": "2026-10-21T06:51:21.708805+00:00",
       "observation_time_min": "",
       "observation_time_max": "",
-      "n_records_fetched": 1,
+      "n_records_fetched": 0,
       "n_new_records": 0,
-      "n_duplicates_skipped": 1,
+      "n_duplicates_skipped": 0,
       "newly_updated_observations": false,
-      "status": "unchanged",
-      "http_status": 200,
-      "sha256": "d03f80f30f0d99d46d75674a6cfe17adadb1effbca21f4fb68b28b3cfefb1b24",
-      "error": "",
-      "notes": "Geofabrik publishes country extracts, not hourly road edits. This connector only fetches the MD5 of pakistan-latest.osm.pbf. A changed hash means the extract moved; it is not an hourly infrastructure observation. Remote MD5 differs from the collected archive; extract updated, full PBF not downloaded hourly. Byte hash matches previous successful fetch; page stored, not treated as new observations.",
-      "raw_files": "data/raw/hourly_ingest/2026-10-20T22-00-06Z/snapshots/geofabrik_md5.txt"
+      "status": "failed",
+      "http_status": 0,
+      "sha256": "",
+      "error": "TimeoutError: The read operation timed out",
+      "notes": "Geofabrik publishes country extracts, not hourly road edits. This connector only fetches the MD5 of pakistan-latest.osm.pbf. A changed hash means the extract moved; it is not an hourly infrastructure observation.",
+      "raw_files": ""
     },
     {
       "source_id": "ndma_homepage",
@@ -90,7 +89,7 @@
       "impact_areas": "emergency;social",
       "publication_frequency": "daily_or_irregular_bulletins",
       "live_observations": false,
-      "fetch_time_utc": "2026-10-20T22:00:45.639164+00:00",
+      "fetch_time_utc": "2026-10-21T06:52:59.656903+00:00",
       "observation_time_min": "",
       "observation_time_max": "",
       "n_records_fetched": 1,
@@ -102,7 +101,7 @@
       "sha256": "ff503e6bbda04243e9b0e5681649b5d913b0f0484aa0786a15867c32272a136a",
       "error": "",
       "notes": "NDMA does not publish a documented hourly observation API in this project. Homepage HTML is stored as a change-detection snapshot. Numbers are not scraped. robots: robots.txt does not disallow this path Byte hash matches previous successful fetch; page stored, not treated as new observations.",
-      "raw_files": "data/raw/hourly_ingest/2026-10-20T22-00-06Z/snapshots/ndma_homepage.html"
+      "raw_files": "data/raw/hourly_ingest/2026-10-21T06-50-55Z/snapshots/ndma_homepage.html"
     },
     {
       "source_id": "pmd_ffd_homepage",
@@ -113,7 +112,7 @@
       "impact_areas": "emergency;physical",
       "publication_frequency": "daily_bulletins",
       "live_observations": false,
-      "fetch_time_utc": "2026-10-20T22:00:46.903493+00:00",
+      "fetch_time_utc": "2026-10-21T06:53:00.468182+00:00",
       "observation_time_min": "",
       "observation_time_max": "",
       "n_records_fetched": 1,
@@ -122,10 +121,10 @@
       "newly_updated_observations": false,
       "status": "success",
       "http_status": 200,
-      "sha256": "de69c54b7059b0779c2a17a87a715dfe457e1bbdb060fe71b4fa1d3b4af47895",
+      "sha256": "eea5612c427bd55e5161932b72c216415fb7d2091f183315e0b75a38350c27c4",
       "error": "",
-      "notes": "PMD Flood Forecasting Division bulletins are daily HTML/PDF, not an hourly station API. River danger levels in the archive are static thresholds, not a live hydrograph. robots: no robots.txt (404)",
-      "raw_files": "data/raw/hourly_ingest/2026-10-20T22-00-06Z/snapshots/pmd_ffd_homepage.html"
+      "notes": "PMD Flood Forecasting Division bulletins are daily HTML/PDF, not an hourly station API. River danger levels in the archive are static thresholds, not a live hydrograph. robots: robots.txt empty or missing",
+      "raw_files": "data/raw/hourly_ingest/2026-10-21T06-50-55Z/snapshots/pmd_ffd_homepage.html"
     },
     {
       "source_id": "pbs_homepage",
@@ -136,7 +135,7 @@
       "impact_areas": "social;economic;producers",
       "publication_frequency": "census_and_periodic_releases",
       "live_observations": false,
-      "fetch_time_utc": "2026-10-20T22:00:47.966883+00:00",
+      "fetch_time_utc": "2026-10-21T06:53:02.580619+00:00",
       "observation_time_min": "",
       "observation_time_max": "",
       "n_records_fetched": 1,
@@ -145,10 +144,10 @@
       "newly_updated_observations": false,
       "status": "success",
       "http_status": 200,
-      "sha256": "4684790d8310e4265e812c5a3426902db23f4c284a6227705f16df0628d2735f",
+      "sha256": "9c1ea1023df9e82017a8babe8c744f1664f3ccdf0b80e5cff96b4f6677c9fa34",
       "error": "",
       "notes": "PBS census, agricultural census, and CPI/SPI releases are not hourly. No live producer, economic, or social observation series is ingested on this cadence. Homepage snapshot is change-detection only; PDF numbers are not extracted. robots: robots.txt does not disallow this path",
-      "raw_files": "data/raw/hourly_ingest/2026-10-20T22-00-06Z/snapshots/pbs_homepage.html"
+      "raw_files": "data/raw/hourly_ingest/2026-10-21T06-50-55Z/snapshots/pbs_homepage.html"
     }
   ],
   "impact_area_summary": {
@@ -178,9 +177,9 @@
       "detail": "open_meteo_weather=success/hourly"
     },
     "infrastructure": {
-      "status": "snapshot_or_change_detection_only",
+      "status": "failed_or_unavailable",
       "sources": "geofabrik_pakistan_pbf_md5",
-      "detail": "geofabrik_pakistan_pbf_md5=unchanged/daily_or_periodic_extract"
+      "detail": "geofabrik_pakistan_pbf_md5=failed/daily_or_periodic_extract"
     },
     "social": {
       "status": "snapshot_or_change_detection_only",
