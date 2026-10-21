@@ -40,9 +40,9 @@ Submitted for **HackInsight 2026: Data-to-Decision** (Climate & Infrastructure A
 
 | Member | Role & Responsibilities | Key Deliverables Led |
 |---|---|---|
-| **Syed Muhammad Hunain** | AI Full Stack Developer, Machine Learning Specialist | Spatial 3D Risk Map, MapLibre GL Integration, FastAPI Architecture, Jury Presentation |
-| **Muhammad Afzal** | Lead Data Engineer & ML Scientist | DuckDB Columnar Warehouse, LightGBM Quantile Models, 24h Baseline Benchmarking, Ingestion Daemon |
-| **Makshoof Kamal Jilani** | Decision Systems & Domain Specialist | 8 Sectoral Impact Matrices, Emergency Action Planner, Responsible AI & Fairness Audit |
+| **Syed Muhammad Hunain** | AI Engineer, Machine Learning Specialist | Spatial 3D Risk Map, MapLibre GL Integration, FastAPI Architecture, Jury Presentation |
+| **Muhammad Afzal** | Fullstack Developer, ML Specialist | DuckDB Columnar Warehouse, LightGBM Quantile Models, 24h Baseline Benchmarking, Ingestion Daemon |
+| **Makshoof Kamal Jilani** | AI Fullstack Developer | 8 Sectoral Impact Matrices, Emergency Action Planner, Responsible AI & Fairness Audit |
 
 ---
 
