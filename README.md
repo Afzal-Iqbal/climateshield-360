@@ -105,31 +105,43 @@ flowchart TD
 
 ## 📸 Interactive UI Gallery
 
-The ClimateShield 360 interface was designed for high-stress municipal operations rooms, featuring an eye-friendly dark tactical theme and instant-load rendering.
+The ClimateShield 360 interface was designed for high-stress municipal operations rooms, featuring an eye-friendly dark tactical theme, sub-second rendering, and real-time live telemetry.
 
-### 1. 3D Spatial Risk Map (`/risk-map`)
-*Planimetric district polygons, real-time flood inundation severity, hospital markers, and road choke points.*
-![Spatial Risk Map](frontend/design/risk_map_climateshield_360_karachi/screen.png)
+### 1. Executive Overview Dashboard (`/`)
+*Dual-hazard meteorological radar, active heatwave & rainfall alerts, citywide rainfall trajectory, and prioritized district action queue.*
+![Executive Overview Dashboard](doc/screenshots/01_overview.png)
 
-### 2. Executive Overview Dashboard (`/overview`)
-*Citywide rainfall trajectory, active weather warnings, top vulnerable zones, and live crisis radar.*
-![Executive Overview](frontend/design/overview_climateshield_360_karachi/screen.png)
+### 2. 3D Spatial Risk Map (`/risk-map`)
+*3D extruded district polygons, 90% confidence interval bands, real-time flood inundation severity choropleths, critical infrastructure overlays (hospitals, schools, shelters, power substations, drainage culverts), and district dossier inspection.*
+![3D Spatial Risk Map](doc/screenshots/02_risk_map.png)
 
-### 3. Sectoral Impact Matrix (`/eight-impacts`)
-*Granular impact analysis across Physical, Transport, Health, Energy, Economic, Agriculture, Social, and Emergency sectors.*
-![Sectoral Impacts](frontend/design/eight_impacts_climateshield_360_karachi/screen.png)
+### 3. Heat & Monsoon Rainfall Forecast (`/forecast`)
+*Multi-horizon (24h / 48h / 7d) observed vs. predicted precipitation curves with LightGBM quantile intervals ($Q_{10}$ to $Q_{90}$) and 24h baseline comparison.*
+![Heat and Rain Forecast](doc/screenshots/03_forecast.png)
 
-### 4. Data Quality & Trust Radar (`/data-quality`)
-*Full transparency into Pandera validation results, fix/fill/flag audit records, and sensor health.*
-![Data Quality Radar](frontend/design/data_quality_climateshield_360_karachi/screen.png)
+### 4. Eight-Sector Impact Matrix (`/eight-impacts`)
+*Granular impact analysis across Physical, Environmental, Producers, Economic, Public Health, Infrastructure, Social, and Emergency Response sectors with empirical evidence indicators.*
+![Eight Sectoral Impacts](doc/screenshots/04_eight_impacts.png)
 
-### 5. Automated Pipeline Freshness (`/system-health`)
-*Live daemon execution heartbeats, lag monitoring, and Prefect run history verification.*
-![Pipeline Freshness](frontend/design/pipeline_freshness_climateshield_360_karachi/screen.png)
+### 5. Emergency Action Planner & SOP Triage (`/emergency-planner`)
+*Operational decision support system for Sindh PDMA (1736) and Rescue 1122 dispatchers: ranked district exposure, critical resource gap detection, and deterministic standard operating procedures.*
+![Emergency Action Planner](doc/screenshots/05_emergency_planner.png)
 
-### 6. Grounded Insight Assistant (`/ai-assistant`)
-*Evidence-based natural language crisis briefing citing exact gold warehouse row IDs.*
-![Insight Assistant](frontend/design/insight_agent_climateshield_360_karachi/screen.png)
+### 6. Data Quality & Trust Radar (`/data-quality`)
+*Full transparency into Pandera schema validation results, boundary rule assertions, real-time fix/fill/flag audit records, and sensor health telemetry.*
+![Data Quality Radar](doc/screenshots/06_data_quality.png)
+
+### 7. Grounded AI Climate Assistant (`/ai-assistant`)
+*Evidence-based natural language crisis briefing engine citing exact DuckDB gold warehouse row IDs, with strict anti-hallucination protocols.*
+![AI Climate Assistant](doc/screenshots/07_ai_assistant.png)
+
+### 8. Automated Pipeline Freshness & System Health (`/system-health`)
+*Live daemon execution heartbeats, lag monitoring, automated 60-minute cron scheduling, and historical Prefect flow run verification.*
+![Pipeline Freshness and System Health](doc/screenshots/08_system_health.png)
+
+### 9. Data Sources, Lineage & Methodology (`/methodology`)
+*Complete open-science documentation: Open-Meteo, Copernicus GloFAS, OpenStreetMap, and PBS Census 2023 dataset declarations, operational caveats, and mathematical model explanations.*
+![Data Sources and Methodology](doc/screenshots/09_methodology.png)
 
 ---
 
@@ -228,6 +240,7 @@ climateshield-360/
 │   └── tests/                # 82 automated pytest test suites
 ├── doc/                      # Official HackInsight submission documentation
 │   ├── assets/               # Brand assets and logos (logo.jpeg)
+│   ├── screenshots/          # Production app screenshots (all 9 operational views)
 │   ├── presentation/         # Gamma AI, Visme AI, and speaker scripts
 │   ├── Dataset_Declaration.* # Gate 1 Data Declaration (PDF + MD)
 │   ├── MODEL_REPORT.md       # Model vs Baseline validation report
