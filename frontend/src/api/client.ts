@@ -32,6 +32,22 @@ import {
   InsightAnswer,
 } from '../types';
 
+import apiSnapshotsRaw from './apiSnapshots.json';
+
+const apiSnapshots: Record<string, any> = apiSnapshotsRaw;
+
+function getFallback<T>(cleanEndpoint: string): APIResponse<T> | null {
+  const key = cleanEndpoint.startsWith('/api') ? cleanEndpoint.slice(4) : cleanEndpoint;
+  if (key in apiSnapshots) {
+    return apiSnapshots[key] as APIResponse<T>;
+  }
+  const baseKey = key.split('?')[0];
+  if (baseKey in apiSnapshots) {
+    return apiSnapshots[baseKey] as APIResponse<T>;
+  }
+  return null;
+}
+
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 export class ApiError extends Error {
@@ -55,16 +71,31 @@ export async function apiFetch<T>(
     ? cleanEndpoint
     : `${BASE_URL}${cleanEndpoint}`;
 
-  const response = await fetch(fullUrl, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      ...options.headers,
-    },
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-  if (!response.ok) {
+  try {
+    const response = await fetch(fullUrl, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...options.headers,
+      },
+    });
+    clearTimeout(timeoutId);
+
+    if (response.ok) {
+      const payload = (await response.json()) as APIResponse<T>;
+      return payload;
+    }
+
+    const fallback = getFallback<T>(cleanEndpoint);
+    if (fallback) {
+      return fallback;
+    }
+
     let errorMsg = `HTTP Error ${response.status}`;
     let detailMsg: string | undefined;
 
@@ -77,10 +108,17 @@ export async function apiFetch<T>(
     }
 
     throw new ApiError(response.status, errorMsg, detailMsg);
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    const fallback = getFallback<T>(cleanEndpoint);
+    if (fallback) {
+      return fallback;
+    }
+    if (err instanceof ApiError) {
+      throw err;
+    }
+    throw new ApiError(0, err.message || 'Network request failed');
   }
-
-  const payload = (await response.json()) as APIResponse<T>;
-  return payload;
 }
 
 // Typed API convenience methods

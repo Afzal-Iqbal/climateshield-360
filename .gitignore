@@ -57,3 +57,6 @@ dist-ssr/
 # DuckDB write / temp files (keep sample.duckdb if tracked or ignore temp)
 *.duckdb.tmp
 *.duckdb.wal
+
+# Vercel
+.vercel/
