@@ -173,8 +173,11 @@ def get_pipeline_status() -> APIResponse[PipelineStatusData]:
             is_latest=True,
         )
 
-        if start_dt:
-            diff_sec = (now_utc - start_dt).total_seconds()
+        # Age from finished_at so a just-completed catch-up is not "late"
+        # because started_at was hours earlier (or a prior run's clock).
+        anchor = finish_dt or start_dt
+        if anchor:
+            diff_sec = (now_utc - anchor).total_seconds()
             minutes_since_success = max(0.0, diff_sec / 60.0)
             is_late = minutes_since_success > 90.0
 

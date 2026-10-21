@@ -30,7 +30,11 @@ export const HourlyUpdateCountdown: React.FC = () => {
   const { data, isLoading } = useQuery({
     queryKey: ['pipeline-status'],
     queryFn: api.getStatus,
-    refetchInterval: 60000,
+    refetchInterval: (query) =>
+      query.state.data?.data?.status_indicator === 'late' ||
+      query.state.data?.data?.status_indicator === 'failed'
+        ? 15000
+        : 30000,
   });
   const [now, setNow] = useState(() => Date.now());
 
@@ -40,7 +44,10 @@ export const HourlyUpdateCountdown: React.FC = () => {
   }, []);
 
   const status = data?.data;
-  const lastIso = status?.latest_successful_run?.started_at ?? null;
+  const lastIso =
+    status?.latest_successful_run?.finished_at ??
+    status?.latest_successful_run?.started_at ??
+    null;
   const scheduledIso = status?.next_scheduled_run?.next_run_utc ?? null;
   const target = nextHourlySlot(lastIso, scheduledIso, now);
   const late = status?.status_indicator === 'late' || status?.status_indicator === 'failed';
@@ -85,12 +92,19 @@ export const StatusBar: React.FC<StatusBarProps> = ({ meta }) => {
   const { data: statusResponse, isLoading } = useQuery({
     queryKey: ['pipeline-status'],
     queryFn: api.getStatus,
-    refetchInterval: 60000,
+    refetchInterval: (query) =>
+      query.state.data?.data?.status_indicator === 'late' ||
+      query.state.data?.data?.status_indicator === 'failed'
+        ? 15000
+        : 30000,
   });
 
   const statusData = statusResponse?.data;
-  const lastSuccessTime = statusData?.latest_successful_run?.started_at
-    ? formatPKT(statusData.latest_successful_run.started_at, { second: undefined })
+  const lastSuccessIso =
+    statusData?.latest_successful_run?.finished_at ||
+    statusData?.latest_successful_run?.started_at;
+  const lastSuccessTime = lastSuccessIso
+    ? formatPKT(lastSuccessIso, { second: undefined })
     : '—';
 
   const relTime = statusData?.minutes_since_last_success !== undefined && statusData.minutes_since_last_success !== null

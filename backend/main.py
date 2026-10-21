@@ -8,7 +8,10 @@ Follows all conventions specified in doc/AGENT_RULES.md:
 - CORS for local dev origin
 """
 
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+import logging
+
 import duckdb
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,6 +27,7 @@ from db import (
     is_sample_database,
     safe_query,
 )
+from hourly_supervisor import start_hourly_supervisor, stop_hourly_supervisor
 from schemas import (
     APIResponse,
     HealthData,
@@ -45,10 +49,24 @@ from routers.model import router as model_router
 from routers.planner import router as planner_router
 from routers.methodology import router as methodology_router
 
+logging.basicConfig(level=logging.INFO)
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """On API start: catch up stale hourly weather and keep refreshing while the app runs."""
+    start_hourly_supervisor()
+    try:
+        yield
+    finally:
+        stop_hourly_supervisor()
+
+
 app = FastAPI(
     title="ClimateShield 360 API",
     description="Extreme-weather decision support API for Karachi, Pakistan (Sindh PDMA / KMC)",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # Configure CORS for local development frontend
