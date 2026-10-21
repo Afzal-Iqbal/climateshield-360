@@ -46,6 +46,9 @@ Submitted for **HackInsight 2026: Data-to-Decision** (Climate & Infrastructure A
 
 ---
 
+## The Working Link:
+https://makshoof.github.io/ClimateShield-360/
+
 ## 🌊 The Karachi Problem Statement
 
 Karachi, a coastal megacity of over 17 million people, faces recurring dual climate shocks: **lethal monsoon urban waterlogging** and **severe extreme heatwaves**. 
