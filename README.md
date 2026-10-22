@@ -8,7 +8,9 @@
 
   [![HackInsight 2026](https://img.shields.io/badge/HackInsight%202026-Data--to--Decision-0ea5e9?style=for-the-badge&logo=target)](https://github.com)
   [![Track](https://img.shields.io/badge/Track-Climate%20%26%20Crisis%20Analytics-10b981?style=for-the-badge&logo=leaflet)](doc/Dataset_Declaration.md)
-  [![Tests](https://img.shields.io/badge/Backend%20Tests-82%2F82%20Passing-emerald?style=for-the-badge&logo=pytest)](backend/tests)
+  [![Tests](https://img.shields.io/badge/Backend%20Tests-87%2F87%20Passing-emerald?style=for-the-badge&logo=pytest)](backend/tests)
+  [![Demo Video](https://img.shields.io/badge/Demo%20Video-12%3A00%20Walkthrough-0284c7?style=for-the-badge&logo=youtube)](doc/presentation/climateshield_360_karachi.mp4)
+  [![Pitch Deck](https://img.shields.io/badge/Pitch%20Deck-PPTX-f59e0b?style=for-the-badge&logo=microsoftpowerpoint)](doc/presentation/ClimateShield_360_Pitch.pptx)
   [![ML Baseline](https://img.shields.io/badge/LightGBM%20vs%20Baseline-%2B35.1%25%20Lower%20MAE-blueviolet?style=for-the-badge&logo=scikitlearn)](doc/MODEL_REPORT.md)
   [![Warehouse](https://img.shields.io/badge/Warehouse-DuckDB%201.5.6-f59e0b?style=for-the-badge&logo=duckdb)](pipeline/data/processed/climateshield.duckdb)
   [![Status](https://img.shields.io/badge/Pipeline%20Status-LIVE%20%E2%80%A2%20Hourly-22c55e?style=for-the-badge&logo=apacheairflow)](doc/HOURLY_INGESTION_REPORT.md)
@@ -21,6 +23,7 @@
 
   <p align="center">
     <a href="#-quickstart-for-hackinsight-judges"><b>⚡ Judge Quickstart</b></a> •
+    <a href="#-live-platform-walkthrough--video-demo"><b>🎬 Video Demo</b></a> •
     <a href="#-the-karachi-problem-statement"><b>🌊 The Problem</b></a> •
     <a href="#-system-architecture"><b>🏗️ Architecture</b></a> •
     <a href="#-interactive-ui-gallery"><b>📸 UI Gallery</b></a> •
@@ -104,6 +107,44 @@ flowchart TD
     M --> D
     W --> D
 ```
+
+---
+
+## 🎬 Live Platform Walkthrough & Video Demo
+
+> [!TIP]
+> **Complete End-to-End Walkthrough**: Watch the full live demonstration of ClimateShield 360 showcasing the 3D Spatial Risk Map, Heat & Monsoon Forecasting with Quantile Intervals, 8 Sectoral Impacts, Pandera Quality Agent triage, and Grounded Insight Assistant.
+
+<div align="center">
+
+  <video src="https://github.com/Afzal-Iqbal/climateshield-360/raw/main/doc/presentation/climateshield_360_karachi.mp4" controls="controls" width="100%" poster="doc/presentation/video_preview.png">
+    <source src="doc/presentation/climateshield_360_karachi.mp4" type="video/mp4" />
+    Your browser does not support the video tag.
+  </video>
+
+  <br/><br/>
+
+  <a href="https://github.com/Afzal-Iqbal/climateshield-360/blob/main/doc/presentation/climateshield_360_karachi.mp4" title="Click to Watch the Full Video Walkthrough">
+    <img src="doc/presentation/demo_preview.gif" alt="ClimateShield 360 Live Animated Platform Walkthrough" width="100%" style="border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); border: 1px solid rgba(56, 189, 248, 0.3);" />
+  </a>
+
+  <br/><br/>
+
+  <p align="center">
+    <a href="doc/presentation/climateshield_360_karachi.mp4">
+      <img src="https://img.shields.io/badge/▶_Watch_Full_Video_Walkthrough-doc%2Fpresentation%2Fclimateshield__360__karachi.mp4-0284c7?style=for-the-badge&logo=quicktime" alt="Watch Full Video Walkthrough" />
+    </a>
+    &nbsp;&nbsp;
+    <a href="doc/presentation/ClimateShield_360_Pitch.pptx">
+      <img src="https://img.shields.io/badge/📊_Download_Pitch_Deck-doc%2Fpresentation%2FClimateShield__360__Pitch.pptx-f59e0b?style=for-the-badge&logo=microsoftpowerpoint" alt="Download Pitch Deck PPTX" />
+    </a>
+    &nbsp;&nbsp;
+    <a href="Summary.pdf">
+      <img src="https://img.shields.io/badge/📄_Executive_Summary-Summary.pdf_(1--Page)-ef4444?style=for-the-badge&logo=adobeacrobatreader" alt="Executive Summary PDF" />
+    </a>
+  </p>
+
+</div>
 
 ---
 
@@ -225,7 +266,8 @@ Every deliverable mandated in `hackathonguide.pdf` (Chapters 1–15) is fully im
 | **§ 9** | **Optimization Log** | • Complete analysis of storage, model, and frontend optimizations: [`doc/OPTIMIZATION_LOG.md`](doc/OPTIMIZATION_LOG.md) | **VERIFIED** |
 | **§ 12** | **Business Model & Value** | • Payer strategy (PPCP), municipal value, and cost structure: [`doc/BUSINESS_MODEL.md`](doc/BUSINESS_MODEL.md) | **VERIFIED** |
 | **§ 13 & 15** | **Summary.pdf (1-Page Executive Summary)** | • Exactly 1-page executive summary PDF: [`doc/Summary.pdf`](doc/Summary.pdf) (also at [`Summary.pdf`](Summary.pdf)) | **VERIFIED** |
-| **§ 13** | **Presentation Decks** | • Copy-paste Gamma AI deck: [`doc/presentation/gamma_ai_presentation.md`](doc/presentation/gamma_ai_presentation.md)<br>• Visual Visme AI deck: [`doc/presentation/visme_ai_presentation.md`](doc/presentation/visme_ai_presentation.md)<br>• Timed 5–7 min speaker script: [`doc/presentation/speaker_script.md`](doc/presentation/speaker_script.md) | **VERIFIED** |
+| **§ 13 & 15** | **Demo Video & Pitch Deck** | • Full Walkthrough Video (MP4 in repository): [`doc/presentation/climateshield_360_karachi.mp4`](doc/presentation/climateshield_360_karachi.mp4)<br>• Official HackInsight Pitch Deck (PPTX): [`doc/presentation/ClimateShield_360_Pitch.pptx`](doc/presentation/ClimateShield_360_Pitch.pptx)<br>• Animated UI Demo: [`doc/presentation/demo_preview.gif`](doc/presentation/demo_preview.gif) | **VERIFIED** |
+| **§ 13** | **Presentation Decks & Scripts** | • Copy-paste Gamma AI deck: [`doc/presentation/gamma_ai_presentation.md`](doc/presentation/gamma_ai_presentation.md)<br>• Visual Visme AI deck: [`doc/presentation/visme_ai_presentation.md`](doc/presentation/visme_ai_presentation.md)<br>• Timed 5–7 min speaker script: [`doc/presentation/speaker_script.md`](doc/presentation/speaker_script.md) | **VERIFIED** |
 | **§ 14** | **Responsible AI & AI Use Log** | • Complete, honest audit of all agent assistance: [`doc/AI_Use_Log.md`](doc/AI_Use_Log.md) | **VERIFIED** |
 
 ---
@@ -257,7 +299,7 @@ npm run dev -- --port 5173
 
 ### 3. Verify System Health & Tests
 ```bash
-# 1. Run all 82 backend test cases (100% pass)
+# 1. Run all 87 backend test cases (100% pass)
 PYTHONPATH=backend:src .venv/bin/pytest backend/tests
 
 # 2. Check live backend API status
@@ -275,11 +317,18 @@ PYTHONPATH=pipeline .venv/bin/python -m climateshield ingest-hourly --once
 climateshield-360/
 ├── backend/                  # FastAPI backend server (port 8002)
 │   ├── routes/               # API route controllers (overview, map, forecast, etc.)
-│   └── tests/                # 82 automated pytest test suites
+│   └── tests/                # 87 automated pytest test suites
 ├── doc/                      # Official HackInsight submission documentation
 │   ├── assets/               # Brand assets and logos (logo.jpeg)
 │   ├── screenshots/          # Production app screenshots (all 9 operational views)
-│   ├── presentation/         # Gamma AI, Visme AI, and speaker scripts
+│   ├── presentation/         # Demo video, pitch deck, and speaker scripts
+│   │   ├── climateshield_360_karachi.mp4 # Full 12-min HD video walkthrough
+│   │   ├── ClimateShield_360_Pitch.pptx  # Official HackInsight 2026 pitch deck
+│   │   ├── demo_preview.gif              # Animated video walkthrough highlight
+│   │   ├── video_preview.png             # Video thumbnail preview card
+│   │   ├── gamma_ai_presentation.md      # Gamma AI deck
+│   │   ├── visme_ai_presentation.md      # Visme AI deck
+│   │   └── speaker_script.md             # Timed jury presentation script
 │   ├── Dataset_Declaration.* # Gate 1 Data Declaration (PDF + MD)
 │   ├── MODEL_REPORT.md       # Model vs Baseline validation report
 │   ├── HOURLY_INGESTION_REPORT.md # Hourly ingestion performance audit
