@@ -155,6 +155,24 @@ In compliance with HackInsight 2026 regulations (Chapter 4: Permitted AI Use & D
   - Verified `pdfinfo Summary.pdf` confirms `Pages: 1` exactly.
   - Verified all internal repository and documentation links across `README.md` are 100% valid.
 
+---
+
+## Log Entry 9: Pitch Deck & Video Demo Walkthrough Packaging
+
+- **Date & Time (UTC):** 2026-10-22 01:40–01:50 UTC (06:40–06:50 PKT)
+- **AI Tool / Agent:** Antigravity Agentic Coding Assistant (Google DeepMind)
+- **Scope & Deliverables:** Video Walkthrough & Presentation Pitch Deck Integration
+- **Activities:**
+  - Ingested and compressed the comprehensive 12-minute platform demonstration screencast to 64 MB with `+faststart` metadata for instant web streaming (`doc/presentation/climateshield_360_karachi.mp4`), strictly adhering to GitHub's 100 MB file limit.
+  - Added official HackInsight 2026 pitch deck presentation (`doc/presentation/ClimateShield_360_Pitch.pptx`, 14 MB).
+  - Generated crisp video preview card (`doc/presentation/video_preview.png`) and lightweight animated looping demo GIF (`doc/presentation/demo_preview.gif`, 366 KB).
+  - Embedded HTML5 `<video>` player, animated GIF showcase, and direct repository media links in `README.md`.
+- **Human Review & Verification:**
+  - Confirmed 87/87 backend pytest suite passing (`make test`).
+  - Confirmed frontend compiles cleanly with 0 errors (`npm run build`).
+  - Verified local file paths and media rendering in `README.md`.
+
+
 
 
 
